@@ -1,0 +1,1019 @@
+---
+title: "Positional Encoding and Sequence Geometry"
+subtitle: "How order enters attention-based language models"
+---
+
+::: {.chapter-opening}
+Self-attention compares tokens by content.  If the input to a Transformer is only a matrix of token embeddings, then self-attention sees a set of token vectors rather than an ordered sentence.  This is a serious mathematical problem: the sentences
+
+$$
+\text{the dog chased the cat}
+$$
+
+and
+
+$$
+\text{the cat chased the dog}
+$$
+
+contain nearly the same words, but they have different meanings because their order is different.  Positional encoding is the mechanism by which a Transformer receives information about order.
+
+This chapter studies position from a mathematical point of view.  We begin with permutation equivariance, then study absolute positional embeddings, sinusoidal positional encodings, Fourier-feature geometry, relative positions, rotary positional embeddings, and attention biases.  The goal is not to memorize architectural variations, but to understand what mathematical information about order is injected into a sequence model.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. explain why vanilla self-attention without position is permutation equivariant;
+2. distinguish token embeddings, position embeddings, and contextual embeddings;
+3. write the sinusoidal positional encoding formulas and check their dimensions;
+4. explain sinusoidal encoding as a finite collection of Fourier features;
+5. compute dot products between sinusoidal position vectors and interpret them as functions of relative distance;
+6. compare learned absolute position embeddings with fixed sinusoidal encodings;
+7. describe relative-position attention, rotary positional embeddings, and additive attention biases;
+8. implement positional encodings in NumPy;
+9. visualize position vectors and their similarity structure with Plotly.js;
+10. identify common mathematical mistakes involving position in Transformers.
+
+## 16.1 The order problem
+
+Let a sequence of length $T$ be represented by a matrix
+
+$$
+X =
+\begin{bmatrix}
+- & x_1^T & - \\
+- & x_2^T & - \\
+  & \vdots &   \\
+- & x_T^T & -
+\end{bmatrix}
+\in R^{T\times d},
+$$
+
+where $x_t\in R^d$ is the input representation of the token at position $t$.  A self-attention layer computes
+
+$$
+\operatorname{Attn}(X)
+=
+\operatorname{softmax}\left(
+\frac{XW_Q(XW_K)^T}{\sqrt{d_k}}
+\right)XW_V.
+$$
+
+This formula compares rows of $X$ using dot products.  If the rows are permuted, the dot-product matrix is permuted in the same way.  Thus self-attention respects the symmetry of the input row order unless we explicitly break that symmetry by adding position information.
+
+::: {.math-card}
+**Key issue.**  A sequence is not only a multiset of tokens.  A sequence has an order.  A Transformer must therefore represent both content and position.
+:::
+
+For example, the two sequences
+
+$$
+(w_1,w_2,w_3)=(\text{students},\text{use},\text{AI})
+$$
+
+and
+
+$$
+(w_1,w_2,w_3)=(\text{AI},\text{use},\text{students})
+$$
+
+have the same bag of words but different syntax and meaning.  Bag-of-words models from Chapters 2--3 intentionally discard order.  Transformers should not.
+
+## 16.2 Permutation equivariance of self-attention
+
+Let $P\in R^{T\times T}$ be a permutation matrix.  Multiplying $X$ on the left by $P$ permutes the rows of $X$:
+
+$$
+X' = PX.
+$$
+
+For a single self-attention head without position, define
+
+$$
+Q=XW_Q,
+\qquad
+K=XW_K,
+\qquad
+V=XW_V.
+$$
+
+For the permuted input $X'=PX$,
+
+$$
+Q'=PXW_Q=PQ,
+\qquad
+K'=PK,
+\qquad
+V'=PV.
+$$
+
+The score matrix becomes
+
+$$
+S'
+=
+\frac{Q'(K')^T}{\sqrt{d_k}}
+=
+\frac{(PQ)(PK)^T}{\sqrt{d_k}}
+=
+P\left(\frac{QK^T}{\sqrt{d_k}}\right)P^T.
+$$
+
+The row-wise softmax satisfies
+
+$$
+\operatorname{softmax}_{\text{row}}(PSP^T)
+=
+P\operatorname{softmax}_{\text{row}}(S)P^T.
+$$
+
+Therefore
+
+$$
+\begin{aligned}
+\operatorname{Attn}(PX)
+&=
+\operatorname{softmax}_{\text{row}}(S')V' \\
+&=
+P\operatorname{softmax}_{\text{row}}(S)P^T PV \\
+&=
+P\operatorname{Attn}(X).
+\end{aligned}
+$$
+
+So self-attention is **permutation equivariant**:
+
+$$
+\operatorname{Attn}(PX)=P\operatorname{Attn}(X).
+$$
+
+This is not wrong; it is often a useful symmetry.  But for language, the original row index matters.  Positional encoding breaks pure permutation symmetry by replacing the token-only representation with a content-plus-position representation.
+
+## 16.3 Content vectors plus position vectors
+
+Let $e:V\to R^d$ be a token embedding map.  If token $w_t$ appears at position $t$, the token embedding is
+
+$$
+x_t=e(w_t).
+$$
+
+A simple positional strategy creates a vector $p_t\in R^d$ for every position $t$, then uses
+
+$$
+z_t = x_t + p_t.
+$$
+
+The matrix input to the Transformer is then
+
+$$
+Z = X + P_{\text{pos}},
+$$
+
+where
+
+$$
+P_{\text{pos}}
+=
+\begin{bmatrix}
+- & p_1^T & - \\
+- & p_2^T & - \\
+  & \vdots &   \\
+- & p_T^T & -
+\end{bmatrix}
+\in R^{T\times d}.
+$$
+
+The addition is simple but mathematically powerful.  Because the vector at row $t$ now contains both token identity and position identity, attention scores can depend on position through inner products such as
+
+$$
+(z_i W_Q)(z_j W_K)^T.
+$$
+
+Expanding $z_i=x_i+p_i$ and $z_j=x_j+p_j$ shows the possible interactions:
+
+$$
+(z_i W_Q)(z_j W_K)^T
+=
+(x_iW_Q)(x_jW_K)^T
++
+(x_iW_Q)(p_jW_K)^T
++
+(p_iW_Q)(x_jW_K)^T
++
+(p_iW_Q)(p_jW_K)^T.
+$$
+
+These terms allow the model to learn rules involving content, source position, target position, and relative placement.
+
+## 16.4 Learned absolute position embeddings
+
+The most direct approach is to learn a position-embedding matrix
+
+$$
+E_{\text{pos}}\in R^{T_{\max}\times d},
+$$
+
+where row $t$ is the learned vector $p_t^T$.  For a sequence of length $T\le T_{\max}$, use the first $T$ rows.
+
+The trainable parameters are
+
+$$
+T_{\max}d.
+$$
+
+This method is flexible because the model learns the position vectors that help the training objective.  But it has two limitations.
+
+First, the model is usually trained with a fixed maximum length $T_{\max}$.  Extrapolating beyond this length is not natural unless additional design choices are made.
+
+Second, learned absolute embeddings do not automatically encode a smooth geometry of distance.  The model must learn from data that positions 10 and 11 are closer than positions 10 and 500.
+
+::: {.math-card}
+**Absolute position viewpoint.**  Learned absolute position embeddings identify each index $t$ with a trainable vector $p_t$.  They are flexible labels for positions, but they do not automatically impose translation or distance structure.
+:::
+
+## 16.5 Sinusoidal positional encoding
+
+The original Transformer introduced a fixed sinusoidal positional encoding.  Suppose $d$ is even.  For position $t$ and coordinate pair indexed by $i=0,1,\ldots,d/2-1$, define
+
+$$
+PE(t,2i)=\sin\left(\frac{t}{10000^{2i/d}}\right),
+$$
+
+and
+
+$$
+PE(t,2i+1)=\cos\left(\frac{t}{10000^{2i/d}}\right).
+$$
+
+Thus each position $t$ is mapped to a vector
+
+$$
+p_t = PE(t)\in R^d.
+$$
+
+The denominator
+
+$$
+10000^{2i/d}
+$$
+
+creates wavelengths on a logarithmic scale.  Low-index coordinate pairs vary rapidly with $t$; high-index coordinate pairs vary slowly.
+
+Equivalently, define frequencies
+
+$$
+\omega_i = 10000^{-2i/d}.
+$$
+
+Then the coordinate pair is
+
+$$
+(\sin(\omega_i t),\cos(\omega_i t)).
+$$
+
+This shows the Fourier-feature structure: sinusoidal encoding represents each position through multiple periodic functions at different frequencies.
+
+## 16.6 Geometry of sinusoidal encodings
+
+For a single frequency $\omega$, define
+
+$$
+u_t(\omega)=(\sin(\omega t),\cos(\omega t))\in R^2.
+$$
+
+Then
+
+$$
+\|u_t(\omega)\|_2^2
+=
+\sin^2(\omega t)+\cos^2(\omega t)=1.
+$$
+
+The dot product between two positions is
+
+$$
+\begin{aligned}
+u_t(\omega)^T u_s(\omega)
+&=\sin(\omega t)\sin(\omega s)+\cos(\omega t)\cos(\omega s)\\
+&=\cos(\omega(t-s)).
+\end{aligned}
+$$
+
+Therefore the similarity between two sinusoidal position vectors depends on the relative displacement $t-s$.  With multiple frequencies,
+
+$$
+p_t^T p_s
+=
+\sum_i \cos(\omega_i(t-s)).
+$$
+
+This is a crucial mathematical property: although the encoding is absolute because it assigns a vector to each $t$, inner products between position vectors naturally contain relative-distance information.
+
+::: {.math-card}
+**Relative-distance property.**  For sinusoidal encodings, the dot product $p_t^T p_s$ is a function of $t-s$.  Thus the geometry of position vectors contains relative offset information.
+:::
+
+## 16.7 Linear transformations of sinusoidal encodings
+
+There is another useful property.  For a fixed shift $\Delta$, the pair
+
+$$
+(\sin(\omega(t+\Delta)),\cos(\omega(t+\Delta)))
+$$
+
+can be obtained from
+
+$$
+(\sin(\omega t),\cos(\omega t))
+$$
+
+by a two-dimensional rotation.  Using angle-addition formulas,
+
+$$
+\sin(\omega(t+\Delta))
+=
+\sin(\omega t)\cos(\omega\Delta)
++
+\cos(\omega t)\sin(\omega\Delta),
+$$
+
+and
+
+$$
+\cos(\omega(t+\Delta))
+=
+\cos(\omega t)\cos(\omega\Delta)
+-
+\sin(\omega t)\sin(\omega\Delta).
+$$
+
+In matrix form,
+
+$$
+\begin{bmatrix}
+\sin(\omega(t+\Delta))\\
+\cos(\omega(t+\Delta))
+\end{bmatrix}
+=
+\begin{bmatrix}
+\cos(\omega\Delta) & \sin(\omega\Delta)\\
+-\sin(\omega\Delta) & \cos(\omega\Delta)
+\end{bmatrix}
+\begin{bmatrix}
+\sin(\omega t)\\
+\cos(\omega t)
+\end{bmatrix}.
+$$
+
+So a fixed relative shift is represented by a block-diagonal linear map across the sinusoidal coordinate pairs.  This helps explain why sinusoidal encodings can support relative-position reasoning.
+
+## 16.8 Scaling token embeddings and position embeddings
+
+In many Transformer implementations, token embeddings are scaled before adding positions:
+
+$$
+z_t=\sqrt{d}\,x_t+p_t.
+$$
+
+The reason is variance control.  Suppose the coordinates of $x_t$ have typical scale around $1/\sqrt{d}$.  Then
+
+$$
+\|x_t\|_2
+$$
+
+may be order 1.  Multiplying by $\sqrt{d}$ changes the coordinate scale and can balance the token content against the added positional signal, depending on how embeddings are initialized.
+
+From a mathematical perspective, the relative magnitude of $x_t$ and $p_t$ matters because attention scores involve dot products.  If $p_t$ is too small, the model may ignore order.  If $p_t$ is too large, the model may overemphasize position and underemphasize content.
+
+## 16.9 Relative position representations
+
+Absolute position embeddings assign vectors to positions:
+
+$$
+t\mapsto p_t.
+$$
+
+Relative-position methods instead emphasize offsets:
+
+$$
+(i,j)\mapsto r_{i-j}.
+$$
+
+In attention, a relative-position term may be added to the score between query position $i$ and key position $j$:
+
+$$
+S_{ij}
+=
+\frac{q_i^T k_j}{\sqrt{d_k}}
++
+ b_{i-j}.
+$$
+
+Here $b_{i-j}$ is a learned or prescribed scalar bias depending on relative displacement.  This gives the model direct access to information such as "nearby tokens should often matter more" or "previous tokens matter in a causal language model."
+
+A vector-valued version uses relative embeddings $r_{i-j}\in R^{d_k}$, for example
+
+$$
+S_{ij}
+=
+\frac{q_i^T(k_j+r_{i-j})}{\sqrt{d_k}}.
+$$
+
+The main idea is that attention scores become functions of both token similarity and relative location.
+
+## 16.10 Rotary positional embeddings
+
+Rotary positional embeddings, often abbreviated RoPE, encode position by rotating query and key vectors.  The simplest version applies a two-dimensional rotation to each coordinate pair.
+
+For a vector pair $(a,b)$ and angle $\theta$, define
+
+$$
+R_\theta
+\begin{bmatrix}a\\ b\end{bmatrix}
+=
+\begin{bmatrix}
+\cos\theta & -\sin\theta\\
+\sin\theta & \cos\theta
+\end{bmatrix}
+\begin{bmatrix}a\\ b\end{bmatrix}.
+$$
+
+At position $t$, coordinate pair $i$ is rotated by angle
+
+$$
+\theta_{t,i}=\omega_i t.
+$$
+
+Let $R_t$ denote the resulting block-diagonal rotation matrix.  RoPE uses
+
+$$
+\tilde q_t = R_t q_t,
+\qquad
+\tilde k_s = R_s k_s.
+$$
+
+The attention score uses
+
+$$
+\tilde q_t^T\tilde k_s
+=
+q_t^T R_t^T R_s k_s.
+$$
+
+Because rotations satisfy
+
+$$
+R_t^T R_s = R_{s-t},
+$$
+
+the score depends on the relative offset $s-t$ through the rotation matrix.  Thus RoPE builds relative position directly into dot-product attention.
+
+::: {.math-card}
+**RoPE viewpoint.**  Instead of adding a position vector to the token vector, RoPE rotates query and key coordinates.  Dot products between rotated vectors naturally encode relative displacement.
+:::
+
+## 16.11 Attention bias and distance decay
+
+Another common approach is to add a deterministic or learned distance bias to attention scores:
+
+$$
+S_{ij}
+=\frac{q_i^T k_j}{\sqrt{d_k}} + b(i,j).
+$$
+
+For a causal decoder, $b(i,j)$ may include the mask
+
+$$
+b(i,j)=
+\begin{cases}
+0, & j\le i,\\
+-\infty, & j>i.
+\end{cases}
+$$
+
+A distance-decay bias may take the form
+
+$$
+b(i,j)=-\lambda |i-j|,
+$$
+
+or, in causal form,
+
+$$
+b(i,j)=-\lambda(i-j)\quad \text{for } j\le i.
+$$
+
+This bias makes attention to distant positions less likely unless the content score is strong enough to overcome the penalty.  From the perspective of probability, the row-wise softmax turns scores into a distribution over positions, so additive biases act like log-prior preferences over where attention should be placed.
+
+## 16.12 Positional encoding as feature design
+
+Before deep learning, feature engineering was a central part of NLP.  Positional encoding is a modern version of feature design.  It chooses a map
+
+$$
+\psi:\{1,2,\ldots,T_{\max}\}\to R^d
+$$
+
+and combines it with the token embedding map
+
+$$
+e:V\to R^d.
+$$
+
+The model receives
+
+$$
+z_t=e(w_t)+\psi(t).
+$$
+
+Different choices of $\psi$ encode different assumptions:
+
+| Method | Mathematical object | Strength | Limitation |
+|---|---:|---|---|
+| Learned absolute | trainable table $E_{\text{pos}}$ | flexible | weak extrapolation |
+| Sinusoidal | Fourier features | relative-offset geometry | fixed frequencies |
+| Relative bias | scalar $b_{i-j}$ | direct distance modeling | less content-position interaction |
+| RoPE | block rotations $R_t$ | relative offset in dot products | requires paired dimensions |
+| Linear bias | monotone score penalty | simple length behavior | less expressive |
+
+The correct choice depends on the task, sequence length, training data, and architecture.
+
+## 16.13 Interactive: sinusoidal position geometry
+
+The following interactive figure visualizes sinusoidal positional encoding.  The left plot shows position vectors projected to the first two sinusoidal coordinates.  The right plot shows the normalized similarity between position $0$ and position $t$.
+
+::: {.interactive-card .nlp-interactive}
+### Sinusoidal positional encoding explorer
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0.75rem;align-items:end;margin-bottom:0.75rem;">
+  <label>Sequence length $T$<br><input id="ch16-T" type="range" min="16" max="160" step="4" value="80"><span id="ch16-T-val">80</span></label>
+  <label>Embedding dimension $d$<br><input id="ch16-d" type="range" min="4" max="64" step="2" value="32"><span id="ch16-d-val">32</span></label>
+  <label>Frequency scale<br><input id="ch16-scale" type="range" min="100" max="20000" step="100" value="10000"><span id="ch16-scale-val">10000</span></label>
+</div>
+
+<div id="ch16-positional-plot" class="plotly-demo"></div>
+<div id="ch16-positional-status" class="plotly-status">Loading local Plotly.js...</div>
+
+<script>
+(function() {
+  function setStatus(message, isError) {
+    var status = document.getElementById("ch16-positional-status");
+    if (!status) return;
+    status.textContent = message;
+    if (isError) status.classList.add("plotly-error");
+    else status.classList.remove("plotly-error");
+  }
+
+  function loadPlotly() {
+    return new Promise(function(resolve, reject) {
+      if (window.Plotly) {
+        resolve(window.Plotly);
+        return;
+      }
+      var existing = document.querySelector('script[data-nlp-local-plotly="true"]');
+      if (existing) {
+        existing.addEventListener("load", function() {
+          if (window.Plotly) resolve(window.Plotly);
+          else reject(new Error("Plotly script loaded but window.Plotly is undefined."));
+        });
+        existing.addEventListener("error", function() {
+          reject(new Error("Could not load ../assets/plotly.min.js."));
+        });
+        return;
+      }
+      var script = document.createElement("script");
+      script.src = "../assets/plotly.min.js";
+      script.async = true;
+      script.setAttribute("data-nlp-local-plotly", "true");
+      script.onload = function() {
+        if (window.Plotly) resolve(window.Plotly);
+        else reject(new Error("Plotly script loaded but window.Plotly is undefined."));
+      };
+      script.onerror = function() {
+        reject(new Error("Could not load ../assets/plotly.min.js."));
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  function sinusoidal(T, d, scale) {
+    if (d % 2 !== 0) d += 1;
+    var P = [];
+    for (var t = 0; t < T; t++) {
+      var row = new Array(d).fill(0);
+      for (var i = 0; i < d / 2; i++) {
+        var denom = Math.pow(scale, (2 * i) / d);
+        row[2 * i] = Math.sin(t / denom);
+        row[2 * i + 1] = Math.cos(t / denom);
+      }
+      P.push(row);
+    }
+    return P;
+  }
+
+  function dot(a, b) {
+    var s = 0;
+    for (var i = 0; i < a.length; i++) s += a[i] * b[i];
+    return s;
+  }
+
+  function render() {
+    var T = parseInt(document.getElementById("ch16-T").value, 10);
+    var d = parseInt(document.getElementById("ch16-d").value, 10);
+    if (d % 2 !== 0) d += 1;
+    var scale = parseInt(document.getElementById("ch16-scale").value, 10);
+    document.getElementById("ch16-T-val").textContent = T;
+    document.getElementById("ch16-d-val").textContent = d;
+    document.getElementById("ch16-scale-val").textContent = scale;
+
+    var P = sinusoidal(T, d, scale);
+    var xs = P.map(function(row) { return row[0]; });
+    var ys = P.map(function(row) { return row[1]; });
+    var labels = P.map(function(_, i) { return "position " + i; });
+    var baseNorm = dot(P[0], P[0]);
+    var offsets = [];
+    var sims = [];
+    for (var t = 0; t < T; t++) {
+      offsets.push(t);
+      sims.push(dot(P[0], P[t]) / baseNorm);
+    }
+
+    var trace1 = {
+      x: xs,
+      y: ys,
+      mode: "markers+lines",
+      type: "scatter",
+      name: "first sinusoidal pair",
+      text: labels,
+      hovertemplate: "%{text}<br>sin coord=%{x:.3f}<br>cos coord=%{y:.3f}<extra></extra>",
+      xaxis: "x1",
+      yaxis: "y1"
+    };
+    var trace2 = {
+      x: offsets,
+      y: sims,
+      mode: "lines+markers",
+      type: "scatter",
+      name: "normalized similarity to position 0",
+      hovertemplate: "offset=%{x}<br>similarity=%{y:.3f}<extra></extra>",
+      xaxis: "x2",
+      yaxis: "y2"
+    };
+
+    var layout = {
+      title: "Sinusoidal position geometry",
+      grid: {rows: 1, columns: 2, pattern: "independent"},
+      xaxis: {title: "sin(t)"},
+      yaxis: {title: "cos(t)", scaleanchor: "x", scaleratio: 1},
+      xaxis2: {title: "offset from position 0"},
+      yaxis2: {title: "normalized dot product", range: [-1.05, 1.05]},
+      margin: {l: 55, r: 25, t: 55, b: 55},
+      showlegend: false
+    };
+    window.Plotly.react("ch16-positional-plot", [trace1, trace2], layout, {responsive: true});
+    setStatus("Move the sliders to change sequence length, dimension, and frequency scale.", false);
+  }
+
+  function init() {
+    var plot = document.getElementById("ch16-positional-plot");
+    if (!plot) return;
+    loadPlotly().then(function() {
+      ["ch16-T", "ch16-d", "ch16-scale"].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener("input", render);
+      });
+      render();
+    }).catch(function(err) {
+      setStatus("Plotly.js was not available, so the interactive figure could not be drawn. Details: " + err.message, true);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+:::
+
+## 16.14 Python example: sinusoidal encodings from scratch
+
+The following code constructs the sinusoidal matrix
+
+$$
+P\in R^{T\times d}
+$$
+
+and checks its shape.
+
+```{python}
+import numpy as np
+
+
+def sinusoidal_encoding(T, d, scale=10000.0):
+    """Return a T by d matrix of sinusoidal positional encodings."""
+    if d % 2 != 0:
+        raise ValueError("d must be even for paired sine/cosine coordinates.")
+    positions = np.arange(T)[:, None]
+    pair_ids = np.arange(d // 2)[None, :]
+    denominators = scale ** (2 * pair_ids / d)
+    angles = positions / denominators
+
+    P = np.zeros((T, d))
+    P[:, 0::2] = np.sin(angles)
+    P[:, 1::2] = np.cos(angles)
+    return P
+
+P = sinusoidal_encoding(T=8, d=6)
+print(P.shape)
+print(np.round(P[:3], 3))
+```
+
+Each row is the position vector for one index.  Each pair of columns is one sine-cosine frequency pair.
+
+## 16.15 Python example: similarity depends on relative offset
+
+For sinusoidal encodings, the dot product $p_t^T p_s$ depends on $t-s$.  The following experiment checks this numerically.
+
+```{python}
+T = 20
+d = 16
+P = sinusoidal_encoding(T, d)
+
+G = P @ P.T
+
+# Compare pairs with the same offset.
+for offset in [1, 2, 5]:
+    values = []
+    for t in range(T - offset):
+        values.append(G[t, t + offset])
+    print("offset", offset, "min", round(min(values), 6), "max", round(max(values), 6))
+```
+
+The values are nearly identical for each fixed offset.  Small numerical differences may appear because of floating-point arithmetic, but the symbolic formula says the values depend only on the offset.
+
+## 16.16 Python example: adding position to token embeddings
+
+The next example illustrates the standard input to a Transformer block:
+
+$$
+Z=X+P_{\text{pos}}.
+$$
+
+```{python}
+rng = np.random.default_rng(7243)
+
+T = 6
+d = 8
+vocab_size = 12
+
+# A small token-embedding matrix.
+E = rng.normal(scale=0.2, size=(vocab_size, d))
+
+# A tokenized sequence represented by integer ids.
+token_ids = np.array([2, 5, 5, 1, 8, 3])
+
+X = E[token_ids]
+P_pos = sinusoidal_encoding(T, d)
+Z = X + P_pos
+
+print("Token embedding matrix X:", X.shape)
+print("Position matrix P_pos:", P_pos.shape)
+print("Transformer input Z:", Z.shape)
+```
+
+This example also shows why position and token embeddings must have the same dimension $d$ when they are combined by addition.
+
+## 16.17 Python example: permutation equivariance without position
+
+The following simple self-attention function demonstrates the permutation-equivariance property numerically.
+
+```{python}
+def row_softmax(S):
+    S_shifted = S - S.max(axis=1, keepdims=True)
+    E = np.exp(S_shifted)
+    return E / E.sum(axis=1, keepdims=True)
+
+
+def self_attention_no_position(X, Wq, Wk, Wv):
+    Q = X @ Wq
+    K = X @ Wk
+    V = X @ Wv
+    S = Q @ K.T / np.sqrt(Q.shape[1])
+    A = row_softmax(S)
+    return A @ V
+
+rng = np.random.default_rng(16)
+T, d, dk, dv = 5, 4, 3, 3
+X = rng.normal(size=(T, d))
+Wq = rng.normal(size=(d, dk))
+Wk = rng.normal(size=(d, dk))
+Wv = rng.normal(size=(d, dv))
+
+perm = np.array([2, 0, 4, 1, 3])
+Pmat = np.eye(T)[perm]
+
+Y = self_attention_no_position(X, Wq, Wk, Wv)
+Y_perm = self_attention_no_position(Pmat @ X, Wq, Wk, Wv)
+
+print(np.allclose(Y_perm, Pmat @ Y))
+```
+
+The output `True` means that permuting the input rows only permutes the output rows.  Without position, the layer does not know which row was originally first, second, or third.
+
+## 16.18 Python example: rotary position operation
+
+Here is a simple implementation of paired coordinate rotations.  For clarity, this code uses the same frequency pattern as sinusoidal encoding.
+
+```{python}
+def apply_rope(X, scale=10000.0):
+    """Apply rotary position rotations to a T by d matrix X with even d."""
+    T, d = X.shape
+    if d % 2 != 0:
+        raise ValueError("d must be even for pairwise rotations.")
+    positions = np.arange(T)[:, None]
+    pair_ids = np.arange(d // 2)[None, :]
+    omega = scale ** (-2 * pair_ids / d)
+    theta = positions * omega
+
+    cos = np.cos(theta)
+    sin = np.sin(theta)
+
+    X_even = X[:, 0::2]
+    X_odd = X[:, 1::2]
+
+    Y = np.empty_like(X)
+    Y[:, 0::2] = X_even * cos - X_odd * sin
+    Y[:, 1::2] = X_even * sin + X_odd * cos
+    return Y
+
+Q = rng.normal(size=(6, 8))
+K = rng.normal(size=(6, 8))
+
+Q_rot = apply_rope(Q)
+K_rot = apply_rope(K)
+S_rot = Q_rot @ K_rot.T / np.sqrt(Q.shape[1])
+
+print(S_rot.shape)
+print(np.round(S_rot[:2, :4], 3))
+```
+
+RoPE is not just a position vector added to $X$.  It changes the geometry of dot products by rotating queries and keys according to their positions.
+
+## 16.19 Python example: Plotly visualization
+
+The interactive above is written directly in JavaScript so it works in the rendered HTML book.  The same idea can be explored in Python with Plotly.
+
+```{python}
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+T = 80
+d = 32
+P = sinusoidal_encoding(T, d)
+G0 = (P @ P[0]) / (P[0] @ P[0])
+
+fig = make_subplots(rows=1, cols=2, subplot_titles=("First sine-cosine pair", "Similarity to position 0"))
+fig.add_trace(
+    go.Scatter(x=P[:, 0], y=P[:, 1], mode="lines+markers", name="positions"),
+    row=1, col=1
+)
+fig.add_trace(
+    go.Scatter(x=np.arange(T), y=G0, mode="lines", name="similarity"),
+    row=1, col=2
+)
+fig.update_xaxes(title_text="sin coordinate", row=1, col=1)
+fig.update_yaxes(title_text="cos coordinate", row=1, col=1)
+fig.update_xaxes(title_text="offset from position 0", row=1, col=2)
+fig.update_yaxes(title_text="normalized dot product", row=1, col=2)
+fig.update_layout(height=420, showlegend=False)
+fig.show()
+```
+
+## 16.20 AI-assisted learning components
+
+Use an AI assistant as a mathematical critic, not only as a code generator.
+
+### Prompt 1: prove the symmetry problem
+
+Ask:
+
+> Prove that self-attention without positional information is permutation equivariant. Use matrices and explain every dimension.
+
+Then check whether the proof correctly uses
+
+$$
+P^TP=I
+$$
+
+and whether it handles the row-wise softmax carefully.
+
+### Prompt 2: compare position methods
+
+Ask:
+
+> Compare learned absolute positional embeddings, sinusoidal encodings, relative-position biases, and RoPE from the viewpoint of inner products and extrapolation to longer sequences.
+
+A good answer should mention trainable tables, Fourier features, additive score biases, and rotations of query/key coordinates.
+
+### Prompt 3: audit an implementation
+
+Give the assistant your positional-encoding code and ask:
+
+> Check the dimension conventions. Are positions rows or columns? Are sine and cosine coordinates interleaved correctly? Does the code work for odd embedding dimension?
+
+Then verify the answer by running tests yourself.
+
+## 16.21 Common mistakes
+
+1. **Confusing token order with vocabulary order.**  The vocabulary index of a token is not its sentence position.
+2. **Forgetting that self-attention is permutation equivariant without position.**  Attention alone does not create order information.
+3. **Using mismatched dimensions.**  If token and position vectors are added, both must lie in $R^d$.
+4. **Assuming sinusoidal encoding is random.**  It is deterministic and structured.
+5. **Assuming all positional methods are equivalent.**  Absolute embeddings, relative biases, and RoPE affect the model in different mathematical ways.
+6. **Ignoring sequence length.**  A method that works for short sequences may behave differently for long-context modeling.
+
+## 16.22 Worked calculation
+
+Let $d=4$ and frequencies $\omega_0=1$, $\omega_1=0.1$.  The sinusoidal position vector is
+
+$$
+p_t=(\sin t,\cos t,\sin(0.1t),\cos(0.1t)).
+$$
+
+Then
+
+$$
+p_t^Tp_s
+=
+\cos(t-s)+\cos(0.1(t-s)).
+$$
+
+In particular,
+
+$$
+p_3^Tp_1
+=\cos(2)+\cos(0.2).
+$$
+
+The result depends on $3-1=2$, not on the absolute pair $(3,1)$ separately.  This illustrates how sinusoidal encodings provide relative-offset information through inner products.
+
+## 16.23 Exercises
+
+1. Prove that if $F(X)=XW$ is applied row-wise, then $F(PX)=PF(X)$ for every permutation matrix $P$.
+2. Prove the permutation-equivariance result for a single self-attention head.
+3. Show that the row-wise softmax satisfies $\operatorname{softmax}_{\text{row}}(PSP^T)=P\operatorname{softmax}_{\text{row}}(S)P^T$.
+4. For a sinusoidal encoding with one frequency $\omega$, prove that $u_t(\omega)^Tu_s(\omega)=\cos(\omega(t-s))$.
+5. Derive the block rotation matrix that maps $u_t(\omega)$ to $u_{t+\Delta}(\omega)$.
+6. Implement sinusoidal encoding for $T=100$ and $d=32$.  Plot the similarity matrix $PP^T$.
+7. Compare learned absolute position embeddings and sinusoidal encodings in terms of parameter count.
+8. Implement a relative-position bias matrix $B$ with entries $B_{ij}=-\lambda |i-j|$.  How does increasing $\lambda$ change attention weights?
+9. Implement the causal relative bias $B_{ij}=-\infty$ for $j>i$ and $B_{ij}=-\lambda(i-j)$ for $j\le i$.
+10. Use RoPE on random queries and keys.  Compare attention score matrices before and after rotation.
+11. Explain why RoPE requires an even number of rotated coordinates, or else a convention for the leftover coordinate.
+12. Write a short mathematical paragraph explaining why position is not a small implementation detail but a structural part of the Transformer model.
+
+## 16.24 Mini-project
+
+Choose one short corpus, such as course descriptions, news headlines, or theorem statements.  Build a tiny Transformer-style input representation in three ways:
+
+1. token embeddings only;
+2. token embeddings plus learned absolute position embeddings;
+3. token embeddings plus sinusoidal position encodings.
+
+For each method, compute the self-attention score matrix before training using the same random $W_Q$ and $W_K$.  Compare how the score structure changes.  Your report should include:
+
+- the mathematical formulas for the three input representations;
+- at least one heatmap for each score matrix;
+- a discussion of permutation equivariance;
+- a discussion of whether the model can distinguish word order before training.
+
+## 16.25 Lab connection
+
+The accompanying lab for this chapter should ask students to build positional encodings from scratch, test permutation equivariance, visualize sinusoidal similarity matrices, implement RoPE, and compare attention weights with and without distance biases.
+
+A useful independent-study lab structure is:
+
+1. implement sinusoidal position encoding;
+2. visualize the encoding matrix and similarity matrix;
+3. prove and test permutation equivariance of attention;
+4. add absolute position vectors and show that equivariance is broken in the desired way;
+5. implement relative-position bias;
+6. implement RoPE;
+7. write a short reflection on how sequence geometry changes attention.
+
+## 16.26 Summary
+
+Self-attention is powerful because every token can compare itself with every other token.  But without position information, self-attention is permutation equivariant: it does not know the original order of the rows.  Positional encoding solves this problem by injecting order into the input vectors or attention scores.
+
+The simplest method adds position vectors to token embeddings.  Learned absolute embeddings are flexible but may not extrapolate naturally.  Sinusoidal encodings use Fourier features and have dot products that depend on relative offsets.  Relative-position biases add displacement information directly to attention scores.  RoPE rotates query and key vectors so their dot products encode relative displacement.
+
+From a mathematical perspective, positional encoding is the study of how to represent the ordered set
+
+$$
+\{1,2,\ldots,T\}
+$$
+
+inside the geometry of a Transformer.  It is where sequence structure enters attention-based language modeling.

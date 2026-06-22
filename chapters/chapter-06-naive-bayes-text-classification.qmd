@@ -1,0 +1,1135 @@
+---
+title: "Naive Bayes and Text Classification"
+subtitle: "Bayes decision rules, multinomial likelihoods, smoothing, and linear log-odds"
+---
+
+::: {.chapter-opening}
+Text classification is the supervised learning problem of assigning a label to a document.  A document may be an email, review, abstract, news article, student question, or clinical note.  In this chapter we develop one of the most important classical models for this task: **Naive Bayes**.  The model is simple, fast, interpretable, and mathematically transparent.  Its main lesson is that a probabilistic model for documents can lead to a linear decision rule in word-count features.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. formulate text classification as a statistical decision problem;
+2. derive the Bayes classifier under zero-one loss;
+3. define the multinomial Naive Bayes model for count vectors;
+4. estimate class priors and class-conditional token probabilities from data;
+5. explain the conditional independence assumption and why it is called "naive";
+6. derive the log-score form
+   $$
+   s_c(x)=\log \widehat \pi_c+\sum_{j=1}^d x_j\log \widehat \theta_{cj};
+   $$
+7. show that Naive Bayes is a linear classifier in count-vector space;
+8. implement Naive Bayes from scratch in Python;
+9. use add-$\alpha$ smoothing to avoid zero probabilities;
+10. evaluate a text classifier with confusion matrices, precision, recall, and $F_1$ score;
+11. use AI tools to critique assumptions, detect data leakage, and explain classifier behavior.
+
+## Why Naive Bayes matters
+
+Naive Bayes is not a modern large language model.  However, it remains a useful mathematical baseline for NLP because it makes the modeling assumptions explicit.
+
+The model answers a clean question:
+
+> If documents in class $c$ generate tokens according to a class-specific probability distribution, which class most likely generated a new document?
+
+This question leads naturally to:
+
+- Bayes' theorem;
+- maximum likelihood estimation;
+- multinomial distributions;
+- Dirichlet/additive smoothing;
+- log-likelihood ratios;
+- linear decision boundaries;
+- interpretable feature weights.
+
+Modern neural classifiers often achieve higher accuracy, but Naive Bayes gives a clear first model against which more complicated systems should be compared.
+
+::: {.math-card}
+**Central idea.**  A count vector $x=(x_1,\ldots,x_d)\in \mathbb{N}^d$ records how often each vocabulary token appears in a document.  Multinomial Naive Bayes estimates
+
+$$
+P(Y=c\mid X=x)
+$$
+
+by combining a class prior $P(Y=c)$ with a class-conditional token model $P(X=x\mid Y=c)$.
+:::
+
+## Text classification as a supervised learning problem
+
+Let
+
+$$
+\mathcal{Y}=\{1,2,\ldots,K\}
+$$
+
+be a finite label set.  Examples include:
+
+| Task | Input | Label set |
+|---|---|---|
+| sentiment analysis | movie review | $\{\text{negative},\text{positive}\}$ |
+| spam detection | email | $\{\text{ham},\text{spam}\}$ |
+| topic classification | news article | $\{\text{sports},\text{business},\text{science},\ldots\}$ |
+| intent classification | student question | $\{\text{transfer credit},\text{course registration},\text{visa},\ldots\}$ |
+
+A training dataset is
+
+$$
+D_n=\{(d_i,y_i)\}_{i=1}^n,
+$$
+
+where $d_i$ is a document and $y_i\in \mathcal{Y}$ is its label.  After choosing a representation map
+
+$$
+\phi: \text{documents}\longrightarrow \mathbb{R}^d,
+$$
+
+we obtain feature vectors
+
+$$
+x_i=\phi(d_i)\in \mathbb{R}^d.
+$$
+
+For Naive Bayes, the most common representation is a count vector:
+
+$$
+x_i=(x_{i1},x_{i2},\ldots,x_{id})\in \mathbb{N}^d,
+$$
+
+where $x_{ij}$ is the number of times vocabulary token $v_j$ appears in document $d_i$.
+
+The goal is to learn a classifier
+
+$$
+f:\mathbb{N}^d\longrightarrow \mathcal{Y}.
+$$
+
+## The Bayes classifier
+
+Assume $(X,Y)$ is a random pair with $X\in \mathbb{N}^d$ and $Y\in \mathcal{Y}$.  Under zero-one loss,
+
+$$
+L(\widehat y,y)=
+\begin{cases}
+0, & \widehat y=y,\\
+1, & \widehat y\neq y,
+\end{cases}
+$$
+
+the best possible prediction rule, if the true distribution were known, is the **Bayes classifier**:
+
+$$
+f^*(x)=\arg\max_{c\in \mathcal{Y}} P(Y=c\mid X=x).
+$$
+
+This rule chooses the class with the largest posterior probability.
+
+By Bayes' theorem,
+
+$$
+P(Y=c\mid X=x)
+=
+\frac{P(X=x\mid Y=c)P(Y=c)}{P(X=x)}.
+$$
+
+For classification, the denominator $P(X=x)$ does not depend on $c$.  Therefore,
+
+$$
+f^*(x)=\arg\max_{c\in \mathcal{Y}} P(X=x\mid Y=c)P(Y=c).
+$$
+
+This is the maximum a posteriori, or MAP, decision rule.
+
+::: {.math-card}
+**Bayes decision rule.**  To classify $x$, compare the posterior scores
+
+$$
+P(X=x\mid Y=c)P(Y=c), \qquad c=1,\ldots,K.
+$$
+
+Naive Bayes becomes a usable classifier after we specify and estimate the class-conditional distribution $P(X=x\mid Y=c)$.
+:::
+
+## The multinomial event model
+
+Let
+
+$$
+V=\{v_1,v_2,\ldots,v_d\}
+$$
+
+be the vocabulary.  In the multinomial Naive Bayes model, each class $c$ has a token probability vector
+
+$$
+\theta_c=(\theta_{c1},\theta_{c2},\ldots,\theta_{cd})\in \Delta^{d-1},
+$$
+
+where
+
+$$
+\theta_{cj}\ge 0, \qquad \sum_{j=1}^d \theta_{cj}=1.
+$$
+
+The interpretation is:
+
+$$
+\theta_{cj}=P(\text{a randomly drawn token is }v_j\mid Y=c).
+$$
+
+Now suppose a document has length
+
+$$
+m=\sum_{j=1}^d x_j.
+$$
+
+The multinomial model assumes that, conditional on the class, the document's tokens are generated by repeated draws from $\theta_c$.  The probability of observing the count vector $x$ is
+
+$$
+P(X=x\mid Y=c)
+=
+\frac{m!}{x_1!x_2!\cdots x_d!}
+\prod_{j=1}^d \theta_{cj}^{x_j}.
+$$
+
+The multinomial coefficient counts how many token sequences have the same count vector.
+
+For classification, if the document $x$ is fixed, the coefficient
+
+$$
+\frac{m!}{x_1!x_2!\cdots x_d!}
+$$
+
+does not depend on the class $c$.  Therefore the MAP classifier can ignore it:
+
+$$
+\widehat y
+=
+\arg\max_{c\in\mathcal{Y}}
+\pi_c\prod_{j=1}^d \theta_{cj}^{x_j},
+$$
+
+where $\pi_c=P(Y=c)$ is the class prior.
+
+## The conditional independence assumption
+
+The word "naive" refers to the conditional independence assumption.  In sequence form, if a document has tokens
+
+$$
+w_1,w_2,\ldots,w_m,
+$$
+
+the model assumes
+
+$$
+P(w_1,\ldots,w_m\mid Y=c)
+\approx
+\prod_{t=1}^m P(w_t\mid Y=c).
+$$
+
+That is, after conditioning on the class label, the tokens are treated as independent draws from a class-specific distribution.
+
+This is a strong assumption.  Natural language has grammar, word order, collocations, phrases, and long-range dependence.  For example, in real text,
+
+```text
+not good
+```
+
+is not the same as the two independent words `not` and `good`.  Yet Naive Bayes often works surprisingly well for topic and sentiment tasks because the presence of highly class-indicative words can dominate the classification score.
+
+::: {.callout-note}
+The Naive Bayes assumption is usually false as a generative model of language.  The important question is not whether the model is literally true, but whether the resulting decision rule is useful and interpretable for a particular task.
+:::
+
+## Estimating the parameters
+
+Suppose we have training examples
+
+$$
+(x_i,y_i),\qquad i=1,\ldots,n.
+$$
+
+### Class priors
+
+The maximum likelihood estimate of the class prior is
+
+$$
+\widehat \pi_c
+=
+\frac{n_c}{n},
+$$
+
+where
+
+$$
+n_c=\sum_{i=1}^n \mathbf{1}\{y_i=c\}
+$$
+
+is the number of training documents in class $c$.
+
+### Token probabilities
+
+Let
+
+$$
+N_{cj}=\sum_{i:y_i=c} x_{ij}
+$$
+
+be the total number of times token $v_j$ appears in documents with label $c$.  Let
+
+$$
+N_c=\sum_{j=1}^d N_{cj}
+$$
+
+be the total number of tokens in class $c$.  The maximum likelihood estimate is
+
+$$
+\widehat \theta_{cj}
+=
+\frac{N_{cj}}{N_c}.
+$$
+
+### Derivation by constrained optimization
+
+For a fixed class $c$, the likelihood for $\theta_c$ is proportional to
+
+$$
+L_c(\theta_c)
+=
+\prod_{j=1}^d \theta_{cj}^{N_{cj}}.
+$$
+
+The log-likelihood is
+
+$$
+\ell_c(\theta_c)
+=
+\sum_{j=1}^d N_{cj}\log \theta_{cj},
+$$
+
+subject to
+
+$$
+\sum_{j=1}^d \theta_{cj}=1.
+$$
+
+Using a Lagrange multiplier $\lambda$, define
+
+$$
+\mathcal{L}(\theta_c,\lambda)
+=
+\sum_{j=1}^d N_{cj}\log \theta_{cj}
++\lambda\left(1-\sum_{j=1}^d \theta_{cj}\right).
+$$
+
+The stationarity condition gives
+
+$$
+\frac{\partial \mathcal{L}}{\partial \theta_{cj}}
+=
+\frac{N_{cj}}{\theta_{cj}}-\lambda=0.
+$$
+
+Hence
+
+$$
+\theta_{cj}=\frac{N_{cj}}{\lambda}.
+$$
+
+Summing over $j$ gives
+
+$$
+1=\sum_{j=1}^d \theta_{cj}=\frac{1}{\lambda}\sum_{j=1}^d N_{cj}=\frac{N_c}{\lambda},
+$$
+
+so $\lambda=N_c$.  Therefore
+
+$$
+\widehat \theta_{cj}=\frac{N_{cj}}{N_c}.
+$$
+
+## Zero probabilities and add-$\alpha$ smoothing
+
+The maximum likelihood estimator assigns probability zero to any token that never appears in class $c$:
+
+$$
+N_{cj}=0 \quad \Longrightarrow \quad \widehat \theta_{cj}=0.
+$$
+
+This creates a serious problem.  If a test document contains even one such token, then
+
+$$
+\prod_{j=1}^d \widehat \theta_{cj}^{x_j}=0
+$$
+
+for that class.  The model may rule out a class entirely because of one unseen word.
+
+To avoid this, we use add-$\alpha$ smoothing:
+
+$$
+\widehat \theta_{cj}^{(\alpha)}
+=
+\frac{N_{cj}+\alpha}{N_c+\alpha d},
+\qquad \alpha>0.
+$$
+
+Common choices include $\alpha=1$ for Laplace smoothing and smaller values such as $\alpha=0.1$ or $\alpha=0.01$ for less aggressive smoothing.
+
+### Bayesian interpretation
+
+Add-$\alpha$ smoothing can be interpreted through a symmetric Dirichlet prior on each class token vector:
+
+$$
+\theta_c\sim \operatorname{Dirichlet}(\alpha,\ldots,\alpha).
+$$
+
+The smoothed estimate
+
+$$
+\frac{N_{cj}+\alpha}{N_c+\alpha d}
+$$
+
+is the posterior predictive probability of the next token being $v_j$ after observing the class-specific token counts.
+
+::: {.math-card}
+**Smoothing as regularization.**  Add-$\alpha$ smoothing shrinks the estimated token distribution away from the boundary of the simplex.  No token receives probability zero, so every class remains possible for every document.
+:::
+
+## Log-scores and numerical stability
+
+The product
+
+$$
+\pi_c\prod_{j=1}^d \theta_{cj}^{x_j}
+$$
+
+can be extremely small.  In computation, multiplying many small probabilities may underflow to zero.  Taking logarithms avoids this problem and converts products into sums:
+
+$$
+s_c(x)
+=
+\log \pi_c+
+\sum_{j=1}^d x_j\log \theta_{cj}.
+$$
+
+The classifier is
+
+$$
+\widehat y
+=
+\arg\max_{c\in\mathcal{Y}} s_c(x).
+$$
+
+Because the logarithm is increasing, maximizing the log-score is equivalent to maximizing the original posterior numerator.
+
+## Naive Bayes as a linear classifier
+
+The score for class $c$ can be written as
+
+$$
+s_c(x)=b_c+w_c^\top x,
+$$
+
+where
+
+$$
+b_c=\log \pi_c,
+\qquad
+w_c=(\log \theta_{c1},\ldots,\log \theta_{cd})^\top.
+$$
+
+Thus multinomial Naive Bayes is a linear classifier in count-vector space.
+
+For binary classification with classes $1$ and $0$, compare log-scores:
+
+$$
+s_1(x)-s_0(x)
+=
+\log\frac{\pi_1}{\pi_0}
++
+\sum_{j=1}^d x_j\log\frac{\theta_{1j}}{\theta_{0j}}.
+$$
+
+The decision rule is
+
+$$
+\widehat y=1
+\quad \Longleftrightarrow \quad
+\log\frac{\pi_1}{\pi_0}
++
+\sum_{j=1}^d x_j\log\frac{\theta_{1j}}{\theta_{0j}}>0.
+$$
+
+The decision boundary is the hyperplane
+
+$$
+\log\frac{\pi_1}{\pi_0}
++
+\sum_{j=1}^d x_j\log\frac{\theta_{1j}}{\theta_{0j}}=0.
+$$
+
+::: {.callout-tip}
+The weights
+
+$$
+\log\frac{\theta_{1j}}{\theta_{0j}}
+$$
+
+are interpretable.  A large positive value means token $v_j$ strongly favors class $1$ over class $0$.  A large negative value means the token strongly favors class $0$.
+:::
+
+## Relation to logistic regression
+
+Both Naive Bayes and logistic regression can produce linear decision boundaries, but they estimate different objects.
+
+Naive Bayes is a **generative** model.  It estimates
+
+$$
+P(Y=c),
+\qquad
+P(X=x\mid Y=c),
+$$
+
+and then uses Bayes' theorem to obtain a classifier.
+
+Logistic regression is a **discriminative** model.  It estimates the conditional probability directly:
+
+$$
+P(Y=c\mid X=x).
+$$
+
+For binary classification, logistic regression models
+
+$$
+P(Y=1\mid X=x)
+=
+\sigma(\beta_0+\beta^\top x),
+$$
+
+where
+
+$$
+\sigma(z)=\frac{1}{1+e^{-z}}.
+$$
+
+Naive Bayes may work well with small data because it imposes strong probabilistic structure.  Logistic regression may work better with enough labeled data because it directly optimizes conditional prediction.
+
+## Bernoulli Naive Bayes
+
+The multinomial model uses token counts.  Another common model uses binary features:
+
+$$
+z_j=\mathbf{1}\{\text{token }v_j\text{ appears in the document}\}.
+$$
+
+For each class $c$, Bernoulli Naive Bayes estimates
+
+$$
+\rho_{cj}=P(Z_j=1\mid Y=c).
+$$
+
+The class-conditional probability is
+
+$$
+P(Z=z\mid Y=c)
+=
+\prod_{j=1}^d \rho_{cj}^{z_j}(1-\rho_{cj})^{1-z_j}.
+$$
+
+The log-score becomes
+
+$$
+s_c(z)
+=
+\log \pi_c+
+\sum_{j=1}^d
+\left[z_j\log \rho_{cj}+(1-z_j)\log(1-\rho_{cj})\right].
+$$
+
+Bernoulli Naive Bayes models word presence or absence; multinomial Naive Bayes models word counts.  For longer documents, multinomial Naive Bayes is often more natural.  For short texts, binary presence features can be useful.
+
+## Worked example by hand
+
+Suppose the vocabulary is
+
+$$
+V=\{\texttt{win},\texttt{meeting},\texttt{free}\}.
+$$
+
+There are two classes:
+
+$$
+\mathcal{Y}=\{\text{spam},\text{ham}\}.
+$$
+
+Assume the estimated parameters are:
+
+$$
+\widehat \pi_{\text{spam}}=0.4,
+\qquad
+\widehat \pi_{\text{ham}}=0.6,
+$$
+
+and
+
+| token | $\widehat\theta_{\text{spam},j}$ | $\widehat\theta_{\text{ham},j}$ |
+|---|---:|---:|
+| `win` | 0.50 | 0.05 |
+| `meeting` | 0.05 | 0.70 |
+| `free` | 0.45 | 0.25 |
+
+Consider the document
+
+```text
+free win free
+```
+
+Its count vector is
+
+$$
+x=(1,0,2).
+$$
+
+The spam log-score is
+
+$$
+\log(0.4)+1\log(0.50)+0\log(0.05)+2\log(0.45).
+$$
+
+The ham log-score is
+
+$$
+\log(0.6)+1\log(0.05)+0\log(0.70)+2\log(0.25).
+$$
+
+Since `win` and `free` are much more likely under the spam token distribution, the spam score will be larger.
+
+## Python example: training from scratch
+
+The following code implements multinomial Naive Bayes without using a machine learning library.  The point is to see the mathematical quantities directly.
+
+```{python}
+import re
+from collections import Counter, defaultdict
+import numpy as np
+import pandas as pd
+
+train_docs = [
+    ("free money win now", "spam"),
+    ("win a free prize", "spam"),
+    ("cheap offer free entry", "spam"),
+    ("meeting schedule for project", "ham"),
+    ("project meeting tomorrow", "ham"),
+    ("please review the project schedule", "ham"),
+]
+
+test_docs = [
+    "free project prize",
+    "meeting tomorrow schedule",
+    "win free offer",
+    "please review money",
+]
+
+def tokenize(text):
+    return re.findall(r"[a-z]+", text.lower())
+
+# Build vocabulary from training documents.
+vocab = sorted({tok for doc, label in train_docs for tok in tokenize(doc)})
+token_to_index = {tok: j for j, tok in enumerate(vocab)}
+classes = sorted({label for _, label in train_docs})
+
+print("Vocabulary:", vocab)
+print("Classes:", classes)
+```
+
+Now estimate the class priors and class-conditional token distributions.
+
+```{python}
+alpha = 1.0
+K = len(classes)
+d = len(vocab)
+
+class_doc_counts = Counter(label for _, label in train_docs)
+class_token_counts = {c: np.zeros(d, dtype=float) for c in classes}
+class_total_tokens = {c: 0.0 for c in classes}
+
+for doc, label in train_docs:
+    for tok in tokenize(doc):
+        j = token_to_index[tok]
+        class_token_counts[label][j] += 1
+        class_total_tokens[label] += 1
+
+priors = {c: class_doc_counts[c] / len(train_docs) for c in classes}
+theta = {}
+for c in classes:
+    theta[c] = (class_token_counts[c] + alpha) / (class_total_tokens[c] + alpha * d)
+
+prior_table = pd.DataFrame({"class": classes, "prior": [priors[c] for c in classes]})
+print(prior_table)
+
+theta_table = pd.DataFrame(theta, index=vocab)
+print(theta_table.round(3))
+```
+
+Define prediction using log-scores.
+
+```{python}
+def vectorize(doc):
+    x = np.zeros(d, dtype=float)
+    for tok in tokenize(doc):
+        if tok in token_to_index:
+            x[token_to_index[tok]] += 1
+    return x
+
+def log_scores(doc):
+    x = vectorize(doc)
+    scores = {}
+    for c in classes:
+        scores[c] = np.log(priors[c]) + np.sum(x * np.log(theta[c]))
+    return scores
+
+def predict(doc):
+    scores = log_scores(doc)
+    return max(scores, key=scores.get), scores
+
+for doc in test_docs:
+    pred, scores = predict(doc)
+    print(f"Document: {doc!r}")
+    print("Prediction:", pred)
+    print("Scores:", {c: round(scores[c], 3) for c in classes})
+    print()
+```
+
+## Python example: interpretable log-odds weights
+
+For binary classification, the log-odds weight for token $v_j$ is
+
+$$
+\log\frac{\widehat\theta_{\text{spam},j}}{\widehat\theta_{\text{ham},j}}.
+$$
+
+```{python}
+positive_class = "spam"
+negative_class = "ham"
+
+log_odds = np.log(theta[positive_class] / theta[negative_class])
+weights = pd.DataFrame({
+    "token": vocab,
+    "log_odds_spam_vs_ham": log_odds
+}).sort_values("log_odds_spam_vs_ham", ascending=False)
+
+print(weights.round(3))
+```
+
+Tokens with positive log-odds push the classifier toward `spam`.  Tokens with negative log-odds push it toward `ham`.
+
+## Python example: accuracy and confusion matrix
+
+Here is a tiny evaluation example.  In a real project, train and test sets should be separated carefully.
+
+```{python}
+labeled_test = [
+    ("free project prize", "spam"),
+    ("meeting tomorrow schedule", "ham"),
+    ("win free offer", "spam"),
+    ("please review money", "ham"),
+]
+
+confusion = pd.DataFrame(0, index=classes, columns=classes)
+correct = 0
+
+for doc, true_label in labeled_test:
+    pred_label, _ = predict(doc)
+    confusion.loc[true_label, pred_label] += 1
+    correct += int(pred_label == true_label)
+
+accuracy = correct / len(labeled_test)
+print("Accuracy:", accuracy)
+print(confusion)
+```
+
+For binary classification with positive class `spam`, define:
+
+$$
+\text{precision}=\frac{TP}{TP+FP},
+\qquad
+\text{recall}=\frac{TP}{TP+FN},
+$$
+
+and
+
+$$
+F_1=\frac{2\cdot \text{precision}\cdot \text{recall}}{\text{precision}+\text{recall}}.
+$$
+
+```{python}
+pos = "spam"
+neg = "ham"
+TP = confusion.loc[pos, pos]
+FP = confusion.loc[neg, pos]
+FN = confusion.loc[pos, neg]
+
+precision = TP / (TP + FP) if TP + FP > 0 else 0.0
+recall = TP / (TP + FN) if TP + FN > 0 else 0.0
+f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+
+print({
+    "precision": round(float(precision), 3),
+    "recall": round(float(recall), 3),
+    "f1": round(float(f1), 3),
+})
+```
+
+## Interactive HTML: smoothing and log-odds
+
+The next interactive component shows how add-$\alpha$ smoothing changes token probabilities and log-odds weights.  The example uses two classes and four tokens.  Move the smoothing slider and token-count sliders to see how the decision score changes.
+
+::: {.content-visible when-format="html"}
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive Naive Bayes Log-Odds Explorer</h3>
+  <p>
+    The document score below is the binary log-odds
+    <code>log P(spam | x) / P(ham | x)</code> up to a normalizing constant:
+    <code>log(pi_spam/pi_ham) + sum_j x_j log(theta_spam,j/theta_ham,j)</code>.
+  </p>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+    <label>alpha smoothing: <span id="ch06-alpha-value">1.00</span><br>
+      <input id="ch06-alpha" type="range" min="0.01" max="5" step="0.01" value="1">
+    </label>
+    <label>count(free): <span id="ch06-free-value">1</span><br>
+      <input id="ch06-free" type="range" min="0" max="5" step="1" value="1">
+    </label>
+    <label>count(win): <span id="ch06-win-value">1</span><br>
+      <input id="ch06-win" type="range" min="0" max="5" step="1" value="1">
+    </label>
+    <label>count(meeting): <span id="ch06-meeting-value">0</span><br>
+      <input id="ch06-meeting" type="range" min="0" max="5" step="1" value="0">
+    </label>
+    <label>count(project): <span id="ch06-project-value">0</span><br>
+      <input id="ch06-project" type="range" min="0" max="5" step="1" value="0">
+    </label>
+  </div>
+
+  <div id="ch06-score-text" style="font-weight: 700; margin-bottom: 0.5rem;"></div>
+  <div id="ch06-weight-plot" style="height: 410px;"></div>
+  <div id="ch06-score-plot" style="height: 340px;"></div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+(function() {
+  const tokens = ["free", "win", "meeting", "project"];
+  const spamCounts = {free: 8, win: 6, meeting: 1, project: 1};
+  const hamCounts = {free: 1, win: 1, meeting: 7, project: 8};
+  const priors = {spam: 0.5, ham: 0.5};
+
+  function value(id) {
+    return Number(document.getElementById(id).value);
+  }
+
+  function update() {
+    const alpha = value("ch06-alpha");
+    const x = {
+      free: value("ch06-free"),
+      win: value("ch06-win"),
+      meeting: value("ch06-meeting"),
+      project: value("ch06-project")
+    };
+
+    document.getElementById("ch06-alpha-value").textContent = alpha.toFixed(2);
+    for (const tok of tokens) {
+      document.getElementById("ch06-" + tok + "-value").textContent = x[tok].toString();
+    }
+
+    const d = tokens.length;
+    const spamTotal = tokens.reduce((s, tok) => s + spamCounts[tok], 0);
+    const hamTotal = tokens.reduce((s, tok) => s + hamCounts[tok], 0);
+
+    const thetaSpam = tokens.map(tok => (spamCounts[tok] + alpha) / (spamTotal + alpha * d));
+    const thetaHam = tokens.map(tok => (hamCounts[tok] + alpha) / (hamTotal + alpha * d));
+    const weights = tokens.map((tok, j) => Math.log(thetaSpam[j] / thetaHam[j]));
+    const contributions = tokens.map((tok, j) => x[tok] * weights[j]);
+    const intercept = Math.log(priors.spam / priors.ham);
+    const logOdds = intercept + contributions.reduce((a, b) => a + b, 0);
+    const probSpam = 1 / (1 + Math.exp(-logOdds));
+    const prediction = logOdds >= 0 ? "spam" : "ham";
+
+    document.getElementById("ch06-score-text").textContent =
+      "log-odds = " + logOdds.toFixed(3) +
+      ", approximate P(spam | x) = " + probSpam.toFixed(3) +
+      ", prediction = " + prediction;
+
+    Plotly.newPlot("ch06-weight-plot", [{
+      x: tokens,
+      y: weights,
+      type: "bar",
+      text: weights.map(w => w.toFixed(2)),
+      textposition: "auto",
+      hovertemplate: "token=%{x}<br>log-odds weight=%{y:.3f}<extra></extra>"
+    }], {
+      title: "Token log-odds weights: log(theta_spam / theta_ham)",
+      yaxis: {title: "weight"},
+      margin: {t: 55, l: 55, r: 20, b: 55}
+    }, {responsive: true});
+
+    Plotly.newPlot("ch06-score-plot", [{
+      x: tokens,
+      y: contributions,
+      type: "bar",
+      text: contributions.map(w => w.toFixed(2)),
+      textposition: "auto",
+      hovertemplate: "token=%{x}<br>count times weight=%{y:.3f}<extra></extra>"
+    }], {
+      title: "Document score contributions: x_j times weight_j",
+      yaxis: {title: "contribution to log-odds"},
+      margin: {t: 55, l: 55, r: 20, b: 55}
+    }, {responsive: true});
+  }
+
+  ["ch06-alpha", "ch06-free", "ch06-win", "ch06-meeting", "ch06-project"].forEach(id => {
+    document.getElementById(id).addEventListener("input", update);
+  });
+  update();
+})();
+</script>
+```
+:::
+
+::: {.content-visible unless-format="html"}
+The HTML version of this chapter contains an interactive Plotly.js component for exploring how add-$\alpha$ smoothing changes Naive Bayes log-odds weights and predictions.  In PDF output, the same ideas can be studied by running the Python code examples above.
+:::
+
+## Statistical interpretation of smoothing
+
+Smoothing changes a classifier in two ways.
+
+First, it prevents impossible events.  Every token receives positive probability in every class:
+
+$$
+\widehat \theta_{cj}^{(\alpha)}>0.
+$$
+
+Second, it reduces the magnitude of extreme log-odds weights.  If a token appears many times in one class and zero times in another, the unsmoothed log-ratio would be infinite.  Smoothing makes the ratio finite:
+
+$$
+\log\frac{N_{1j}+\alpha}{N_{0j}+\alpha}
++
+\log\frac{N_0+\alpha d}{N_1+\alpha d}.
+$$
+
+Thus smoothing acts like a regularizer on the classifier's feature weights.
+
+## Model assumptions and failure modes
+
+Naive Bayes works best when class-indicative tokens are strong and word order is not essential.  It can fail when meaning depends on syntax, negation, or context.
+
+### Failure mode 1: negation
+
+The phrases
+
+```text
+good
+```
+
+and
+
+```text
+not good
+```
+
+have different meanings.  A unigram Naive Bayes model may treat `good` as positive even when preceded by `not`.
+
+Possible remedy: add bigram features such as `not_good`.
+
+### Failure mode 2: repeated correlated words
+
+Because Naive Bayes multiplies token probabilities, repeated correlated words may make the model overconfident.  The model behaves as though each occurrence contributes independent evidence.
+
+Possible remedy: use binary features, stronger smoothing, feature selection, or a discriminative model.
+
+### Failure mode 3: dataset leakage
+
+If the training data contains label artifacts, the classifier may learn shortcuts.  For example, if all spam examples contain a footer phrase not present at deployment time, the model may appear accurate in validation but fail in practice.
+
+Possible remedy: inspect feature weights and validate on realistic held-out data.
+
+## AI-assisted learning component
+
+Use AI tools as a mathematical tutor and model auditor, not as a replacement for your own derivations.
+
+### Prompt 1: explain the assumption
+
+```text
+I am studying multinomial Naive Bayes for text classification.
+Explain the conditional independence assumption using probability notation.
+Then give two examples where this assumption is false in natural language.
+Do not use code.
+```
+
+After receiving an answer, check whether it correctly distinguishes
+
+$$
+P(w_1,\ldots,w_m\mid Y=c)
+$$
+
+from
+
+$$
+\prod_{t=1}^m P(w_t\mid Y=c).
+$$
+
+### Prompt 2: audit feature weights
+
+```text
+Here are the largest positive and negative log-odds features from a Naive Bayes text classifier.
+Identify which features seem semantically meaningful and which may indicate dataset leakage.
+Explain your reasoning in a table.
+```
+
+This is useful because Naive Bayes is interpretable.  Large log-odds weights should be inspected before trusting a model.
+
+### Prompt 3: compare models
+
+```text
+Compare multinomial Naive Bayes and logistic regression for count-vector text classification.
+Use the language of generative and discriminative models.
+Explain when Naive Bayes might perform well despite false assumptions.
+```
+
+A strong answer should mention that Naive Bayes estimates a joint model while logistic regression estimates a conditional model.
+
+### Prompt 4: generate counterexamples
+
+```text
+Generate five short text examples where a unigram Naive Bayes sentiment classifier may fail.
+For each example, identify which mathematical assumption is responsible for the failure.
+```
+
+This helps connect model assumptions to concrete language behavior.
+
+::: {.callout-warning}
+When using AI tools, never paste private emails, student records, or sensitive documents into an external model.  Use synthetic or anonymized text for examples.
+:::
+
+## A complete mathematical summary
+
+The multinomial Naive Bayes pipeline can be summarized as follows.
+
+1. Choose a vocabulary
+
+$$
+V=\{v_1,\ldots,v_d\}.
+$$
+
+2. Represent each document as a count vector
+
+$$
+x\in \mathbb{N}^d.
+$$
+
+3. Estimate class priors
+
+$$
+\widehat \pi_c=\frac{n_c}{n}.
+$$
+
+4. Estimate smoothed token probabilities
+
+$$
+\widehat \theta_{cj}
+=
+\frac{N_{cj}+\alpha}{N_c+\alpha d}.
+$$
+
+5. Compute class log-scores
+
+$$
+s_c(x)=\log \widehat \pi_c+
+\sum_{j=1}^d x_j\log \widehat \theta_{cj}.
+$$
+
+6. Predict
+
+$$
+\widehat y=\arg\max_{c\in\mathcal{Y}}s_c(x).
+$$
+
+The classifier is probabilistic in origin but linear in its final scoring form.
+
+## Exercises
+
+1. **Bayes rule.**  Starting from Bayes' theorem, derive the MAP classification rule
+   $$
+   \widehat y=\arg\max_c P(X=x\mid Y=c)P(Y=c).
+   $$
+
+2. **Multinomial likelihood.**  Let $x\in\mathbb{N}^d$ with $m=\sum_j x_j$.  Write the multinomial probability $P(X=x\mid Y=c)$ and identify which factor can be ignored for classification.
+
+3. **MLE derivation.**  Use Lagrange multipliers to derive
+   $$
+   \widehat \theta_{cj}=\frac{N_{cj}}{N_c}.
+   $$
+
+4. **Smoothing.**  Suppose $d=1000$, $N_c=5000$, $N_{cj}=0$, and $\alpha=1$.  Compute the smoothed probability of token $v_j$ in class $c$.
+
+5. **Log-odds.**  In a binary classifier, show that the Naive Bayes decision boundary is a hyperplane in $\mathbb{R}^d$.
+
+6. **Interpretability.**  Suppose a token has log-odds weight $3.2$ for spam versus ham.  Interpret this value as a ratio of class-conditional token probabilities.
+
+7. **Bernoulli versus multinomial.**  Give an example of a task where binary word-presence features may be better than count features.
+
+8. **Negation.**  Construct a small example showing why unigram Naive Bayes can mishandle negation.
+
+9. **Implementation.**  Modify the Python code above so that unknown test tokens are mapped to a special `<unk>` token.
+
+10. **AI critique.**  Ask an AI tool to explain Naive Bayes.  Then identify one place where the answer is incomplete, imprecise, or missing a mathematical assumption.
+
+## Mini-project: a transparent text classifier
+
+Build a Naive Bayes classifier for a small text classification task.  Possible datasets include synthetic course-question categories, movie-review sentiment, or news-topic labels.
+
+Your report should include:
+
+1. a description of the label set;
+2. the vocabulary construction procedure;
+3. the mathematical form of the model;
+4. the smoothing value $\alpha$ and why you chose it;
+5. a confusion matrix;
+6. precision, recall, and $F_1$ score for at least one class;
+7. the top positive and negative log-odds tokens;
+8. an error analysis of at least five misclassified examples;
+9. a discussion of one assumption that fails in your data.
+
+## Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-06-naive-bayes-text-classification.ipynb
+```
+
+The lab should be designed for independent study and should include:
+
+- a self-contained review of Bayes' theorem;
+- count-vector construction;
+- multinomial Naive Bayes from scratch;
+- smoothing experiments;
+- feature-weight interpretation;
+- comparison with logistic regression;
+- a short AI-assisted model-auditing exercise.
+
+## What to remember
+
+- Naive Bayes is a generative classifier: it models $P(Y)$ and $P(X\mid Y)$.
+- The multinomial model treats a document as a bag of token counts.
+- The conditional independence assumption is mathematically convenient but linguistically false.
+- Add-$\alpha$ smoothing prevents zero probabilities and regularizes log-odds weights.
+- The MAP rule becomes a linear classifier in count-vector space.
+- The feature weights are interpretable through log-ratios of class-conditional token probabilities.
+- Naive Bayes is a useful baseline before using larger neural NLP models.
+
+## Notes and references
+
+Naive Bayes is a classical method in statistical NLP and information retrieval.  For broader context, see @manning_schuetze_1999, @manning_ir_2008, and @jurafsky_martin_slp3.  The relationship between generative and discriminative classifiers is also connected to standard material in statistical learning theory.

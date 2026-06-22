@@ -1,0 +1,1230 @@
+---
+title: "Documents as Vectors"
+subtitle: "Term-document matrices, TF-IDF, and cosine geometry"
+---
+
+::: {.chapter-opening}
+After text has been tokenized, the next classical step in NLP is to represent each document by a vector.  This chapter develops document vectors from a mathematical point of view.  We build count vectors, term-document matrices, normalized frequency vectors, TF-IDF vectors, and cosine similarity.  The goal is not only to compute these objects, but to understand what assumptions they encode and why they still matter in modern AI systems such as search engines and retrieval-augmented generation.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. define a document-vector representation as a map from token sequences to $R^d$;
+2. construct count vectors and document-term matrices from a corpus;
+3. distinguish counts, binary indicators, relative frequencies, and normalized vectors;
+4. explain TF-IDF as a mathematical weighting scheme for term specificity;
+5. compute cosine similarity and interpret it geometrically;
+6. rank documents in response to a query using sparse vector operations;
+7. describe the statistical assumptions behind bag-of-words models;
+8. implement document-vector methods in Python without relying on black-box NLP libraries;
+9. use interactive visualizations to study how TF-IDF and normalization change retrieval;
+10. use AI tools critically to test, explain, and improve vector-space representations.
+
+## Why documents become vectors
+
+A document is naturally a sequence of tokens.  If the vocabulary is
+
+$$
+V = \{v_1,v_2,\ldots,v_d\},
+$$
+
+then a tokenized document has the form
+
+$$
+x=(t_1,t_2,\ldots,t_m), \qquad t_k \in V.
+$$
+
+Many mathematical and statistical methods, however, operate on vectors and matrices.  The basic idea of this chapter is to replace a token sequence by a vector
+
+$$
+\phi(x) \in R^d,
+$$
+
+where the $j$th coordinate measures how strongly token $v_j$ appears in the document.
+
+::: {.math-card}
+**Central idea.**  A document-vector model is a representation map
+
+$$
+\phi:V^* \to R^d.
+$$
+
+Different choices of $\phi$ produce different mathematical models.  Count vectors, TF-IDF vectors, binary vectors, probability vectors, and neural embeddings are all representation maps.
+:::
+
+The simplest representation ignores word order and records only token counts.  Although this loses information, it produces a useful finite-dimensional object.  In classical NLP and information retrieval, this is called the **vector space model**.
+
+## Corpus, vocabulary, and notation
+
+Let
+
+$$
+D = (x_1,x_2,\ldots,x_n)
+$$
+
+be a corpus of $n$ tokenized documents.  Each document $x_i$ is a finite sequence over the vocabulary $V$.
+
+We use the following notation throughout the chapter:
+
+| Symbol | Meaning |
+|---|---|
+| $n$ | number of documents |
+| $d$ | vocabulary size |
+| $x_i$ | document $i$ |
+| $v_j$ | vocabulary token $j$ |
+| $c_{ij}$ | count of token $v_j$ in document $x_i$ |
+| $X$ | document-term matrix |
+| $q$ | query vector |
+| $s_i$ | similarity score between document $i$ and query |
+
+The central matrix is
+
+$$
+X = (c_{ij}) \in R^{n \times d},
+$$
+
+where
+
+$$
+c_{ij}=\#\{k : t_{ik}=v_j\}.
+$$
+
+Here $t_{ik}$ is the $k$th token in document $x_i$.
+
+### Row convention
+
+In this book we usually use the row convention:
+
+$$
+X_{i\cdot} = \text{vector representation of document } x_i.
+$$
+
+Thus each row is a document and each column is a term.  Some books use the transpose convention, where columns are documents.  Both are valid, but dimensions must be tracked carefully.
+
+::: {.math-card}
+**Dimension check.**  If $X \in R^{n \times d}$ and a query vector is $q \in R^d$, then raw document-query scores have the form
+
+$$
+Xq \in R^n.
+$$
+
+The output contains one score for each document.
+:::
+
+## Count vectors
+
+The count vector of a document $x$ is
+
+$$
+c(x)=(c_1(x),c_2(x),\ldots,c_d(x)) \in N^d,
+$$
+
+where
+
+$$
+c_j(x)=\#\{k:t_k=v_j\}.
+$$
+
+For example, suppose
+
+$$
+V=\{\text{data},\text{language},\text{learning},\text{models},\text{token}\}.
+$$
+
+If
+
+```text
+data data learning models
+```
+
+is the document, then
+
+$$
+c(x)=(2,0,1,1,0).
+$$
+
+The count vector answers the question: **How many times does each vocabulary term appear?**
+
+### What counts preserve and lose
+
+The count vector preserves token frequency but discards order.  For example, the two documents
+
+```text
+models predict language
+```
+
+and
+
+```text
+language predict models
+```
+
+have the same count vector.  Therefore, the count-vector map is not injective.
+
+::: {.math-card}
+**Bag-of-words assumption.**  A count vector treats a document as a multiset of tokens rather than as an ordered sequence.  Mathematically, this means the representation is invariant under permutations of the token positions.
+:::
+
+If $\pi$ is a permutation of $\{1,2,\ldots,m\}$ and
+
+$$
+x=(t_1,t_2,\ldots,t_m),
+$$
+
+then the permuted document
+
+$$
+\pi x=(t_{\pi(1)},t_{\pi(2)},\ldots,t_{\pi(m)})
+$$
+
+satisfies
+
+$$
+c(\pi x)=c(x).
+$$
+
+This invariance is both a strength and a weakness.  It makes the model simple and robust, but it cannot distinguish syntax, negation, or word order.
+
+## Binary vectors
+
+Sometimes we care only whether a token appears, not how often.  The binary representation is
+
+$$
+b_j(x)=
+\begin{cases}
+1, & c_j(x)>0,\\
+0, & c_j(x)=0.
+\end{cases}
+$$
+
+Thus
+
+$$
+b(x) \in \{0,1\}^d.
+$$
+
+Binary vectors are useful when repeated occurrences should not dominate.  For example, if one document repeats the word "model" many times, a raw count vector may make it appear overly similar to any query containing "model."  Binary vectors reduce this effect.
+
+## Relative-frequency vectors
+
+Raw counts depend strongly on document length.  If one document is twice as long as another, its count vector may have a larger norm simply because it contains more words.  A simple correction is to divide by the document length.
+
+Let
+
+$$
+|x| = \sum_{j=1}^d c_j(x)
+$$
+
+be the total number of vocabulary tokens in document $x$.  The relative-frequency vector is
+
+$$
+p_j(x)=\frac{c_j(x)}{|x|}, \qquad j=1,\ldots,d.
+$$
+
+Then
+
+$$
+p(x) \in R^d, \qquad p_j(x)\ge 0, \qquad \sum_{j=1}^d p_j(x)=1.
+$$
+
+Thus $p(x)$ is an empirical probability distribution over the vocabulary.
+
+::: {.math-card}
+**Statistical viewpoint.**  If a document is modeled as a sample from a multinomial distribution over $V$, then the relative-frequency vector is the maximum likelihood estimate of the token probability vector for that document.
+:::
+
+This interpretation connects document vectors to statistics.  A document is not merely a string; it can be viewed as data generated by an unknown distribution on words.
+
+## The document-term matrix
+
+Given $n$ documents and $d$ vocabulary terms, the count vectors form a matrix
+
+$$
+X =
+\begin{bmatrix}
+--- & c(x_1)^T & ---\\
+--- & c(x_2)^T & ---\\
+& \vdots & \\
+--- & c(x_n)^T & ---
+\end{bmatrix}
+\in R^{n\times d}.
+$$
+
+Equivalently,
+
+$$
+X_{ij}=c_j(x_i).
+$$
+
+This matrix is usually sparse because most documents contain only a small fraction of all vocabulary terms.
+
+### Example
+
+Consider the corpus
+
+1. `machine learning models learn from data`
+2. `language models predict the next token`
+3. `statistics studies data uncertainty and models`
+
+Using the vocabulary
+
+$$
+V=\{\text{data},\text{language},\text{learning},\text{models},\text{predict},\text{statistics},\text{token}\},
+$$
+
+the document-term matrix is
+
+$$
+X=
+\begin{bmatrix}
+1&0&1&1&0&0&0\\
+0&1&0&1&1&0&1\\
+1&0&0&1&0&1&0
+\end{bmatrix}.
+$$
+
+The first row says that the first document contains `data`, `learning`, and `models` once each.
+
+## Python example: building a document-term matrix
+
+The following code builds a vocabulary and document-term matrix from scratch.  This is useful because it exposes the mathematical object directly.
+
+```{python}
+#| label: ch03-document-term-matrix
+#| echo: true
+#| eval: false
+
+import re
+import numpy as np
+import pandas as pd
+
+corpus = [
+    "machine learning models learn from data",
+    "language models predict the next token",
+    "statistics studies data uncertainty and models",
+    "learning from data helps statistical models",
+]
+
+def tokenize(text):
+    text = text.lower()
+    return re.findall(r"[a-z]+", text)
+
+tokenized = [tokenize(doc) for doc in corpus]
+
+# Build vocabulary in alphabetical order for reproducibility.
+vocab = sorted(set(token for doc in tokenized for token in doc))
+token_to_id = {token: j for j, token in enumerate(vocab)}
+
+X = np.zeros((len(corpus), len(vocab)), dtype=int)
+for i, doc in enumerate(tokenized):
+    for token in doc:
+        X[i, token_to_id[token]] += 1
+
+X_df = pd.DataFrame(X, columns=vocab, index=[f"doc_{i+1}" for i in range(len(corpus))])
+print(X_df)
+```
+
+The output matrix is the basic object used by many classical NLP algorithms.  Notice that the matrix construction requires only tokenization, a vocabulary map, and counting.
+
+## Linear algebra viewpoint
+
+Once documents are represented as vectors, we can use linear algebra.
+
+Let
+
+$$
+x,y \in R^d
+$$
+
+be two document vectors.  We may compute:
+
+- their dot product $x^Ty$;
+- their norms $\|x\|_1$, $\|x\|_2$, or $\|x\|_\infty$;
+- their angle through cosine similarity;
+- their distance, such as $\|x-y\|_2$;
+- their projection onto a low-dimensional subspace.
+
+The dot product is
+
+$$
+x^Ty=\sum_{j=1}^d x_jy_j.
+$$
+
+For count vectors, this quantity is large when the two documents share many terms with high counts.
+
+However, dot products are sensitive to length.  A longer document tends to have a larger norm and may receive a large dot product even when it is not especially similar in content.
+
+## Cosine similarity
+
+Cosine similarity normalizes by vector length:
+
+$$
+\operatorname{cos}(x,y)=\frac{x^Ty}{\|x\|_2\|y\|_2},
+$$
+
+provided $x\ne 0$ and $y\ne 0$.
+
+Geometrically, this is the cosine of the angle between $x$ and $y$.  It measures direction rather than magnitude.  If $x$ and $y$ point in the same direction, then their cosine similarity is $1$.  If they are orthogonal, the similarity is $0$.
+
+For nonnegative document vectors, cosine similarity lies between $0$ and $1$.
+
+::: {.math-card}
+**Scale invariance.**  For any $a>0$ and $b>0$,
+
+$$
+\operatorname{cos}(ax,by)=\operatorname{cos}(x,y).
+$$
+
+Therefore, cosine similarity ignores positive rescaling of documents.  This is useful when document lengths differ.
+:::
+
+### Matrix form of cosine retrieval
+
+Suppose $X\in R^{n\times d}$ contains document vectors and $q\in R^d$ is a query vector.  The raw dot-product scores are
+
+$$
+r=Xq \in R^n.
+$$
+
+The cosine scores are
+
+$$
+s_i=\frac{X_{i\cdot}q}{\|X_{i\cdot}\|_2\|q\|_2}, \qquad i=1,\ldots,n.
+$$
+
+If we define the row-normalized matrix
+
+$$
+\widetilde X_{i\cdot}=\frac{X_{i\cdot}}{\|X_{i\cdot}\|_2}
+$$
+
+and the normalized query
+
+$$
+\widetilde q=\frac{q}{\|q\|_2},
+$$
+
+then
+
+$$
+s=\widetilde X\widetilde q.
+$$
+
+Thus retrieval by cosine similarity is matrix-vector multiplication after normalization.
+
+## Python example: cosine search
+
+```{python}
+#| label: ch03-cosine-search
+#| echo: true
+#| eval: false
+
+import numpy as np
+import pandas as pd
+import re
+
+corpus = [
+    "machine learning models learn from data",
+    "language models predict the next token",
+    "statistics studies data uncertainty and models",
+    "learning from data helps statistical models",
+]
+
+def tokenize(text):
+    return re.findall(r"[a-z]+", text.lower())
+
+tokenized = [tokenize(doc) for doc in corpus]
+vocab = sorted(set(token for doc in tokenized for token in doc))
+token_to_id = {token: j for j, token in enumerate(vocab)}
+
+def vectorize(tokens):
+    vec = np.zeros(len(vocab))
+    for token in tokens:
+        if token in token_to_id:
+            vec[token_to_id[token]] += 1
+    return vec
+
+X = np.vstack([vectorize(doc) for doc in tokenized])
+
+query = "data learning models"
+q = vectorize(tokenize(query))
+
+def cosine_similarity_matrix(X, q):
+    q_norm = np.linalg.norm(q)
+    X_norms = np.linalg.norm(X, axis=1)
+    scores = X @ q
+    scores = scores / (X_norms * q_norm)
+    return scores
+
+scores = cosine_similarity_matrix(X, q)
+ranking = np.argsort(-scores)
+
+for rank, i in enumerate(ranking, start=1):
+    print(f"{rank}. score={scores[i]:.3f} | {corpus[i]}")
+```
+
+This code shows that document retrieval can be written as a small linear algebra problem.
+
+## Term frequency
+
+Raw counts can be transformed before similarity is computed.  The first transformation is **term frequency**.
+
+A simple term frequency is
+
+$$
+\operatorname{tf}_{ij}=c_{ij}.
+$$
+
+A length-normalized term frequency is
+
+$$
+\operatorname{tf}_{ij}=\frac{c_{ij}}{\sum_{k=1}^d c_{ik}}.
+$$
+
+A log-scaled term frequency is
+
+$$
+\operatorname{tf}_{ij}=
+\begin{cases}
+1+\log(c_{ij}), & c_{ij}>0,\\
+0, & c_{ij}=0.
+\end{cases}
+$$
+
+The log transform reduces the effect of repeated occurrences.  For example, a term appearing ten times should not always be ten times as important as a term appearing once.
+
+## Document frequency and inverse document frequency
+
+Some words appear in many documents.  These common terms often have low discriminative value.  For example, words such as `the`, `and`, `model`, or `data` may appear frequently in a technical corpus.
+
+The document frequency of token $v_j$ is
+
+$$
+\operatorname{df}_j=\#\{i:c_{ij}>0\}.
+$$
+
+It counts how many documents contain the term at least once.
+
+The inverse document frequency is commonly defined as
+
+$$
+\operatorname{idf}_j=\log\left(\frac{n+1}{\operatorname{df}_j+1}\right)+1.
+$$
+
+The added $1$ in numerator and denominator is smoothing.  It avoids division by zero and keeps the weight finite.  Other conventions are also used.
+
+::: {.math-card}
+**Interpretation.**  If $\operatorname{df}_j/n$ is the empirical probability that a random document contains token $v_j$, then
+
+$$
+\log\left(\frac{n}{\operatorname{df}_j}\right)
+$$
+
+is the negative logarithm of this empirical probability.  Rare terms receive larger weights because they are more informative for distinguishing documents.
+:::
+
+## TF-IDF vectors
+
+The TF-IDF weight of term $v_j$ in document $x_i$ is
+
+$$
+w_{ij}=\operatorname{tf}_{ij}\operatorname{idf}_j.
+$$
+
+In matrix form, if $T=(\operatorname{tf}_{ij})$ and
+
+$$
+D_{\operatorname{idf}}=\operatorname{diag}(\operatorname{idf}_1,\ldots,\operatorname{idf}_d),
+$$
+
+then the TF-IDF matrix is
+
+$$
+W=TD_{\operatorname{idf}}.
+$$
+
+This is a column weighting of the term-frequency matrix.  Terms that appear in many documents get smaller weights.  Terms that appear in fewer documents get larger weights.
+
+### Why TF-IDF is useful
+
+TF-IDF balances two effects:
+
+1. **Within-document importance.**  A term is important if it appears often in a particular document.
+2. **Across-document specificity.**  A term is more informative if it does not appear in almost every document.
+
+Thus TF-IDF is a simple way to say:
+
+> A good keyword should be frequent in this document but not too frequent across the whole corpus.
+
+## Python example: TF-IDF from scratch
+
+```{python}
+#| label: ch03-tfidf-from-scratch
+#| echo: true
+#| eval: false
+
+import numpy as np
+import pandas as pd
+
+# X is the document-term count matrix from the previous example.
+n, d = X.shape
+
+# Term frequency: length-normalized counts.
+doc_lengths = X.sum(axis=1, keepdims=True)
+TF = X / doc_lengths
+
+# Document frequency.
+df = (X > 0).sum(axis=0)
+
+# Smoothed inverse document frequency.
+idf = np.log((n + 1) / (df + 1)) + 1
+
+# TF-IDF matrix.
+W = TF * idf
+
+W_df = pd.DataFrame(W, columns=vocab, index=[f"doc_{i+1}" for i in range(n)])
+print(W_df.round(3))
+```
+
+The resulting matrix has the same shape as the count matrix, but its entries have changed.  Common tokens receive smaller column weights, while more specific tokens receive larger column weights.
+
+## Comparing count vectors and TF-IDF vectors
+
+Count vectors often reward documents that share common terms with the query.  TF-IDF vectors reward documents that share more specific terms.
+
+Suppose the query is
+
+```text
+language token prediction
+```
+
+A count-vector search might rank a document highly because it contains `language` and `token`.  TF-IDF may increase the importance of `token` if it appears in only a few documents.
+
+This distinction matters in academic settings.  For example, in a corpus of course descriptions, words such as `course`, `students`, and `methods` may appear everywhere.  Words such as `Bayesian`, `topology`, or `transformer` may be more specific.
+
+## Interactive HTML: TF-IDF and cosine retrieval explorer
+
+The following interactive component lets you adjust the IDF strength and choose a query.  It uses a tiny corpus so that the mathematics remains visible.  Move the slider to see how document rankings change.
+
+::: {.content-visible when-format="html"}
+<div class="interactive-card">
+  <h3>Interactive TF-IDF retrieval explorer</h3>
+  <p>
+    Choose a query and adjust the IDF strength.  When the IDF strength is 0, the system behaves like normalized term frequency.  When it is 1, it uses the full smoothed IDF weight.
+  </p>
+
+  <label for="ch03-query-select"><strong>Query:</strong></label>
+  <select id="ch03-query-select">
+    <option value="data learning models">data learning models</option>
+    <option value="language token predict">language token predict</option>
+    <option value="statistics uncertainty data">statistics uncertainty data</option>
+    <option value="machine learning statistics">machine learning statistics</option>
+  </select>
+
+  <br><br>
+
+  <label for="ch03-idf-slider"><strong>IDF strength:</strong> <span id="ch03-idf-value">1.00</span></label>
+  <input id="ch03-idf-slider" type="range" min="0" max="1" step="0.05" value="1" style="width: 100%;">
+
+  <div id="ch03-score-plot" class="plotly-demo"></div>
+  <div id="ch03-weight-plot" class="plotly-demo"></div>
+
+  <p id="ch03-explanation" style="font-size: 0.95rem;"></p>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+(function() {
+  const docs = [
+    "machine learning models learn from data",
+    "language models predict the next token",
+    "statistics studies data uncertainty and models",
+    "learning from data helps statistical models"
+  ];
+
+  const docLabels = ["Doc 1", "Doc 2", "Doc 3", "Doc 4"];
+
+  function tokenize(text) {
+    return text.toLowerCase().match(/[a-z]+/g) || [];
+  }
+
+  const tokenizedDocs = docs.map(tokenize);
+  const vocab = Array.from(new Set(tokenizedDocs.flat())).sort();
+  const tokenToId = new Map(vocab.map((t, i) => [t, i]));
+
+  function vectorize(tokens) {
+    const vec = Array(vocab.length).fill(0);
+    tokens.forEach(t => {
+      if (tokenToId.has(t)) vec[tokenToId.get(t)] += 1;
+    });
+    return vec;
+  }
+
+  const X = tokenizedDocs.map(vectorize);
+  const n = X.length;
+  const d = vocab.length;
+
+  const df = Array(d).fill(0);
+  for (let j = 0; j < d; j++) {
+    for (let i = 0; i < n; i++) {
+      if (X[i][j] > 0) df[j] += 1;
+    }
+  }
+
+  const idf = df.map(x => Math.log((n + 1) / (x + 1)) + 1);
+
+  function norm(vec) {
+    return Math.sqrt(vec.reduce((s, x) => s + x * x, 0));
+  }
+
+  function dot(a, b) {
+    return a.reduce((s, x, i) => s + x * b[i], 0);
+  }
+
+  function tfidf(vec, alpha) {
+    const length = vec.reduce((s, x) => s + x, 0);
+    if (length === 0) return vec.map(() => 0);
+    return vec.map((x, j) => (x / length) * Math.pow(idf[j], alpha));
+  }
+
+  function cosine(a, b) {
+    const na = norm(a);
+    const nb = norm(b);
+    if (na === 0 || nb === 0) return 0;
+    return dot(a, b) / (na * nb);
+  }
+
+  function update() {
+    const queryText = document.getElementById("ch03-query-select").value;
+    const alpha = parseFloat(document.getElementById("ch03-idf-slider").value);
+    document.getElementById("ch03-idf-value").textContent = alpha.toFixed(2);
+
+    const qCounts = vectorize(tokenize(queryText));
+    const qWeight = tfidf(qCounts, alpha);
+    const W = X.map(row => tfidf(row, alpha));
+    const scores = W.map(row => cosine(row, qWeight));
+
+    const scoreTrace = {
+      x: docLabels,
+      y: scores,
+      type: "bar",
+      text: scores.map(s => s.toFixed(3)),
+      textposition: "auto",
+      hovertemplate: "%{x}<br>cosine score=%{y:.3f}<extra></extra>"
+    };
+
+    Plotly.newPlot("ch03-score-plot", [scoreTrace], {
+      title: "Cosine similarity between query and documents",
+      yaxis: {range: [0, 1], title: "cosine similarity"},
+      margin: {t: 55, l: 55, r: 20, b: 45}
+    }, {responsive: true});
+
+    const nonzeroTerms = vocab.filter((term, j) => qWeight[j] > 0);
+    const nonzeroWeights = nonzeroTerms.map(term => qWeight[tokenToId.get(term)]);
+
+    const weightTrace = {
+      x: nonzeroTerms,
+      y: nonzeroWeights,
+      type: "bar",
+      hovertemplate: "%{x}<br>query weight=%{y:.3f}<extra></extra>"
+    };
+
+    Plotly.newPlot("ch03-weight-plot", [weightTrace], {
+      title: "Weighted query vector coordinates",
+      yaxis: {title: "TF-IDF weight"},
+      margin: {t: 55, l: 55, r: 20, b: 70}
+    }, {responsive: true});
+
+    const bestIndex = scores.indexOf(Math.max(...scores));
+    document.getElementById("ch03-explanation").innerHTML =
+      "Current top document: <strong>" + docLabels[bestIndex] + "</strong>. " +
+      "Its text is: <em>" + docs[bestIndex] + "</em>. " +
+      "Increasing IDF strength gives more influence to terms that appear in fewer documents.";
+  }
+
+  document.getElementById("ch03-query-select").addEventListener("change", update);
+  document.getElementById("ch03-idf-slider").addEventListener("input", update);
+  update();
+})();
+</script>
+:::
+
+::: {.content-visible when-format="pdf"}
+The HTML version of this chapter contains an interactive Plotly.js component for exploring TF-IDF weighting and cosine retrieval.  In PDF output, the same ideas can be studied by running the Python code in the associated lab notebook.
+:::
+
+## The geometry of sparse document vectors
+
+Document vectors often live in very high dimensions.  A vocabulary may contain thousands or millions of tokens, while a single document uses only a small subset.  Therefore, most entries of a document vector are zero.
+
+This creates a sparse geometry:
+
+$$
+\#\{j:x_j\ne 0\} \ll d.
+$$
+
+Sparse vectors are computationally useful because we do not need to store or multiply by all zero entries.  They are also geometrically interesting.  Two randomly chosen short documents may have no terms in common, which makes their dot product zero.
+
+### Orthogonality in sparse spaces
+
+If two count vectors have disjoint supports, then
+
+$$
+x^Ty=0.
+$$
+
+For nonnegative vectors, this means their cosine similarity is zero.  In a large vocabulary, many pairs of documents may be nearly orthogonal even if they are topically related but use different words.
+
+For example, the documents
+
+```text
+neural network training
+```
+
+and
+
+```text
+deep learning optimization
+```
+
+are semantically related, but a simple bag-of-words model may give low similarity if the exact words do not overlap.  This limitation motivates later chapters on latent semantic analysis, word embeddings, and transformer representations.
+
+## Stop words and projection
+
+A common preprocessing step removes very frequent words such as `the`, `and`, `of`, and `to`.  Mathematically, stop-word removal is a coordinate projection.
+
+Let $S\subseteq \{1,2,\ldots,d\}$ be the set of coordinates corresponding to terms we keep.  The projection map is
+
+$$
+P_S:R^d\to R^{|S|},
+$$
+
+where
+
+$$
+P_S(x)=(x_j)_{j\in S}.
+$$
+
+This map discards coordinates.  It can improve retrieval by removing noise, but it can also remove meaningful words in some contexts.  For example, `not` is often a stop word in generic lists, but it is crucial for sentiment analysis.
+
+::: {.math-card}
+**Modeling warning.**  Stop-word removal is not universally safe.  It is a projection that may remove coordinates relevant to the task.
+:::
+
+## Statistical model behind bag-of-words
+
+The bag-of-words representation can be derived from a multinomial model.
+
+Suppose document $x_i$ has length $m_i$ and is generated by independent draws from a categorical distribution
+
+$$
+\theta_i=(\theta_{i1},\ldots,\theta_{id}),
+$$
+
+where
+
+$$
+\theta_{ij}\ge 0, \qquad \sum_{j=1}^d \theta_{ij}=1.
+$$
+
+The probability of observing counts
+
+$$
+c_i=(c_{i1},\ldots,c_{id})
+$$
+
+is
+
+$$
+P(c_i\mid \theta_i)=\frac{m_i!}{c_{i1}!c_{i2}!\cdots c_{id}!}\prod_{j=1}^d \theta_{ij}^{c_{ij}}.
+$$
+
+The log-likelihood, ignoring the multinomial coefficient, is
+
+$$
+\ell(\theta_i)=\sum_{j=1}^d c_{ij}\log \theta_{ij}.
+$$
+
+Maximizing this subject to $\sum_j \theta_{ij}=1$ gives
+
+$$
+\widehat\theta_{ij}=\frac{c_{ij}}{m_i}.
+$$
+
+Thus the relative-frequency vector is the maximum likelihood estimate of the document's token distribution under this simplified model.
+
+### What the model assumes
+
+The multinomial bag-of-words model assumes:
+
+1. token order is irrelevant;
+2. tokens are conditionally independent given $\theta_i$;
+3. each document has its own word distribution;
+4. dependence between neighboring words is ignored.
+
+These assumptions are false for real language, but they give a mathematically transparent baseline.
+
+## Connection to classification
+
+Document vectors are not only used for retrieval.  They can also be used for classification.
+
+Suppose each document has a label
+
+$$
+y_i\in \{1,2,\ldots,K\}.
+$$
+
+A linear classifier has the form
+
+$$
+f(x_i)=\arg\max_{k\in\{1,\ldots,K\}} \left(w_k^T\phi(x_i)+b_k\right).
+$$
+
+Here $\phi(x_i)$ may be a count vector, TF-IDF vector, or another document representation.  The same vectorization step supports logistic regression, support vector machines, naive Bayes, and neural networks.
+
+For binary classification, a common model is
+
+$$
+P(y_i=1\mid x_i)=\sigma(w^T\phi(x_i)+b),
+$$
+
+where
+
+$$
+\sigma(z)=\frac{1}{1+e^{-z}}.
+$$
+
+This shows how vector-space NLP connects directly to statistics and machine learning.
+
+## Low-dimensional visualization by SVD
+
+Because document vectors are high-dimensional, we often visualize them by projecting to two dimensions.  A simple method is singular value decomposition.
+
+Let $W\in R^{n\times d}$ be a centered or weighted document-term matrix.  Its singular value decomposition is
+
+$$
+W=U\Sigma V^T.
+$$
+
+The best rank-$k$ approximation in Frobenius norm is
+
+$$
+W_k=U_k\Sigma_kV_k^T.
+$$
+
+For visualization, we often use the rows of
+
+$$
+U_2\Sigma_2\in R^{n\times 2}
+$$
+
+as two-dimensional document coordinates.
+
+::: {.math-card}
+**Preview.**  This idea leads to latent semantic analysis, which studies low-rank structure in document-term matrices.  Chapter 7 returns to this topic in detail.
+:::
+
+## Python example: two-dimensional document map
+
+```{python}
+#| label: ch03-svd-visualization
+#| echo: true
+#| eval: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Use the TF-IDF matrix W from the earlier example.
+# Center columns so the SVD highlights differences among documents.
+W_centered = W - W.mean(axis=0, keepdims=True)
+
+U, S, Vt = np.linalg.svd(W_centered, full_matrices=False)
+coords = U[:, :2] * S[:2]
+
+plt.figure(figsize=(6, 4))
+plt.scatter(coords[:, 0], coords[:, 1])
+for i, text in enumerate(corpus):
+    plt.annotate(f"doc_{i+1}", (coords[i, 0], coords[i, 1]))
+plt.axhline(0, linewidth=0.8)
+plt.axvline(0, linewidth=0.8)
+plt.xlabel("first SVD coordinate")
+plt.ylabel("second SVD coordinate")
+plt.title("Documents projected to two dimensions")
+plt.show()
+```
+
+This visualization is not a replacement for the full high-dimensional representation.  It is a diagnostic tool that helps us inspect whether documents cluster by topic or vocabulary.
+
+## Evaluation of retrieval
+
+A document-vector method is often used for retrieval: given a query, return a ranked list of documents.  To evaluate retrieval, we need relevance judgments.
+
+For a query $q$, let
+
+$$
+R(q)\subseteq \{1,2,\ldots,n\}
+$$
+
+be the set of relevant documents.  If a system returns the top $k$ documents
+
+$$
+A_k(q),
+$$
+
+then precision at $k$ is
+
+$$
+\operatorname{Precision@}k=\frac{|A_k(q)\cap R(q)|}{k}.
+$$
+
+Recall at $k$ is
+
+$$
+\operatorname{Recall@}k=\frac{|A_k(q)\cap R(q)|}{|R(q)|}.
+$$
+
+Precision measures how many retrieved documents are relevant.  Recall measures how many relevant documents were retrieved.
+
+For course search, advising chatbots, and RAG systems, retrieval evaluation is essential.  A language model can only answer from useful evidence if the retrieval step finds useful evidence.
+
+## AI component: document vectors in RAG systems
+
+Modern retrieval-augmented generation systems often use neural embeddings rather than TF-IDF.  However, the mathematical pipeline is similar:
+
+$$
+\text{document} \xrightarrow{\phi} R^p,
+\qquad
+\text{query} \xrightarrow{\phi} R^p,
+\qquad
+\text{rank by similarity}.
+$$
+
+In classical vector search, $\phi$ may be TF-IDF.  In neural vector search, $\phi$ may be a transformer embedding model.  The retrieval step still depends on geometry: dot products, cosine similarity, nearest neighbors, and ranking.
+
+::: {.ai-box}
+**AI-assisted learning activity.**  Ask an AI system:
+
+> Give three short documents for which TF-IDF search succeeds and three short documents for which TF-IDF search fails.  For each failure, explain the mathematical reason in terms of vocabulary overlap, synonymy, negation, or word order.
+
+Then verify the examples by computing count vectors and cosine similarities yourself.
+:::
+
+## AI component: auditing a representation
+
+When using AI tools to help build NLP systems, ask the tool to make the representation assumptions explicit.  A useful prompt is:
+
+> I am representing documents using TF-IDF vectors.  List the mathematical assumptions of this representation.  Which assumptions are problematic for sentiment analysis, course advising, and mathematical text search?
+
+A good answer should mention at least:
+
+- loss of word order;
+- dependence on exact vocabulary overlap;
+- sensitivity to tokenization;
+- inability to understand synonyms unless they share terms;
+- possible removal of important stop words;
+- limited handling of negation;
+- dependence on the corpus used to compute IDF.
+
+Use AI tools as mathematical critics, not as replacements for mathematical verification.
+
+## Worked example: hand calculation
+
+Consider three documents with vocabulary
+
+$$
+V=\{a,b,c,d\}.
+$$
+
+Suppose the count matrix is
+
+$$
+X=
+\begin{bmatrix}
+2&1&0&0\\
+1&0&2&0\\
+0&1&0&3
+\end{bmatrix}.
+$$
+
+Let the query be
+
+$$
+q=(1,1,0,0)^T.
+$$
+
+The raw dot-product scores are
+
+$$
+Xq=
+\begin{bmatrix}
+3\\
+1\\
+1
+\end{bmatrix}.
+$$
+
+The Euclidean norms are
+
+$$
+\|q\|_2=\sqrt{2},
+$$
+
+$$
+\|X_{1\cdot}\|_2=\sqrt{5}, \qquad
+\|X_{2\cdot}\|_2=\sqrt{5}, \qquad
+\|X_{3\cdot}\|_2=\sqrt{10}.
+$$
+
+Thus the cosine scores are
+
+$$
+s_1=\frac{3}{\sqrt{5}\sqrt{2}}=\frac{3}{\sqrt{10}},
+$$
+
+$$
+s_2=\frac{1}{\sqrt{5}\sqrt{2}}=\frac{1}{\sqrt{10}},
+$$
+
+and
+
+$$
+s_3=\frac{1}{\sqrt{10}\sqrt{2}}=\frac{1}{\sqrt{20}}.
+$$
+
+Therefore, document 1 is most similar to the query.
+
+This small example illustrates the full retrieval calculation: vectorize, multiply, normalize, rank.
+
+## Common pitfalls
+
+### Pitfall 1: confusing rows and columns
+
+Always state whether documents are rows or columns.  In this book, documents are rows.
+
+### Pitfall 2: forgetting zero vectors
+
+Cosine similarity is undefined when one vector has zero norm.  This can happen if a query contains no vocabulary terms.
+
+### Pitfall 3: assuming TF-IDF understands meaning
+
+TF-IDF is a lexical method.  It does not know that `doctor` and `physician` are related unless the corpus and vocabulary create indirect associations.
+
+### Pitfall 4: ignoring corpus dependence
+
+IDF weights depend on the corpus.  If the corpus changes, the IDF weights change.
+
+### Pitfall 5: treating preprocessing as neutral
+
+Lowercasing, punctuation removal, stop-word removal, and stemming all change the mathematical representation.
+
+## Chapter summary
+
+The main construction in this chapter is the document-vector map
+
+$$
+\phi:V^*\to R^d.
+$$
+
+The simplest choice is the count vector.  From count vectors we build the document-term matrix
+
+$$
+X\in R^{n\times d}.
+$$
+
+We then transform this matrix using normalization and TF-IDF weighting.  Similarity between documents or between a query and documents is often measured by cosine similarity:
+
+$$
+\operatorname{cos}(x,y)=\frac{x^Ty}{\|x\|_2\|y\|_2}.
+$$
+
+These ideas form the classical foundation of search and retrieval.  They also prepare us for modern NLP, where documents and queries are represented by learned dense vectors instead of sparse TF-IDF vectors.
+
+## Exercises
+
+### Conceptual exercises
+
+1. Explain why the count-vector map $c:V^*\to N^d$ is not injective.
+2. Give two documents with the same count vector but different meanings.
+3. Explain why cosine similarity is often preferable to raw dot product for document retrieval.
+4. Give an example where stop-word removal changes the meaning of a document.
+5. Explain why IDF weights depend on the corpus, not only on the document.
+
+### Computational exercises
+
+6. For the vocabulary $V=\{a,b,c,d\}$ and document $x=(a,b,a,d,d,d)$, compute the count vector, binary vector, and relative-frequency vector.
+7. Given
+
+$$
+X=
+\begin{bmatrix}
+1&2&0\\
+0&1&3\\
+1&0&1
+\end{bmatrix},
+\qquad
+q=(1,1,0)^T,
+$$
+
+compute the raw scores $Xq$ and the cosine similarity scores.
+
+8. For a corpus with $n=10$ documents, suppose a term appears in $2$ documents.  Compute the smoothed IDF
+
+$$
+\log\left(\frac{n+1}{\operatorname{df}+1}\right)+1.
+$$
+
+9. Build a document-term matrix for five short course descriptions of your choice.
+10. Compare rankings from raw counts and TF-IDF for the same query.
+
+### Proof-based exercises
+
+11. Prove that cosine similarity is invariant under positive rescaling of both vectors.
+12. Prove that if two nonnegative vectors have disjoint supports, then their cosine similarity is $0$.
+13. Show that the relative-frequency vector is the maximum likelihood estimate for a multinomial token distribution.
+14. Let $D_{\operatorname{idf}}$ be a positive diagonal matrix.  Explain geometrically how multiplying $X$ by $D_{\operatorname{idf}}$ changes the coordinate system.
+
+### AI-assisted exercises
+
+15. Ask an AI system to generate a corpus of six documents about mathematics, statistics, and machine learning.  Build a TF-IDF matrix for the corpus and identify which terms receive the largest IDF weights.
+16. Ask an AI system for an example where TF-IDF fails because two documents use synonyms.  Verify the failure numerically using cosine similarity.
+17. Ask an AI system to explain why `not` should not always be removed as a stop word.  Translate the explanation into a statement about coordinate projection.
+
+## Mini-project: a small mathematical search engine
+
+Build a small search engine for a topic of your choice, such as graduate course descriptions, research abstracts, or textbook chapter summaries.
+
+Your project should include:
+
+1. a corpus of at least $20$ short documents;
+2. a documented tokenizer;
+3. a vocabulary list;
+4. a count matrix;
+5. a TF-IDF matrix;
+6. cosine-similarity retrieval for at least five queries;
+7. a short analysis comparing successful and unsuccessful searches;
+8. one AI-assisted critique of the representation.
+
+The final report should explain the mathematical representation before showing code.
+
+## Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-03-documents-as-vectors.ipynb
+```
+
+The lab should be written for independent study and should include:
+
+- background on sparse vectors and document-term matrices;
+- count, binary, relative-frequency, and TF-IDF representations;
+- cosine similarity from scratch;
+- document retrieval experiments;
+- visualization using SVD;
+- comparison with a modern embedding-based retrieval method as an optional extension.
+
+## Notes and references
+
+The vector space model and TF-IDF are classical foundations of information retrieval.  For more detail, see @manning_ir_2008 and @manning_schuetze_1999.  Modern NLP still uses the same underlying linear algebra ideas, even when the representation map is learned by a neural network rather than manually constructed.  Later chapters connect these ideas to latent semantic analysis, word embeddings, and transformer-based retrieval.

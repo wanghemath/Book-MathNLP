@@ -1,0 +1,198 @@
+---
+title: "Computer Labs"
+subtitle: "Google Colab Notebooks for Independent Study"
+---
+
+::: {.hero-box}
+The computer labs for *Mathematical Foundations of Natural Language Processing* are designed for independent study. Each lab begins with the necessary mathematical and conceptual background before programming, then develops the ideas through small transparent examples in Python.
+:::
+
+The labs are stored in the `labs/` folder of the GitHub repository:
+
+<https://github.com/wanghemath/Book-MathNLP>
+
+Each notebook can be opened directly in Google Colab. Students do not need to install Python locally, although the notebooks can also be downloaded and run in JupyterLab.
+
+## How to use the labs
+
+A good workflow for each chapter is:
+
+1. read the corresponding textbook chapter;
+2. open the lab notebook in Google Colab;
+3. run the notebook from top to bottom once without changing code;
+4. return to each section and explain the mathematical idea in your own words;
+5. complete the exercises;
+6. complete the mini-project or extension task;
+7. write a short reflection on assumptions, limitations, and possible improvements.
+
+The labs emphasize understanding before automation. Many examples intentionally use small toy corpora so that students can inspect the data, compute intermediate quantities by hand, and see how the mathematics becomes code.
+
+## Repository and Colab pattern
+
+The general Colab link format is:
+
+```text
+https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/<notebook-name>.ipynb
+```
+
+For example, Lab 1 opens with:
+
+[Open Lab 1 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-01-what-is-nlp.ipynb)
+
+## Lab overview by part
+
+### Part I. Language as Data
+
+These labs introduce texts, tokens, vocabularies, and document vectors. The central question is how raw language becomes a mathematical object.
+
+| Lab | Chapter | Notebook | Main ideas |
+|---:|---|---|---|
+| 1 | What Is Natural Language Processing? | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-01-what-is-nlp.ipynb) | NLP pipeline, tokens, vocabulary, vectors, document-term matrices, first classifier intuition |
+| 2 | Text, Tokens, and Vocabularies | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-02-text-tokens-vocabularies.ipynb) | tokenization, normalization, unknown tokens, vocabulary size, entropy, simple BPE |
+| 3 | Documents as Vectors | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-03-documents-as-vectors.ipynb) | count vectors, binary vectors, relative frequency, TF-IDF, cosine similarity, SVD retrieval |
+
+### Part II. Probability Models for Language
+
+These labs develop language modeling and classification from finite probability distributions.
+
+| Lab | Chapter | Notebook | Main ideas |
+|---:|---|---|---|
+| 4 | Probability and Language | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-04-probability-and-language.ipynb) | empirical distributions, likelihood, MLE, entropy, KL divergence, perplexity, bigram preview |
+| 5 | N-gram Language Models | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-05-ngram-language-models.ipynb) | Markov assumption, boundary tokens, smoothing, log-probability, generation, interpolation |
+| 6 | Naive Bayes Text Classification | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-06-naive-bayes-text-classification.ipynb) | Bayes rule, multinomial Naive Bayes, log-scores, smoothing, posterior probabilities, evaluation |
+
+### Part III. Linear Algebra of Language
+
+These labs study language as geometry in high-dimensional vector spaces.
+
+| Lab | Chapter | Notebook | Main ideas |
+|---:|---|---|---|
+| 7 | Vector Space Models | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-07-vector-space-models.ipynb) | document-term matrices, Gram matrices, cosine retrieval, TF-IDF scaling, SVD, LSA |
+| 8 | Word Embeddings | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-08-word-embeddings.ipynb) | one-hot vectors, embedding lookup, co-occurrence, PMI, PPMI, SVD embeddings, negative sampling |
+| 9 | Geometry of Embeddings | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-09-geometry-of-embeddings.ipynb) | metrics, cosine similarity, PCA, anisotropy, hubness, clustering, semantic directions |
+
+### Part IV. Neural Networks for Sequences
+
+These labs introduce neural models for text and show why order matters.
+
+| Lab | Chapter | Notebook | Main ideas |
+|---:|---|---|---|
+| 10 | Neural Networks for Text | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-10-neural-networks-for-text.ipynb) | embeddings, pooling, softmax, cross-entropy, gradients, backpropagation through embeddings |
+| 11 | Recurrent Neural Networks | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-11-recurrent-neural-networks.ipynb) | recurrence, hidden states, many-to-one classification, BPTT, gradient clipping, vanishing gradients |
+| 12 | LSTM and GRU Models | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-12-lstm-gru-models.ipynb) | gated memory, LSTM equations, GRU equations, forget/update gates, long-range dependencies |
+
+### Part V. Attention and Transformers
+
+These labs build the core computations behind modern transformer-based NLP.
+
+| Lab | Chapter | Notebook | Main ideas |
+|---:|---|---|---|
+| 13 | Attention Mechanisms | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-13-attention-mechanisms.ipynb) | queries, keys, values, scaled dot-product attention, masking, attention heatmaps, entropy |
+| 14 | Self-Attention | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-14-self-attention.ipynb) | contextual embeddings, permutation equivariance, positional encodings, padding masks, causal masks |
+| 15 | Transformers | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-15-transformers.ipynb) | multi-head attention, residual connections, layer normalization, feedforward networks, encoder block |
+| 16 | Positional Encoding and Sequence Geometry | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-16-positional-encoding.ipynb) | learned position embeddings, sinusoidal encodings, relative bias, RoPE, causal position geometry |
+
+### Part VI. Large Language Models and Retrieval
+
+These labs connect autoregressive modeling, LLM training objectives, retrieval systems, RAG, and evaluation.
+
+| Lab | Chapter | Notebook | Main ideas |
+|---:|---|---|---|
+| 17 | Autoregressive Language Models | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-17-autoregressive-language-models.ipynb) | chain rule, teacher forcing, next-token probability, perplexity, top-$k$ sampling, nucleus sampling |
+| 18 | Training Large Language Models | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-18-training-large-language-models.ipynb) | pretraining, SFT masking, AdamW, validation loss, KL regularization, preference loss, low-rank adaptation |
+| 19 | Embeddings, Retrieval, and RAG | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-19-embeddings-retrieval-rag.ipynb) | sparse retrieval, dense retrieval, hybrid search, reranking, chunking, retrieval metrics, toy RAG |
+| 20 | Evaluation | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-20-evaluation-of-language-models.ipynb) | classification metrics, calibration, ECE, retrieval metrics, RAG evaluation, bootstrap intervals, subgroup analysis |
+
+### Part VII. Advanced Mathematical Perspectives
+
+These labs connect NLP to information theory, optimization, graphs, topology, geometry, and responsible AI.
+
+| Lab | Chapter | Notebook | Main ideas |
+|---:|---|---|---|
+| 21 | Information Theory | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-21-information-theory.ipynb) | surprisal, entropy, cross-entropy, KL divergence, perplexity, mutual information, PMI/PPMI |
+| 22 | Optimization for NLP | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-22-optimization-for-nlp.ipynb) | stable cross-entropy, gradient checking, SGD, momentum, Adam, AdamW, clipping, masked losses |
+| 23 | Graphs and Language | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-23-graphs-and-language.ipynb) | adjacency matrices, Laplacians, dependency graphs, co-occurrence graphs, PageRank, GCN, graph attention |
+| 24 | Topology, Geometry, and Language | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-24-topology-geometry-language.ipynb) | metric spaces, neighborhood graphs, Vietoris--Rips complexes, Betti numbers, persistence, Mapper summaries |
+| 25 | Ethics, Bias, and Responsibility | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-25-ethics-bias-responsibility.ipynb) | fairness metrics, calibration, distribution shift, embedding audits, abstention, privacy, RAG factuality auditing |
+
+## Skills developed across the labs
+
+The labs are cumulative. By completing all 25 labs, students practice the following skills.
+
+| Skill area | Examples from the labs |
+|---|---|
+| Mathematical representation | finite vocabularies, probability distributions, vectors, matrices, graphs, metric spaces |
+| Numerical computation | NumPy arrays, matrix operations, stable softmax, SVD, gradient checking |
+| Modeling | n-gram models, Naive Bayes, neural classifiers, RNNs, gated networks, transformers |
+| Retrieval | TF-IDF search, dense similarity search, hybrid retrieval, reranking, chunking, RAG diagnostics |
+| Evaluation | accuracy, precision, recall, $F_1$, perplexity, calibration, bootstrap uncertainty, subgroup analysis |
+| Responsible AI | bias audits, threshold tradeoffs, factuality checks, privacy, abstention, documentation |
+
+## Suggested grading or self-study structure
+
+For a course, each lab can be used in one of three ways.
+
+### Option A. Guided practice
+
+Students run the notebook, answer the short exercises, and submit selected outputs. This is appropriate for weekly low-stakes assignments.
+
+### Option B. Independent lab report
+
+Students submit a short report containing:
+
+- a summary of the main mathematical idea;
+- one key equation and its interpretation;
+- selected code output;
+- answers to exercises;
+- one limitation or failure mode;
+- one proposed extension.
+
+### Option C. Mini-project pathway
+
+Students use the mini-project section as a starting point for a longer project. This is appropriate for final projects, research preparation, or independent study.
+
+## Recommended pacing
+
+A semester course can use the labs at different depths.
+
+| Course length | Suggested use |
+|---|---|
+| 7 weeks | Labs 1--3, 5--6, 8, 13--15, 17, 19--20, 25 |
+| 10 weeks | Labs 1--10, 13--15, 17--20, 21--22, 25 |
+| 14 weeks | Labs 1--25, with selected mini-projects replacing some exercises |
+
+A slower mathematical course may spend more time on Labs 4, 7, 8, 13, 15, 21, and 22. A more applied NLP course may spend more time on Labs 6, 10, 17, 19, 20, and 25.
+
+## Technical notes
+
+The labs are intended to run in Google Colab with common scientific Python libraries:
+
+- `numpy`
+- `pandas`
+- `matplotlib`
+- `scikit-learn`
+
+Some notebooks use optional libraries when available, but the core examples are designed to remain small and transparent. The emphasis is on understanding the mathematical structure rather than training large models.
+
+## Student expectations
+
+Students should keep the following principles in mind.
+
+::: {.callout-tip}
+A lab is not complete when the code runs. A lab is complete when you can explain what mathematical object each variable represents and why the output makes sense.
+:::
+
+For every model, ask:
+
+- What is the input space?
+- What is the output space?
+- What parameters are learned or chosen?
+- What loss, score, or criterion is being optimized?
+- What assumptions does the method make about language?
+- What failure modes should be checked?
+
+## Instructor notes
+
+The labs can be used as weekly assignments, recitation materials, independent-study notebooks, or project preparation. Because each lab includes background before programming, students can also use them as review materials after completing the corresponding chapter.
+
+When assigning labs, it is useful to ask students to submit both code output and written interpretation. The written interpretation helps students connect Python arrays back to the mathematical ideas in the textbook.

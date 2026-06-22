@@ -1,0 +1,1273 @@
+---
+title: "Chapter 20. Evaluation of Language Models"
+subtitle: "Metrics, Uncertainty, Calibration, and Responsible Measurement"
+format:
+  html:
+    toc: true
+    code-fold: false
+  pdf:
+    toc: true
+jupyter: python3
+---
+
+# Chapter 20. Evaluation of Language Models
+
+Evaluation is the mathematical discipline of asking whether a language system is doing what we want it to do.
+For a small classifier, evaluation may mean accuracy on a labeled test set.
+For a language model, evaluation may mean perplexity on held-out text.
+For a summarizer, evaluation may compare generated summaries with reference summaries.
+For a retrieval-augmented generation system, evaluation must include both retrieval quality and answer quality.
+For a deployed assistant, evaluation must also consider calibration, robustness, factuality, bias, latency, privacy, and human usefulness.
+
+The purpose of this chapter is not to collect many disconnected scores.
+The goal is to show that most evaluation methods have a common statistical structure:
+
+$$
+\text{model} \quad \longrightarrow \quad \text{predictions} \quad \longrightarrow \quad \text{loss or score} \quad \longrightarrow \quad \text{statistical estimate}.
+$$
+
+For MA Applied Mathematics and MS Statistics students, this chapter should feel familiar.
+Evaluation is estimation.
+A reported score is usually a sample average, a ratio of random counts, or a function of empirical distributions.
+Therefore, every evaluation score has assumptions, variance, failure modes, and a domain of validity.
+
+::: {.callout-tip}
+## Guiding principle
+A metric is not a property of a model alone.
+It is a property of a model, a data distribution, a task definition, an annotation procedure, and a scoring rule.
+:::
+
+## 20.1 Learning goals
+
+After studying this chapter, you should be able to:
+
+1. express NLP evaluation as estimation of expected loss or expected utility;
+2. compute accuracy, precision, recall, $F_1$, and confusion matrices from first principles;
+3. derive cross-entropy and perplexity for language models;
+4. explain calibration, Brier score, and expected calibration error;
+5. distinguish token-level, sequence-level, retrieval-level, and human-centered evaluation;
+6. implement overlap-based metrics such as ROUGE-style recall and BLEU-style precision;
+7. evaluate retrieval and RAG pipelines using Precision@$k$, Recall@$k$, MRR, and nDCG;
+8. quantify uncertainty in evaluation using standard errors and bootstrap confidence intervals;
+9. critique metric choice using mathematical reasoning.
+
+## 20.2 The mathematical form of evaluation
+
+Let $(X,Y)$ be a random input-output pair drawn from an unknown population distribution $P$.
+A model $f_\theta$ maps an input $x$ to either a prediction, a score vector, a probability distribution, or a generated sequence.
+A loss function compares the model output to the target:
+
+$$
+L(f_\theta(X),Y).
+$$
+
+The population risk is
+
+$$
+R(\theta) = E_P[L(f_\theta(X),Y)].
+$$
+
+Since $P$ is unknown, we estimate risk from a test set
+
+$$
+D_{\text{test}} = \{(x_i,y_i)\}_{i=1}^n.
+$$
+
+The empirical risk is
+
+$$
+\widehat R(\theta) = \frac{1}{n}\sum_{i=1}^n L(f_\theta(x_i),y_i).
+$$
+
+This formula is the mathematical backbone of evaluation.
+Different NLP tasks use different forms of $X$, $Y$, $f_\theta$, and $L$.
+
+| Task | Input $X$ | Target $Y$ | Model output | Example score |
+|---|---:|---:|---:|---:|
+| Sentiment classification | document | class label | class probability | accuracy, $F_1$ |
+| Language modeling | prefix | next token | categorical distribution | cross-entropy, perplexity |
+| Summarization | document | reference summary | generated summary | ROUGE, human rating |
+| Retrieval | query | relevant documents | ranked list | Recall@$k$, MRR |
+| RAG answering | query plus corpus | answer | generated answer with evidence | faithfulness, answer correctness |
+
+The important statistical question is:
+
+$$
+\widehat R(\theta) \approx R(\theta)?
+$$
+
+This approximation depends on sample size, test-set quality, distribution shift, and whether the metric faithfully measures the desired behavior.
+
+## 20.3 Data splits and the danger of leakage
+
+A standard supervised workflow uses three data sets:
+
+$$
+D_{\text{train}}, \qquad D_{\text{validation}}, \qquad D_{\text{test}}.
+$$
+
+The training set is used to fit parameters.
+The validation set is used to choose hyperparameters, thresholds, prompts, decoding strategies, retrieval settings, and checkpoints.
+The test set is used only once for final evaluation.
+
+If decisions are repeatedly made using the test set, then the test score becomes optimistically biased.
+This is a form of selection bias.
+For example, suppose we try many models $\theta_1,\ldots,\theta_m$ and report the best test score.
+Even if all models have the same population risk, the minimum empirical risk
+
+$$
+\min_{1 \le j \le m} \widehat R(\theta_j)
+$$
+
+will usually be smaller than the true risk of the selected model.
+
+::: {.callout-warning}
+## Test-set leakage
+A test set is not a data bank for repeated design decisions.
+It is an estimator of future performance.
+Once it guides design choices, it starts functioning like a validation set.
+:::
+
+## 20.4 Classification metrics
+
+Consider a classification task with classes $\{1,\ldots,K\}$.
+Let $y_i$ be the true class and $\hat y_i$ be the predicted class.
+The accuracy is
+
+$$
+\operatorname{Accuracy}=\frac{1}{n}\sum_{i=1}^n \mathbf 1\{\hat y_i=y_i\}.
+$$
+
+Accuracy is simple and useful when classes are balanced and errors have similar cost.
+However, for imbalanced tasks, accuracy can be misleading.
+A classifier that always predicts the majority class may have high accuracy but low usefulness.
+
+### Binary confusion matrix
+
+For binary classification, let the positive class be $1$ and the negative class be $0$.
+The confusion counts are:
+
+$$
+TP = \sum_i \mathbf 1\{y_i=1,\hat y_i=1\},
+$$
+
+$$
+FP = \sum_i \mathbf 1\{y_i=0,\hat y_i=1\},
+$$
+
+$$
+FN = \sum_i \mathbf 1\{y_i=1,\hat y_i=0\},
+$$
+
+$$
+TN = \sum_i \mathbf 1\{y_i=0,\hat y_i=0\}.
+$$
+
+Precision measures how reliable positive predictions are:
+
+$$
+\operatorname{Precision}=\frac{TP}{TP+FP}.
+$$
+
+Recall measures how many true positives are found:
+
+$$
+\operatorname{Recall}=\frac{TP}{TP+FN}.
+$$
+
+The $F_1$ score is the harmonic mean:
+
+$$
+F_1 = \frac{2\cdot \operatorname{Precision}\cdot \operatorname{Recall}}{\operatorname{Precision}+\operatorname{Recall}}.
+$$
+
+The harmonic mean is small if either precision or recall is small.
+Thus $F_1$ rewards balance.
+
+### Thresholds and decision rules
+
+Many classifiers output a score $s(x)$ or probability estimate $p_\theta(y=1\mid x)$.
+A threshold $\tau$ produces a hard prediction:
+
+$$
+\hat y_\tau(x)=\mathbf 1\{p_\theta(y=1\mid x)\ge \tau\}.
+$$
+
+Changing $\tau$ changes $TP$, $FP$, $FN$, and $TN$.
+Therefore precision, recall, and $F_1$ are not properties of the probability model alone.
+They are properties of the probability model plus the threshold.
+
+::: {.callout-note}
+## Mathematical viewpoint
+A threshold is a decision rule.
+The same probabilistic model can produce many classifiers depending on how probabilities are converted into actions.
+:::
+
+## 20.5 Python example: classification metrics from scratch
+
+```{python}
+import numpy as np
+
+# A small binary text-classification evaluation example.
+y_true = np.array([1, 1, 0, 1, 0, 0, 1, 0, 1, 0])
+p_score = np.array([0.92, 0.75, 0.62, 0.55, 0.48, 0.40, 0.36, 0.30, 0.22, 0.10])
+
+def binary_metrics(y_true, p_score, threshold=0.5):
+    y_pred = (p_score >= threshold).astype(int)
+    tp = int(np.sum((y_true == 1) & (y_pred == 1)))
+    fp = int(np.sum((y_true == 0) & (y_pred == 1)))
+    fn = int(np.sum((y_true == 1) & (y_pred == 0)))
+    tn = int(np.sum((y_true == 0) & (y_pred == 0)))
+    accuracy = (tp + tn) / len(y_true)
+    precision = tp / (tp + fp) if tp + fp > 0 else 0.0
+    recall = tp / (tp + fn) if tp + fn > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+    return {
+        "threshold": threshold,
+        "TP": tp,
+        "FP": fp,
+        "FN": fn,
+        "TN": tn,
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+    }
+
+for tau in [0.3, 0.5, 0.7]:
+    print(binary_metrics(y_true, p_score, tau))
+```
+
+## 20.6 Macro, micro, and weighted averaging
+
+For multiclass classification, we can compute precision, recall, and $F_1$ separately for each class.
+For class $c$, treat $c$ as positive and all other classes as negative.
+This gives $F_{1,c}$.
+
+Macro averaging gives equal weight to each class:
+
+$$
+F_{1,\text{macro}} = \frac{1}{K}\sum_{c=1}^K F_{1,c}.
+$$
+
+Weighted averaging weights each class by its support $n_c$:
+
+$$
+F_{1,\text{weighted}} = \sum_{c=1}^K \frac{n_c}{n}F_{1,c}.
+$$
+
+Micro averaging pools all true positives, false positives, and false negatives across classes before computing the score.
+For single-label multiclass classification, micro $F_1$ equals accuracy.
+
+The choice matters.
+Macro $F_1$ emphasizes minority classes.
+Weighted $F_1$ is closer to the empirical class distribution.
+Micro metrics emphasize overall instance-level performance.
+
+```{python}
+y_true_mc = np.array(["math", "math", "stats", "stats", "cs", "math", "cs", "stats"])
+y_pred_mc = np.array(["math", "stats", "stats", "stats", "math", "math", "cs", "cs"])
+classes = sorted(set(y_true_mc) | set(y_pred_mc))
+
+def per_class_f1(y_true, y_pred, classes):
+    rows = []
+    for c in classes:
+        tp = np.sum((y_true == c) & (y_pred == c))
+        fp = np.sum((y_true != c) & (y_pred == c))
+        fn = np.sum((y_true == c) & (y_pred != c))
+        precision = tp / (tp + fp) if tp + fp > 0 else 0.0
+        recall = tp / (tp + fn) if tp + fn > 0 else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+        support = int(np.sum(y_true == c))
+        rows.append((c, support, precision, recall, f1))
+    return rows
+
+rows = per_class_f1(y_true_mc, y_pred_mc, classes)
+for row in rows:
+    print(row)
+
+macro_f1 = np.mean([row[-1] for row in rows])
+weighted_f1 = sum(row[1] * row[-1] for row in rows) / len(y_true_mc)
+accuracy = np.mean(y_true_mc == y_pred_mc)
+print("macro F1:", macro_f1)
+print("weighted F1:", weighted_f1)
+print("accuracy:", accuracy)
+```
+
+## 20.7 Language-model evaluation: cross-entropy and perplexity
+
+For a language model, the target is usually the next token.
+Given a sequence $w_{1:T}$, an autoregressive model assigns
+
+$$
+p_\theta(w_{1:T}) = \prod_{t=1}^T p_\theta(w_t \mid w_{<t}).
+$$
+
+The average negative log-likelihood per token is
+
+$$
+\widehat H = -\frac{1}{N}\sum_{i=1}^N \log p_\theta(w_i \mid \text{context}_i),
+$$
+
+where $N$ is the number of evaluated target tokens.
+This quantity is also called empirical cross-entropy when the tokens are sampled from a data distribution.
+
+Perplexity is
+
+$$
+\operatorname{PPL} = \exp(\widehat H)
+$$
+
+when natural logarithms are used.
+If logarithms base $2$ are used, then
+
+$$
+\operatorname{PPL}=2^{\widehat H_2}.
+$$
+
+Perplexity can be interpreted as an effective average branching factor.
+A lower perplexity means the model assigns higher probability to the observed next tokens.
+
+### Important limitations of perplexity
+
+Perplexity is useful for comparing models under the same tokenizer and evaluation distribution.
+However, it can be misleading across tokenizers.
+A model using shorter subword units may have a different number of tokens than a model using longer tokens.
+Per-token perplexity is therefore not automatically comparable across tokenization schemes.
+
+Also, low perplexity does not guarantee usefulness, factuality, safety, or reasoning quality.
+A model may predict common text well but fail on specialized mathematical or institutional questions.
+
+```{python}
+# Token-level negative log-likelihood and perplexity.
+# Rows are time steps; columns are vocabulary items.
+logits = np.array([
+    [2.0, 1.0, 0.0],
+    [0.2, 1.8, 0.1],
+    [0.1, 0.4, 2.2],
+    [1.4, 0.8, 0.2],
+])
+
+targets = np.array([0, 1, 2, 1])
+
+def log_softmax(z):
+    z = z - np.max(z, axis=-1, keepdims=True)
+    return z - np.log(np.sum(np.exp(z), axis=-1, keepdims=True))
+
+log_probs = log_softmax(logits)
+nll = -log_probs[np.arange(len(targets)), targets]
+mean_nll = np.mean(nll)
+perplexity = np.exp(mean_nll)
+
+print("token NLL values:", np.round(nll, 4))
+print("mean NLL:", round(mean_nll, 4))
+print("perplexity:", round(perplexity, 4))
+```
+
+## 20.8 Calibration and probabilistic honesty
+
+Accuracy measures whether predictions are correct.
+Calibration measures whether predicted probabilities mean what they say.
+
+A binary classifier is calibrated if
+
+$$
+P(Y=1 \mid \hat p(X)=q)=q
+$$
+
+for all probability values $q$.
+In practice, probabilities are binned.
+For bin $B_m$, define
+
+$$
+\operatorname{conf}(B_m)=\frac{1}{|B_m|}\sum_{i\in B_m}\hat p_i,
+$$
+
+and
+
+$$
+\operatorname{acc}(B_m)=\frac{1}{|B_m|}\sum_{i\in B_m}y_i.
+$$
+
+The expected calibration error is approximated by
+
+$$
+\operatorname{ECE}=\sum_{m=1}^M \frac{|B_m|}{n}\left|\operatorname{acc}(B_m)-\operatorname{conf}(B_m)\right|.
+$$
+
+A related proper scoring rule is the Brier score:
+
+$$
+\operatorname{Brier}=\frac{1}{n}\sum_{i=1}^n (\hat p_i-y_i)^2.
+$$
+
+A proper scoring rule rewards honest probability estimates.
+Cross-entropy and Brier score are both proper scoring rules for probabilistic prediction.
+
+```{python}
+y = np.array([1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0])
+p = np.array([0.95, 0.88, 0.82, 0.76, 0.69, 0.55, 0.52, 0.45, 0.37, 0.28, 0.21, 0.08])
+
+def calibration_table(y, p, bins=4):
+    edges = np.linspace(0, 1, bins + 1)
+    rows = []
+    ece = 0.0
+    for j in range(bins):
+        lo, hi = edges[j], edges[j + 1]
+        if j == bins - 1:
+            mask = (p >= lo) & (p <= hi)
+        else:
+            mask = (p >= lo) & (p < hi)
+        if np.sum(mask) == 0:
+            continue
+        conf = np.mean(p[mask])
+        acc = np.mean(y[mask])
+        weight = np.mean(mask)
+        ece += weight * abs(acc - conf)
+        rows.append((lo, hi, int(np.sum(mask)), conf, acc))
+    return rows, ece
+
+rows, ece = calibration_table(y, p, bins=4)
+for row in rows:
+    print(row)
+print("ECE:", round(ece, 4))
+print("Brier:", round(np.mean((p - y) ** 2), 4))
+```
+
+## 20.9 Interactive: threshold, precision, recall, and calibration
+
+The following interactive example shows how a single set of probability scores can lead to different classification metrics as the decision threshold changes.
+It also shows how temperature scaling changes probabilistic confidence.
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: Evaluation metric trade-off explorer</h3>
+  <p>
+    Move the threshold to see how precision, recall, and F1 change.
+    Move the temperature to rescale logits before converting them into probabilities.
+    This illustrates that evaluation is partly a property of the model and partly a property of the decision rule.
+  </p>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; align-items:end;">
+    <label>
+      Decision threshold τ:
+      <input id="ch20-threshold" type="range" min="0.05" max="0.95" step="0.01" value="0.50" style="width:100%;">
+      <span id="ch20-threshold-label">0.50</span>
+    </label>
+    <label>
+      Temperature T:
+      <input id="ch20-temperature" type="range" min="0.50" max="3.00" step="0.05" value="1.00" style="width:100%;">
+      <span id="ch20-temperature-label">1.00</span>
+    </label>
+  </div>
+
+  <div id="ch20-status" class="plotly-status">Loading local Plotly...</div>
+  <div id="ch20-metrics-plot" class="plotly-demo"></div>
+  <div id="ch20-calibration-plot" class="plotly-demo"></div>
+  <pre id="ch20-summary" style="white-space:pre-wrap;"></pre>
+</div>
+
+<script>
+(function() {
+  function loadPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    const candidates = [
+      "../assets/plotly.min.js",
+      "assets/plotly.min.js",
+      "./assets/plotly.min.js"
+    ];
+    let i = 0;
+    function tryNext() {
+      if (window.Plotly) {
+        callback();
+        return;
+      }
+      if (i >= candidates.length) {
+        const status = document.getElementById("ch20-status");
+        if (status) {
+          status.textContent = "Plotly.js was not available, so the interactive figure could not be drawn. Check that assets/plotly.min.js exists in the rendered site.";
+        }
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = candidates[i++];
+      script.onload = function() { callback(); };
+      script.onerror = tryNext;
+      document.head.appendChild(script);
+    }
+    tryNext();
+  }
+
+  function sigmoid(x) {
+    return 1 / (1 + Math.exp(-x));
+  }
+
+  function logit(p) {
+    return Math.log(p / (1 - p));
+  }
+
+  function metrics(y, p, tau) {
+    let tp = 0, fp = 0, fn = 0, tn = 0;
+    for (let i = 0; i < y.length; i++) {
+      const pred = p[i] >= tau ? 1 : 0;
+      if (y[i] === 1 && pred === 1) tp++;
+      if (y[i] === 0 && pred === 1) fp++;
+      if (y[i] === 1 && pred === 0) fn++;
+      if (y[i] === 0 && pred === 0) tn++;
+    }
+    const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+    const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+    const f1 = precision + recall > 0 ? 2 * precision * recall / (precision + recall) : 0;
+    const accuracy = (tp + tn) / y.length;
+    return {tp, fp, fn, tn, precision, recall, f1, accuracy};
+  }
+
+  function calibrationBins(y, p, bins) {
+    const xs = [];
+    const ys = [];
+    const sizes = [];
+    let ece = 0;
+    for (let b = 0; b < bins; b++) {
+      const lo = b / bins;
+      const hi = (b + 1) / bins;
+      let count = 0;
+      let conf = 0;
+      let acc = 0;
+      for (let i = 0; i < p.length; i++) {
+        const inBin = b === bins - 1 ? (p[i] >= lo && p[i] <= hi) : (p[i] >= lo && p[i] < hi);
+        if (inBin) {
+          count++;
+          conf += p[i];
+          acc += y[i];
+        }
+      }
+      if (count > 0) {
+        conf /= count;
+        acc /= count;
+        xs.push(conf);
+        ys.push(acc);
+        sizes.push(8 + 2 * count);
+        ece += (count / p.length) * Math.abs(acc - conf);
+      }
+    }
+    return {xs, ys, sizes, ece};
+  }
+
+  function initCh20() {
+    const status = document.getElementById("ch20-status");
+    const thresholdSlider = document.getElementById("ch20-threshold");
+    const tempSlider = document.getElementById("ch20-temperature");
+    const thresholdLabel = document.getElementById("ch20-threshold-label");
+    const tempLabel = document.getElementById("ch20-temperature-label");
+    const summary = document.getElementById("ch20-summary");
+    if (!thresholdSlider || !tempSlider || !window.Plotly) return;
+    if (status) status.textContent = "";
+
+    const y = [1,1,1,1,1,1,0,0,0,0,0,0,1,0,1,0];
+    const baseP = [0.96,0.88,0.81,0.73,0.65,0.57,0.91,0.69,0.61,0.45,0.34,0.20,0.42,0.15,0.30,0.08];
+    const logits = baseP.map(logit);
+    const thresholds = [];
+    for (let t = 0.05; t <= 0.950001; t += 0.01) thresholds.push(t);
+
+    function update() {
+      const tau = parseFloat(thresholdSlider.value);
+      const temp = parseFloat(tempSlider.value);
+      thresholdLabel.textContent = tau.toFixed(2);
+      tempLabel.textContent = temp.toFixed(2);
+      const p = logits.map(z => sigmoid(z / temp));
+      const precisionCurve = thresholds.map(t => metrics(y, p, t).precision);
+      const recallCurve = thresholds.map(t => metrics(y, p, t).recall);
+      const f1Curve = thresholds.map(t => metrics(y, p, t).f1);
+      const m = metrics(y, p, tau);
+      const cal = calibrationBins(y, p, 5);
+      const brier = p.reduce((s, pi, i) => s + Math.pow(pi - y[i], 2), 0) / p.length;
+
+      Plotly.react("ch20-metrics-plot", [
+        {x: thresholds, y: precisionCurve, type: "scatter", mode: "lines", name: "precision"},
+        {x: thresholds, y: recallCurve, type: "scatter", mode: "lines", name: "recall"},
+        {x: thresholds, y: f1Curve, type: "scatter", mode: "lines", name: "F1"},
+        {x: [tau, tau], y: [0, 1], type: "scatter", mode: "lines", name: "current threshold", line: {dash: "dash"}}
+      ], {
+        title: "Precision-recall-F1 as functions of the threshold",
+        xaxis: {title: "threshold τ", range: [0.05, 0.95]},
+        yaxis: {title: "score", range: [0, 1.02]},
+        margin: {l: 50, r: 20, t: 50, b: 50}
+      }, {responsive: true, displayModeBar: false});
+
+      Plotly.react("ch20-calibration-plot", [
+        {x: [0, 1], y: [0, 1], type: "scatter", mode: "lines", name: "perfect calibration"},
+        {x: cal.xs, y: cal.ys, type: "scatter", mode: "markers", name: "bins", marker: {size: cal.sizes}}
+      ], {
+        title: "Calibration diagram",
+        xaxis: {title: "mean predicted confidence", range: [0, 1]},
+        yaxis: {title: "empirical positive rate", range: [0, 1]},
+        margin: {l: 50, r: 20, t: 50, b: 50}
+      }, {responsive: true, displayModeBar: false});
+
+      summary.textContent =
+        "TP=" + m.tp + ", FP=" + m.fp + ", FN=" + m.fn + ", TN=" + m.tn + "\n" +
+        "Accuracy=" + m.accuracy.toFixed(3) +
+        ", Precision=" + m.precision.toFixed(3) +
+        ", Recall=" + m.recall.toFixed(3) +
+        ", F1=" + m.f1.toFixed(3) + "\n" +
+        "ECE=" + cal.ece.toFixed(3) + ", Brier=" + brier.toFixed(3) + "\n" +
+        "Interpretation: increasing the threshold usually raises precision and lowers recall. Increasing temperature pushes probabilities toward 0.5 and can change calibration without changing the rank order of examples.";
+    }
+
+    thresholdSlider.addEventListener("input", update);
+    tempSlider.addEventListener("input", update);
+    update();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() { loadPlotly(initCh20); });
+  } else {
+    loadPlotly(initCh20);
+  }
+})();
+</script>
+```
+
+## 20.10 Overlap metrics for generated text
+
+Generated text is difficult to evaluate because there may be many correct answers.
+For example, two summaries can be semantically similar while sharing few exact words.
+Nevertheless, overlap metrics remain useful as quick baselines.
+
+Let $G$ be a generated sequence and $R$ be a reference sequence.
+For a token $n$-gram $g$, let $c_G(g)$ and $c_R(g)$ be its counts.
+A clipped precision score is
+
+$$
+P_n = \frac{\sum_g \min\{c_G(g),c_R(g)\}}{\sum_g c_G(g)}.
+$$
+
+BLEU-style evaluation combines clipped $n$-gram precisions with a brevity penalty.
+A simplified version is
+
+$$
+\operatorname{BLEU}_N = BP \cdot \exp\left(\frac{1}{N}\sum_{n=1}^N \log P_n\right),
+$$
+
+where
+
+$$
+BP = \begin{cases}
+1, & |G| > |R|,\\
+\exp(1-|R|/|G|), & |G| \le |R|.
+\end{cases}
+$$
+
+ROUGE-style evaluation often emphasizes recall.
+For unigrams, a simple ROUGE-1 recall score is
+
+$$
+\operatorname{ROUGE\text{-}1\ recall} = \frac{\sum_g \min\{c_G(g),c_R(g)\}}{\sum_g c_R(g)}.
+$$
+
+The conceptual difference is important:
+
+- BLEU-style precision asks: how much of the generated text is supported by the reference?
+- ROUGE-style recall asks: how much of the reference was covered by the generated text?
+
+```{python}
+from collections import Counter
+import math
+
+def tokenize_simple(text):
+    return text.lower().replace(".", "").replace(",", "").split()
+
+def ngrams(tokens, n):
+    return [tuple(tokens[i:i+n]) for i in range(len(tokens) - n + 1)]
+
+def clipped_precision(generated, reference, n):
+    g_counts = Counter(ngrams(generated, n))
+    r_counts = Counter(ngrams(reference, n))
+    overlap = sum(min(count, r_counts[gram]) for gram, count in g_counts.items())
+    total = sum(g_counts.values())
+    return overlap / total if total > 0 else 0.0
+
+def rouge1_recall(generated, reference):
+    g_counts = Counter(generated)
+    r_counts = Counter(reference)
+    overlap = sum(min(g_counts[token], count) for token, count in r_counts.items())
+    total = sum(r_counts.values())
+    return overlap / total if total > 0 else 0.0
+
+def bleu_like(generated, reference, max_n=2, eps=1e-12):
+    precisions = [max(clipped_precision(generated, reference, n), eps) for n in range(1, max_n + 1)]
+    geo = math.exp(sum(math.log(p) for p in precisions) / max_n)
+    bp = 1.0 if len(generated) > len(reference) else math.exp(1 - len(reference) / max(len(generated), 1))
+    return bp * geo
+
+reference = tokenize_simple("the model retrieves relevant evidence before answering")
+generated = tokenize_simple("the system retrieves evidence before generating an answer")
+
+print("clipped unigram precision:", clipped_precision(generated, reference, 1))
+print("clipped bigram precision:", clipped_precision(generated, reference, 2))
+print("ROUGE-1 recall:", rouge1_recall(generated, reference))
+print("BLEU-like score:", bleu_like(generated, reference, max_n=2))
+```
+
+## 20.11 Semantic evaluation and embedding similarity
+
+Exact token overlap fails when two answers are semantically similar but lexically different.
+A common alternative is to embed generated and reference text into vectors:
+
+$$
+z_G = f(G), \qquad z_R = f(R),
+$$
+
+and score similarity by cosine similarity:
+
+$$
+\operatorname{sim}(G,R)=\frac{z_G^T z_R}{\|z_G\|\|z_R\|}.
+$$
+
+This is mathematically clean but not automatically reliable.
+The embedding model itself has limitations.
+It may miss precise mathematical distinctions, factual errors, negations, or numerical mistakes.
+
+For example, the sentences
+
+```text
+The null hypothesis is rejected.
+The null hypothesis is not rejected.
+```
+
+may be close in embedding space because most words are shared, but their statistical meanings are different.
+
+Thus semantic similarity is useful, but it should not replace task-specific correctness checks.
+
+## 20.12 Retrieval and RAG evaluation
+
+For retrieval, the model returns an ordered list of documents
+
+$$
+(d_1,d_2,\ldots,d_k).
+$$
+
+Let $R(q)$ be the set of relevant documents for query $q$.
+Precision@$k$ is
+
+$$
+\operatorname{Precision@}k = \frac{|\{d_1,\ldots,d_k\}\cap R(q)|}{k}.
+$$
+
+Recall@$k$ is
+
+$$
+\operatorname{Recall@}k = \frac{|\{d_1,\ldots,d_k\}\cap R(q)|}{|R(q)|}.
+$$
+
+The reciprocal rank is
+
+$$
+RR(q)=\frac{1}{\operatorname{rank of first relevant document}}.
+$$
+
+The mean reciprocal rank is the average over queries:
+
+$$
+\operatorname{MRR}=\frac{1}{m}\sum_{j=1}^m RR(q_j).
+$$
+
+If relevance has graded scores, discounted cumulative gain is
+
+$$
+\operatorname{DCG@}k = \sum_{i=1}^k \frac{2^{rel_i}-1}{\log_2(i+1)}.
+$$
+
+Normalized DCG divides by the ideal DCG:
+
+$$
+\operatorname{nDCG@}k = \frac{\operatorname{DCG@}k}{\operatorname{IDCG@}k}.
+$$
+
+### RAG-specific decomposition
+
+A RAG system should be evaluated in at least three pieces:
+
+$$
+\text{RAG quality} = \text{retrieval quality} + \text{grounding quality} + \text{answer quality}.
+$$
+
+Retrieval quality asks whether useful evidence was retrieved.
+Grounding quality asks whether the answer is supported by the retrieved evidence.
+Answer quality asks whether the final response is correct, complete, and usable.
+
+A failure may occur at any stage:
+
+1. the retriever misses the relevant document;
+2. the retriever finds it but ranks it too low;
+3. the generator ignores the evidence;
+4. the generator cites evidence incorrectly;
+5. the answer is correct but incomplete;
+6. the answer is fluent but unsupported.
+
+```{python}
+def precision_at_k(ranked, relevant, k):
+    top = ranked[:k]
+    return len(set(top) & set(relevant)) / k
+
+def recall_at_k(ranked, relevant, k):
+    top = ranked[:k]
+    return len(set(top) & set(relevant)) / len(relevant) if relevant else 0.0
+
+def reciprocal_rank(ranked, relevant):
+    relevant = set(relevant)
+    for i, doc in enumerate(ranked, start=1):
+        if doc in relevant:
+            return 1 / i
+    return 0.0
+
+def dcg_at_k(relevances, k):
+    return sum((2 ** rel - 1) / math.log2(i + 2) for i, rel in enumerate(relevances[:k]))
+
+def ndcg_at_k(ranked_relevances, k):
+    dcg = dcg_at_k(ranked_relevances, k)
+    ideal = dcg_at_k(sorted(ranked_relevances, reverse=True), k)
+    return dcg / ideal if ideal > 0 else 0.0
+
+ranked_docs = ["d7", "d2", "d9", "d1", "d4"]
+relevant_docs = {"d1", "d2", "d4"}
+ranked_relevances = [0, 2, 0, 3, 1]
+
+print("Precision@3:", precision_at_k(ranked_docs, relevant_docs, 3))
+print("Recall@3:", recall_at_k(ranked_docs, relevant_docs, 3))
+print("MRR contribution:", reciprocal_rank(ranked_docs, relevant_docs))
+print("nDCG@5:", ndcg_at_k(ranked_relevances, 5))
+```
+
+## 20.13 Human evaluation
+
+For open-ended generation, human evaluation is often necessary.
+A typical human evaluation protocol defines a rubric.
+For example, a generated answer may be rated on:
+
+- correctness;
+- completeness;
+- clarity;
+- faithfulness to evidence;
+- mathematical precision;
+- usefulness for the intended audience.
+
+Suppose $r_{ij}$ is the rating assigned by evaluator $j$ to item $i$.
+A simple average score is
+
+$$
+\bar r = \frac{1}{mn}\sum_{i=1}^n\sum_{j=1}^m r_{ij}.
+$$
+
+However, human evaluation has its own statistical issues:
+
+- annotators may disagree;
+- rubrics may be ambiguous;
+- ratings may be ordinal rather than interval-valued;
+- examples may not represent the target population;
+- evaluators may be influenced by fluency or length.
+
+Inter-rater agreement should be checked when human scores are used as evidence.
+A simple pairwise agreement rate is
+
+$$
+\operatorname{Agreement}=\frac{\text{number of matching rating decisions}}{\text{number of compared decisions}}.
+$$
+
+For categorical ratings, Cohen's kappa adjusts for chance agreement:
+
+$$
+\kappa = \frac{p_o-p_e}{1-p_e},
+$$
+
+where $p_o$ is observed agreement and $p_e$ is expected chance agreement under the annotators' marginal distributions.
+
+## 20.14 Statistical uncertainty in evaluation
+
+An evaluation score computed on a finite test set is a random variable.
+For a loss sample
+
+$$
+\ell_i = L(f_\theta(x_i),y_i),
+$$
+
+the empirical mean is
+
+$$
+\bar \ell = \frac{1}{n}\sum_{i=1}^n \ell_i.
+$$
+
+The sample variance is
+
+$$
+s^2 = \frac{1}{n-1}\sum_{i=1}^n (\ell_i-\bar \ell)^2.
+$$
+
+An approximate standard error is
+
+$$
+SE(\bar \ell)=\frac{s}{\sqrt n}.
+$$
+
+A rough $95\%$ confidence interval is
+
+$$
+\bar \ell \pm 1.96\frac{s}{\sqrt n}.
+$$
+
+For metrics such as $F_1$, BLEU, or nDCG, the formula may be complicated.
+A bootstrap interval is often easier.
+The nonparametric bootstrap repeatedly samples test examples with replacement and recomputes the metric.
+
+```{python}
+rng = np.random.default_rng(7243)
+
+# Simulated item-level correctness for an NLP system.
+correct = rng.binomial(1, 0.78, size=200)
+accuracy_hat = np.mean(correct)
+se = np.std(correct, ddof=1) / np.sqrt(len(correct))
+normal_ci = (accuracy_hat - 1.96 * se, accuracy_hat + 1.96 * se)
+
+# Bootstrap confidence interval.
+B = 2000
+boot = []
+for _ in range(B):
+    sample = rng.choice(correct, size=len(correct), replace=True)
+    boot.append(np.mean(sample))
+boot_ci = np.quantile(boot, [0.025, 0.975])
+
+print("accuracy:", round(accuracy_hat, 4))
+print("normal CI:", tuple(np.round(normal_ci, 4)))
+print("bootstrap CI:", tuple(np.round(boot_ci, 4)))
+```
+
+## 20.15 Comparing two models
+
+Suppose two systems A and B are evaluated on the same $n$ examples.
+Let
+
+$$
+d_i = L_A(x_i,y_i)-L_B(x_i,y_i).
+$$
+
+If lower loss is better, then $d_i>0$ means B is better on item $i$.
+The mean difference is
+
+$$
+\bar d = \frac{1}{n}\sum_{i=1}^n d_i.
+$$
+
+A paired comparison is usually better than comparing two independent averages because both models are evaluated on the same items.
+The paired standard error is
+
+$$
+SE(\bar d)=\frac{s_d}{\sqrt n}.
+$$
+
+where $s_d$ is the sample standard deviation of the item-level differences.
+
+```{python}
+rng = np.random.default_rng(7339)
+loss_A = rng.normal(loc=0.42, scale=0.12, size=100)
+loss_B = loss_A - rng.normal(loc=0.03, scale=0.08, size=100)
+d = loss_A - loss_B
+mean_diff = np.mean(d)
+se_diff = np.std(d, ddof=1) / np.sqrt(len(d))
+ci_diff = (mean_diff - 1.96 * se_diff, mean_diff + 1.96 * se_diff)
+
+print("mean paired loss reduction A - B:", round(mean_diff, 4))
+print("approximate 95% CI:", tuple(np.round(ci_diff, 4)))
+```
+
+A confidence interval for the paired difference is more informative than saying one score is simply larger than another.
+It tells us whether the observed difference is large compared with test-set variability.
+
+## 20.16 Robustness and distribution shift
+
+Let $P_{\text{test}}$ be the distribution represented by the evaluation set and $P_{\text{deploy}}$ be the distribution where the system is actually used.
+A model with low empirical risk on $P_{\text{test}}$ may fail when
+
+$$
+P_{\text{deploy}} \ne P_{\text{test}}.
+$$
+
+In NLP, distribution shift may come from:
+
+- a different domain;
+- a different institution;
+- new terminology;
+- multilingual or code-switched text;
+- different prompt styles;
+- adversarial inputs;
+- longer contexts;
+- updated policies or facts.
+
+Robust evaluation therefore should include subpopulation analysis.
+If the test set is partitioned into groups $G_1,\ldots,G_m$, compute
+
+$$
+\widehat R_j = \frac{1}{|G_j|}\sum_{i\in G_j} L(f_\theta(x_i),y_i).
+$$
+
+A single average can hide serious failures on smaller groups.
+
+## 20.17 Evaluation for mathematical NLP tasks
+
+For this book's audience, mathematical precision matters.
+A language model can be fluent but mathematically wrong.
+For math-heavy NLP tasks, evaluation should check:
+
+1. **symbolic correctness:** Are formulas syntactically and mathematically valid?
+2. **logical correctness:** Does each conclusion follow from previous statements?
+3. **numerical correctness:** Are computations correct?
+4. **definition consistency:** Are terms used consistently?
+5. **assumption tracking:** Are required assumptions stated?
+6. **citation and source grounding:** For RAG, is every factual claim supported by evidence?
+
+A useful rubric for generated mathematical explanations may score each answer using a vector
+
+$$
+r = (r_{\text{correct}}, r_{\text{complete}}, r_{\text{clear}}, r_{\text{rigorous}}, r_{\text{audience}}).
+$$
+
+The final evaluation may use a weighted score
+
+$$
+S = w^T r,
+$$
+
+where weights $w$ should be chosen before evaluation.
+
+## 20.18 AI-assisted evaluation workflows
+
+Large language models can help with evaluation, but they should not be treated as infallible judges.
+A good AI-assisted workflow is:
+
+1. ask the AI judge to identify specific claims;
+2. ask it to compare each claim with the reference or retrieved evidence;
+3. require a structured score with reasons;
+4. audit a sample manually;
+5. measure agreement between AI judgments and human judgments.
+
+For mathematical material, an AI judge should be asked to separate:
+
+- algebraic correctness;
+- statistical interpretation;
+- notation consistency;
+- hidden assumptions;
+- relevance to the question.
+
+::: {.callout-important}
+## AI judge caution
+Using a language model to evaluate another language model creates a second modeling problem.
+The evaluator has its own biases, blind spots, and uncertainty.
+Treat AI-based evaluation as an instrument that must itself be validated.
+:::
+
+### Prompt pattern for AI-assisted evaluation
+
+```text
+You are evaluating an NLP model answer for a graduate applied mathematics audience.
+Evaluate the answer using the following dimensions:
+1. mathematical correctness,
+2. statistical interpretation,
+3. notation consistency,
+4. completeness,
+5. clarity.
+For each dimension, give a score from 0 to 4 and cite the exact sentence or formula that supports your judgment.
+Do not reward fluent but unsupported claims.
+```
+
+This prompt is not a substitute for human evaluation.
+It is a way to make the evaluation process more structured.
+
+## 20.19 A compact evaluation checklist
+
+Before reporting an NLP evaluation score, answer the following questions.
+
+1. What is the target population distribution?
+2. What is the exact test set?
+3. Was the test set used during development?
+4. What is the loss or metric?
+5. Does the metric match the desired behavior?
+6. What is the uncertainty of the estimate?
+7. Are subgroups or domains evaluated separately?
+8. Are errors qualitatively inspected?
+9. Are failure cases reported?
+10. Could the model optimize the metric while failing the real task?
+
+## 20.20 Worked example: evaluating a mini sentiment classifier
+
+Suppose a sentiment classifier outputs the following probabilities for the positive class:
+
+$$
+(0.9,0.8,0.7,0.6,0.4,0.3,0.2,0.1)
+$$
+
+and the true labels are
+
+$$
+(1,1,0,1,0,0,1,0).
+$$
+
+At threshold $\tau=0.5$, the predictions are
+
+$$
+(1,1,1,1,0,0,0,0).
+$$
+
+Thus
+
+$$
+TP=3, \quad FP=1, \quad FN=1, \quad TN=3.
+$$
+
+Accuracy is
+
+$$
+\frac{TP+TN}{8}=\frac{6}{8}=0.75.
+$$
+
+Precision is
+
+$$
+\frac{TP}{TP+FP}=\frac{3}{4}=0.75.
+$$
+
+Recall is
+
+$$
+\frac{TP}{TP+FN}=\frac{3}{4}=0.75.
+$$
+
+Therefore
+
+$$
+F_1 = 0.75.
+$$
+
+The example is small, but it illustrates the general idea: metrics are functions of counts induced by a decision rule.
+
+## 20.21 Common mistakes
+
+1. **Reporting one number without uncertainty.** A score on a small test set may not be stable.
+2. **Comparing perplexity across different tokenizers.** Tokenization changes the unit of measurement.
+3. **Using accuracy on imbalanced data.** High accuracy may hide poor minority-class performance.
+4. **Treating overlap metrics as semantic correctness.** Word overlap does not guarantee meaning.
+5. **Ignoring retrieval in RAG evaluation.** A good answer may be impossible if retrieval failed.
+6. **Optimizing the test set.** Repeated test-set use biases reported performance.
+7. **Not examining errors.** Aggregate metrics rarely reveal all failure modes.
+8. **Using an AI judge without validation.** The evaluator must also be evaluated.
+
+## 20.22 Python mini-project: evaluation report from predictions
+
+The following code produces a compact evaluation report for a binary classifier.
+Students can extend it to multiclass classification, retrieval, or generated-text evaluation.
+
+```{python}
+def evaluation_report(y_true, p_score, threshold=0.5, bins=5):
+    base = binary_metrics(y_true, p_score, threshold)
+    rows, ece = calibration_table(y_true, p_score, bins=bins)
+    brier = float(np.mean((p_score - y_true) ** 2))
+    return {
+        **base,
+        "ECE": ece,
+        "Brier": brier,
+        "calibration_bins": rows,
+    }
+
+report = evaluation_report(y_true, p_score, threshold=0.5, bins=5)
+for key, value in report.items():
+    print(key, ":", value)
+```
+
+## 20.23 Exercises
+
+### Conceptual exercises
+
+1. Explain why evaluation is an estimation problem.
+2. Give an example where accuracy is misleading but macro $F_1$ is informative.
+3. Explain why perplexity should not be compared directly across two models with different tokenizers.
+4. Describe a situation where ROUGE-style recall rewards a poor summary.
+5. Explain why a RAG system should be evaluated in separate retrieval and generation stages.
+6. Describe one way an AI judge can be useful and one way it can be misleading.
+
+### Mathematical exercises
+
+1. Prove that the empirical accuracy is an unbiased estimator of population accuracy when test examples are independent samples from the target distribution.
+2. Derive the $F_1$ formula from precision and recall as a harmonic mean.
+3. Show that if $\widehat H$ is average negative log-likelihood in nats, then perplexity is $\exp(\widehat H)$.
+4. Compute Precision@3, Recall@3, and MRR for the ranked list $(d_3,d_5,d_1,d_2)$ when the relevant set is $\{d_1,d_2\}$.
+5. For a binary classifier with scores $(0.9,0.6,0.4,0.2)$ and labels $(1,0,1,0)$, compute accuracy, precision, recall, and $F_1$ at thresholds $0.3$, $0.5$, and $0.7$.
+6. Suppose item-level losses have sample mean $0.42$, sample standard deviation $0.16$, and $n=100$. Compute an approximate $95\%$ confidence interval for population loss.
+
+### Computational exercises
+
+1. Implement macro, micro, and weighted $F_1$ for a multiclass classifier from scratch.
+2. Write a function that computes token-level cross-entropy and perplexity from logits and target token indices.
+3. Implement a bootstrap confidence interval for $F_1$.
+4. Implement BLEU-like clipped precision for $n=1,2,3,4$.
+5. Implement Precision@$k$, Recall@$k$, MRR, and nDCG for a list of queries.
+6. Build a small evaluation dashboard for a text classifier using Plotly.
+
+## 20.24 Mini-project
+
+Choose one NLP system from the earlier chapters:
+
+- Naive Bayes sentiment classifier;
+- TF-IDF retrieval system;
+- embedding-based retrieval system;
+- small language model;
+- RAG prototype.
+
+Write a short evaluation report containing:
+
+1. task definition;
+2. data split;
+3. chosen metrics and why they are appropriate;
+4. numerical results;
+5. confidence intervals or bootstrap intervals;
+6. at least five qualitative error examples;
+7. one recommendation for improving the system.
+
+The report should distinguish between what the metric proves and what it does not prove.
+
+## 20.25 Lab connection
+
+The companion lab for this chapter should ask students to build an evaluation toolkit from scratch.
+The lab should include:
+
+1. classification metrics;
+2. calibration metrics;
+3. perplexity calculation;
+4. overlap metrics for generated text;
+5. retrieval metrics;
+6. bootstrap uncertainty;
+7. a small Plotly dashboard.
+
+The main lesson is that evaluation is not a final afterthought.
+It is a mathematical design choice that shapes the entire NLP workflow.
+
+## 20.26 Summary
+
+This chapter developed evaluation as a statistical and mathematical problem.
+The central object is the population risk
+
+$$
+R(\theta)=E_P[L(f_\theta(X),Y)],
+$$
+
+and the practical object is an empirical estimate from a finite test set.
+Classification metrics arise from confusion counts.
+Language-model metrics arise from likelihood and cross-entropy.
+Calibration evaluates probabilistic honesty.
+Overlap metrics approximate generated-text similarity but do not fully measure meaning.
+Retrieval and RAG systems require multi-stage evaluation.
+Human and AI-assisted evaluation can be valuable, but both require clear rubrics and validation.
+
+A mathematically mature NLP practitioner should always ask:
+
+> What quantity is this metric estimating, and is that quantity actually what we care about?

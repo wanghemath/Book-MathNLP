@@ -1,0 +1,105 @@
+project:
+  type: book
+  output-dir: docs
+  resources:
+    - assets/plotly.min.js
+
+book:
+  title: "Mathematical Foundations of Natural Language Processing"
+  subtitle: "A Clean Mathematical Introduction for Applied Mathematics and Statistics Students"
+  author: "He Wang"
+  date: today
+  repo-url: "https://github.com/wanghemath/Book-NLP-Math"
+  site-url: "https://wanghemath.github.io/Book-NLP-Math/"
+  search: true
+  chapters:
+    - index.qmd
+    - introduction.qmd
+    - roadmap.qmd
+    - notation.qmd
+    - math-background.qmd
+    - part: "Part I. Language as Data"
+      chapters:
+        - chapters/chapter-01-what-is-nlp.qmd
+        - chapters/chapter-02-text-tokens-vocabularies.qmd
+        - chapters/chapter-03-documents-as-vectors.qmd
+    - part: "Part II. Probability Models for Language"
+      chapters:
+        - chapters/chapter-04-probability-and-language.qmd
+        - chapters/chapter-05-ngram-language-models.qmd
+        - chapters/chapter-06-naive-bayes-text-classification.qmd
+    - part: "Part III. Linear Algebra of Language"
+      chapters:
+        - chapters/chapter-07-vector-space-models.qmd
+        - chapters/chapter-08-word-embeddings.qmd
+        - chapters/chapter-09-geometry-of-embeddings.qmd
+    - part: "Part IV. Neural Networks for Sequences"
+      chapters:
+        - chapters/chapter-10-neural-networks-for-text.qmd
+        - chapters/chapter-11-recurrent-neural-networks.qmd
+        - chapters/chapter-12-lstm-gru-models.qmd
+    - part: "Part V. Attention and Transformers"
+      chapters:
+        - chapters/chapter-13-attention-mechanisms.qmd
+        - chapters/chapter-14-self-attention.qmd
+        - chapters/chapter-15-transformers.qmd
+        - chapters/chapter-16-positional-encoding.qmd
+    - part: "Part VI. Large Language Models and Retrieval"
+      chapters:
+        - chapters/chapter-17-autoregressive-language-models.qmd
+        - chapters/chapter-18-training-large-language-models.qmd
+        - chapters/chapter-19-embeddings-retrieval-rag.qmd
+        - chapters/chapter-20-evaluation.qmd
+    - part: "Part VII. Advanced Mathematical Perspectives"
+      chapters:
+        - chapters/chapter-21-information-theory.qmd
+        - chapters/chapter-22-optimization-for-nlp.qmd
+        - chapters/chapter-23-graphs-and-language.qmd
+        - chapters/chapter-24-topology-geometry-language.qmd
+        - chapters/chapter-25-ethics-bias-responsibility.qmd
+    - labs-summary.qmd
+    - interactive-htmls.qmd
+    - interactive-diagnostics.qmd
+    - final-projects.qmd
+    - python-reference.qmd
+    - references.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    theme: cosmo
+    css: styles.scss
+    include-in-header:
+      text: |
+        <script>
+        (function() {
+          if (window.Plotly || document.querySelector('script[data-local-plotly="true"]')) return;
+          var script = document.createElement('script');
+          var inChapters = window.location.pathname.indexOf('/chapters/') !== -1;
+          script.src = (inChapters ? '../' : '') + 'assets/plotly.min.js';
+          script.async = true;
+          script.setAttribute('data-local-plotly', 'true');
+          document.head.appendChild(script);
+        })();
+        </script>
+    toc: true
+    number-sections: true
+    code-fold: false
+    code-tools: true
+    df-print: paged
+  pdf:
+    documentclass: scrreprt
+    toc: true
+    number-sections: true
+    geometry:
+      - margin=1in
+    fontsize: 11pt
+
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: auto
+
+jupyter: python3

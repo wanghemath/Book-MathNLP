@@ -1,0 +1,1015 @@
+---
+title: "Chapter 21. Information Theory and Language"
+subtitle: "Entropy, Divergence, Mutual Information, and Compression"
+format:
+  html:
+    toc: true
+    code-fold: false
+  pdf:
+    toc: true
+jupyter: python3
+---
+
+# Chapter 21. Information Theory and Language
+
+Information theory gives a mathematical language for uncertainty, prediction, compression, and dependence.
+For natural language processing, these ideas are not optional background.
+They appear directly in language-model training, perplexity, tokenization, decoding, representation learning, retrieval, and alignment.
+
+The central observation is simple:
+
+> A language model assigns probabilities to possible tokens and sequences.  Therefore, a language model can be studied using the mathematics of probability distributions and information.
+
+Earlier chapters used cross-entropy as a loss function and perplexity as an evaluation metric.
+This chapter explains why those quantities are natural.
+The goal is to make explicit the connection between prediction and compression:
+
+$$
+\text{good probabilistic prediction} \quad \Longleftrightarrow \quad \text{short code length on average}.
+$$
+
+For MA Applied Mathematics and MS Statistics students, information theory is especially useful because it gives clean definitions that apply to both classical statistical NLP and modern neural language models.
+
+::: {.callout-tip}
+## Guiding principle
+Entropy measures uncertainty under a true distribution.
+Cross-entropy measures the average loss when one distribution is used to predict another.
+KL divergence measures the extra cost caused by using the wrong distribution.
+:::
+
+## 21.1 Learning goals
+
+After studying this chapter, you should be able to:
+
+1. compute entropy, cross-entropy, KL divergence, and perplexity for discrete token distributions;
+2. explain why cross-entropy is the standard training loss for language models;
+3. interpret perplexity as an exponential average branching factor;
+4. use the entropy chain rule to decompose uncertainty in a sequence;
+5. define conditional entropy and mutual information;
+6. connect pointwise mutual information with word co-occurrence and embeddings;
+7. explain how tokenization changes entropy and code length;
+8. interpret KL regularization in fine-tuning and alignment;
+9. implement information-theoretic quantities from scratch in Python;
+10. critique language-model evaluations using information-theoretic reasoning.
+
+## 21.2 Discrete distributions over tokens
+
+Let $V=\{1,2,\ldots,d\}$ be a finite vocabulary.
+A token distribution is a vector
+
+$$
+p=(p_1,\ldots,p_d) \in \Delta^{d-1},
+$$
+
+where
+
+$$
+p_j \ge 0, \qquad \sum_{j=1}^d p_j=1.
+$$
+
+Here $\Delta^{d-1}$ is the probability simplex.
+In NLP, $p_j$ may represent the empirical frequency of token $j$ in a corpus, the conditional probability assigned by a language model to token $j$, or the predicted class probability in a classifier.
+
+Given counts $c_1,\ldots,c_d$ from a corpus, the empirical distribution is
+
+$$
+\widehat p_j = \frac{c_j}{\sum_{r=1}^d c_r}.
+$$
+
+This is the maximum likelihood estimator for a categorical distribution.
+It is also the simplest bridge between text and information theory: a corpus becomes a point in a probability simplex.
+
+::: {.callout-note}
+## Logarithm base
+If logs use base $2$, entropy is measured in bits.
+If logs use base $e$, entropy is measured in nats.
+Machine learning usually uses natural logarithms because gradients are simpler.
+This chapter mostly uses natural logarithms.
+:::
+
+## 21.3 Entropy
+
+Let $X$ be a discrete random variable with distribution $p$ on $V$.
+The entropy of $X$ is
+
+$$
+H(X)=H(p)=-\sum_{j=1}^d p_j \log p_j.
+$$
+
+By convention, $0\log 0=0$.
+Entropy measures the average uncertainty before observing $X$.
+Equivalently, it is the average information content of the outcome:
+
+$$
+H(X)=E[-\log p_X].
+$$
+
+The quantity
+
+$$
+I(x)=-\log p(x)
+$$
+
+is called the surprisal or self-information of the event $X=x$.
+Rare events have high surprisal; common events have low surprisal.
+
+### Basic properties
+
+For a distribution on $d$ outcomes,
+
+$$
+0 \le H(p) \le \log d.
+$$
+
+The lower bound occurs when all probability mass is concentrated on one outcome.
+The upper bound occurs at the uniform distribution $p_j=1/d$.
+Thus entropy is largest when all tokens are equally likely.
+
+This upper bound is easy to prove using KL divergence.
+Let $u_j=1/d$ be the uniform distribution.
+Because $D_{\mathrm{KL}}(p\|u)\ge 0$,
+
+$$
+0 \le \sum_{j=1}^d p_j\log\frac{p_j}{1/d}
+= \sum_{j=1}^d p_j\log p_j + \log d.
+$$
+
+Therefore,
+
+$$
+H(p) = -\sum_{j=1}^d p_j\log p_j \le \log d.
+$$
+
+The inequality says that no distribution on $d$ tokens has more uncertainty than the uniform distribution.
+
+## 21.4 Cross-entropy and the log score
+
+Suppose the true token distribution is $p$, but a model predicts distribution $q$.
+The cross-entropy of $p$ relative to $q$ is
+
+$$
+H(p,q) = -\sum_{j=1}^d p_j \log q_j.
+$$
+
+It is the expected negative log-probability assigned by $q$ when the data are generated from $p$:
+
+$$
+H(p,q)=E_{X\sim p}[-\log q_X].
+$$
+
+This is exactly the population version of the language-model loss.
+Given tokens $x_1,\ldots,x_n$, the empirical cross-entropy loss is
+
+$$
+\widehat H(p,q) = -\frac{1}{n}\sum_{i=1}^n \log q_{x_i}.
+$$
+
+If $q=q_\theta(\cdot \mid \text{context})$ is a neural language model, then minimizing cross-entropy is the same as maximizing likelihood.
+
+### Why the negative log score?
+
+The negative log score has several special properties.
+It rewards assigning high probability to the observed token, but it also punishes overconfident mistakes severely.
+If $q_x$ is close to zero for the observed token $x$, then $-\log q_x$ is very large.
+
+For one-hot target vector $e_y$ and predicted distribution $q$, the cross-entropy loss is
+
+$$
+\ell(q,y)=-\sum_{j=1}^d (e_y)_j\log q_j=-\log q_y.
+$$
+
+This is the loss used in next-token prediction.
+
+## 21.5 KL divergence
+
+The Kullback--Leibler divergence from $q$ to $p$ is
+
+$$
+D_{\mathrm{KL}}(p\|q)=\sum_{j=1}^d p_j\log\frac{p_j}{q_j}.
+$$
+
+It is not symmetric, so it is not a metric.
+However, it has a crucial interpretation:
+
+$$
+D_{\mathrm{KL}}(p\|q) = H(p,q)-H(p).
+$$
+
+Thus KL divergence is the extra expected log loss incurred by predicting with $q$ when the true distribution is $p$.
+Since $H(p)$ does not depend on $q$, minimizing cross-entropy over $q$ is equivalent to minimizing KL divergence from the data distribution to the model distribution.
+
+### Gibbs inequality
+
+For distributions $p$ and $q$ with $q_j>0$ whenever $p_j>0$,
+
+$$
+D_{\mathrm{KL}}(p\|q)\ge 0,
+$$
+
+with equality if and only if $p=q$.
+One proof uses the concavity of $\log$.
+Let $Z=q_X/p_X$ when $X\sim p$.
+Then
+
+$$
+-D_{\mathrm{KL}}(p\|q)
+= \sum_j p_j\log\frac{q_j}{p_j}
+\le \log\left(\sum_j p_j\frac{q_j}{p_j}\right)
+=\log\left(\sum_j q_j\right)=0.
+$$
+
+Therefore $D_{\mathrm{KL}}(p\|q)\ge 0$.
+
+::: {.callout-warning}
+## Support mismatch
+If $p_j>0$ but $q_j=0$, then $D_{\mathrm{KL}}(p\|q)=\infty$.
+This is the information-theoretic version of the zero-probability problem in n-gram language models.
+Smoothing is necessary because a model should not assign zero probability to plausible future tokens.
+:::
+
+## 21.6 Perplexity
+
+For a sequence of $n$ observed tokens $x_1,\ldots,x_n$, suppose a language model assigns conditional probabilities
+
+$$
+q_i = q_\theta(x_i\mid x_{<i}).
+$$
+
+The average negative log-likelihood is
+
+$$
+\operatorname{NLL}_{\text{avg}} = -\frac{1}{n}\sum_{i=1}^n \log q_i.
+$$
+
+The perplexity is
+
+$$
+\operatorname{PPL}=\exp\left(\operatorname{NLL}_{\text{avg}}\right).
+$$
+
+When natural logarithms are used, perplexity is the exponential of average cross-entropy in nats.
+When base-$2$ logarithms are used,
+
+$$
+\operatorname{PPL}=2^{H_2},
+$$
+
+where $H_2$ is measured in bits.
+
+Perplexity can be interpreted as an average branching factor.
+A perplexity of $20$ means the model is, in an information-theoretic sense, as uncertain as if it were choosing uniformly among about $20$ equally likely tokens at each step.
+
+::: {.callout-note}
+## Perplexity depends on tokenization
+Perplexity is not directly comparable across different tokenizers.
+A character-level model, word-level model, and subword-level model define different random variables.
+Changing the tokenization changes the unit of prediction and therefore changes the entropy scale.
+:::
+
+## 21.7 Sequence entropy and the chain rule
+
+Let $W_{1:T}=(W_1,\ldots,W_T)$ be a sequence of tokens.
+The joint entropy is
+
+$$
+H(W_{1:T})=-\sum_{w_{1:T}}p(w_{1:T})\log p(w_{1:T}).
+$$
+
+The entropy chain rule states that
+
+$$
+H(W_{1:T})=\sum_{t=1}^T H(W_t\mid W_{1:t-1}).
+$$
+
+This identity matches the autoregressive factorization
+
+$$
+p(w_{1:T})=\prod_{t=1}^T p(w_t\mid w_{1:t-1}).
+$$
+
+Taking negative logs and expectations gives the entropy chain rule.
+Thus autoregressive language modeling is not just an engineering trick.
+It is aligned with the fundamental decomposition of uncertainty in a sequence.
+
+### Entropy rate
+
+For a stationary stochastic process $W_1,W_2,\ldots$, the entropy rate is
+
+$$
+\bar H = \lim_{T\to\infty}\frac{1}{T}H(W_{1:T}),
+$$
+
+when the limit exists.
+Equivalently, under suitable conditions,
+
+$$
+\bar H = \lim_{T\to\infty}H(W_T\mid W_{1:T-1}).
+$$
+
+For language, the entropy rate measures the long-run average uncertainty per token after using all previous context.
+Better context modeling should reduce conditional entropy.
+
+## 21.8 Conditional entropy and mutual information
+
+For random variables $X$ and $Y$, the conditional entropy is
+
+$$
+H(Y\mid X) = -\sum_x p(x)\sum_y p(y\mid x)\log p(y\mid x).
+$$
+
+It measures the remaining uncertainty in $Y$ after observing $X$.
+The mutual information between $X$ and $Y$ is
+
+$$
+I(X;Y)=H(Y)-H(Y\mid X).
+$$
+
+It is also
+
+$$
+I(X;Y)=\sum_{x,y}p(x,y)\log\frac{p(x,y)}{p(x)p(y)}.
+$$
+
+Therefore,
+
+$$
+I(X;Y)=D_{\mathrm{KL}}(p(x,y)\|p(x)p(y)).
+$$
+
+Mutual information measures how far the joint distribution is from independence.
+If $X$ and $Y$ are independent, then $p(x,y)=p(x)p(y)$ and $I(X;Y)=0$.
+
+### Mutual information in NLP
+
+Mutual information appears naturally in several places:
+
+- word co-occurrence: how much does seeing one word tell us about a nearby word?
+- classification: how informative is a token about a label?
+- representation learning: how much information does an embedding retain about input or target variables?
+- retrieval: how informative is a document about a query?
+- prompting: how much does an instruction reduce uncertainty about the desired answer?
+
+## 21.9 Pointwise mutual information and word co-occurrence
+
+For two events $X=x$ and $Y=y$, the pointwise mutual information is
+
+$$
+\operatorname{PMI}(x,y)=\log\frac{p(x,y)}{p(x)p(y)}.
+$$
+
+PMI is positive when $x$ and $y$ co-occur more often than expected under independence.
+It is negative when they co-occur less often than expected.
+
+In word-context analysis, we may let $X$ be a center word and $Y$ be a context word.
+Then PMI becomes
+
+$$
+\operatorname{PMI}(w,c)=\log\frac{p(w,c)}{p(w)p(c)}.
+$$
+
+The positive part is called positive PMI:
+
+$$
+\operatorname{PPMI}(w,c)=\max\{\operatorname{PMI}(w,c),0\}.
+$$
+
+Chapter 8 used PPMI matrices for word embeddings.
+This chapter explains why the ratio is meaningful: it compares observed co-occurrence with what independence would predict.
+
+## 21.10 Compression interpretation
+
+Information theory connects probability and coding.
+If an event $x$ has probability $p(x)$, an ideal code assigns it length approximately
+
+$$
+\ell(x)=-\log_2 p(x)
+$$
+
+bits.
+Frequent events receive shorter codes; rare events receive longer codes.
+The expected code length is
+
+$$
+E[\ell(X)] = H_2(X).
+$$
+
+If we encode data generated from $p$ using a code designed for $q$, the expected code length becomes
+
+$$
+H_2(p,q)=H_2(p)+D_{\mathrm{KL},2}(p\|q).
+$$
+
+Thus KL divergence is the excess number of bits per token caused by using the wrong probability model.
+This gives a concrete interpretation of language-model loss:
+
+> Lower cross-entropy means the model gives a shorter average code for the text.
+
+This viewpoint is useful for understanding why language modeling is such a general pretraining task.
+To compress text well, a model must learn spelling, syntax, semantics, style, factual regularities, and long-range dependencies.
+
+## 21.11 Tokenization and information
+
+Tokenization changes the random variable being modeled.
+Suppose the same text can be represented as characters, words, or subwords.
+Each representation gives a different sequence:
+
+$$
+C_{1:m}, \qquad W_{1:n}, \qquad S_{1:r}.
+$$
+
+The entropy per token is not directly comparable across these representations because the token units are different.
+A word-level model may have a large vocabulary and high entropy per token.
+A character-level model may have a small vocabulary and lower entropy per token, but many more tokens per sentence.
+
+A more meaningful comparison is often code length per original character or per original byte:
+
+$$
+\text{bits per character} = \frac{\text{total code length in bits}}{\text{number of characters}}.
+$$
+
+This is why compression-based comparisons must specify the coding unit.
+
+## 21.12 KL divergence in fine-tuning and alignment
+
+In Chapter 18, we saw objectives that include a KL penalty.
+A common form is
+
+$$
+\max_\theta E_{y\sim \pi_\theta(\cdot\mid x)}[r(x,y)]
+-\beta D_{\mathrm{KL}}(\pi_\theta(\cdot\mid x)\|\pi_0(\cdot\mid x)).
+$$
+
+Here $\pi_0$ is a reference model and $\pi_\theta$ is the fine-tuned model.
+The reward term encourages helpful behavior.
+The KL term discourages the new model from moving too far from the reference distribution.
+
+Mathematically, the KL penalty is a distributional trust region.
+It does not simply penalize parameter distance.
+Two models may have very different parameter vectors but similar output distributions, or similar parameters but different output distributions.
+KL regularization measures distance in probability behavior.
+
+## 21.13 Information bottleneck viewpoint
+
+Let $X$ be an input sequence, $Z$ be a learned representation, and $Y$ be a target.
+The information bottleneck principle asks for a representation $Z$ that is useful for predicting $Y$ but compressed relative to $X$.
+One idealized objective is
+
+$$
+\min \ I(X;Z) - \beta I(Z;Y).
+$$
+
+The first term encourages compression: $Z$ should not retain irrelevant details of $X$.
+The second term encourages prediction: $Z$ should retain information about $Y$.
+
+This viewpoint is not a complete theory of large language models, but it provides useful language for asking mathematical questions:
+
+- Which information about the input is preserved in an embedding?
+- Which information is discarded by pooling, truncation, or retrieval?
+- How does fine-tuning change the information available for a downstream task?
+- How can we measure whether a representation contains syntactic, semantic, or factual information?
+
+## 21.14 Interactive: entropy, KL divergence, and perplexity
+
+The following interactive changes a predicted distribution $q$ over four possible next tokens while keeping a fixed empirical distribution $p$.
+It shows how entropy, cross-entropy, KL divergence, and perplexity respond.
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: Entropy and KL divergence for next-token prediction</h3>
+  <p>
+    The empirical distribution p is fixed. Move the sliders to change the model distribution q.
+    The display normalizes the q values automatically so they form a probability distribution.
+  </p>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items:end;">
+    <label>q(machine):
+      <input id="ch21-q0" type="range" min="0.02" max="1.00" step="0.01" value="0.50" style="width:100%;">
+      <span id="ch21-q0-label">0.50</span>
+    </label>
+    <label>q(language):
+      <input id="ch21-q1" type="range" min="0.02" max="1.00" step="0.01" value="0.30" style="width:100%;">
+      <span id="ch21-q1-label">0.30</span>
+    </label>
+    <label>q(data):
+      <input id="ch21-q2" type="range" min="0.02" max="1.00" step="0.01" value="0.15" style="width:100%;">
+      <span id="ch21-q2-label">0.15</span>
+    </label>
+    <label>q(model):
+      <input id="ch21-q3" type="range" min="0.02" max="1.00" step="0.01" value="0.05" style="width:100%;">
+      <span id="ch21-q3-label">0.05</span>
+    </label>
+  </div>
+
+  <div id="ch21-status" class="plotly-status">Loading local Plotly...</div>
+  <div id="ch21-dist-plot" class="plotly-demo"></div>
+  <div id="ch21-metrics-plot" class="plotly-demo"></div>
+  <pre id="ch21-summary" style="white-space:pre-wrap;"></pre>
+</div>
+
+<script>
+(function() {
+  function loadPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    const candidates = [
+      "../assets/plotly.min.js",
+      "assets/plotly.min.js",
+      "./assets/plotly.min.js"
+    ];
+    let i = 0;
+    function tryNext() {
+      if (window.Plotly) {
+        callback();
+        return;
+      }
+      if (i >= candidates.length) {
+        const status = document.getElementById("ch21-status");
+        if (status) {
+          status.textContent = "Plotly.js was not available, so the interactive figure could not be drawn. Check that assets/plotly.min.js exists in the rendered site.";
+        }
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = candidates[i++];
+      script.onload = function() { callback(); };
+      script.onerror = tryNext;
+      document.head.appendChild(script);
+    }
+    tryNext();
+  }
+
+  function entropy(p) {
+    let s = 0;
+    for (const x of p) {
+      if (x > 0) s -= x * Math.log(x);
+    }
+    return s;
+  }
+
+  function crossEntropy(p, q) {
+    let s = 0;
+    for (let i = 0; i < p.length; i++) {
+      s -= p[i] * Math.log(q[i]);
+    }
+    return s;
+  }
+
+  function normalize(x) {
+    const sum = x.reduce((a, b) => a + b, 0);
+    return x.map(v => v / sum);
+  }
+
+  function initCh21() {
+    const status = document.getElementById("ch21-status");
+    const ids = ["ch21-q0", "ch21-q1", "ch21-q2", "ch21-q3"];
+    const labels = ["ch21-q0-label", "ch21-q1-label", "ch21-q2-label", "ch21-q3-label"];
+    const sliders = ids.map(id => document.getElementById(id));
+    const labelNodes = labels.map(id => document.getElementById(id));
+    const summary = document.getElementById("ch21-summary");
+    if (sliders.some(x => !x) || !window.Plotly) return;
+    if (status) status.textContent = "";
+
+    const tokens = ["machine", "language", "data", "model"];
+    const p = [0.45, 0.30, 0.20, 0.05];
+
+    function update() {
+      const raw = sliders.map(s => parseFloat(s.value));
+      const q = normalize(raw);
+      for (let i = 0; i < q.length; i++) {
+        labelNodes[i].textContent = q[i].toFixed(3);
+      }
+
+      const Hp = entropy(p);
+      const Hq = entropy(q);
+      const Hpq = crossEntropy(p, q);
+      const KL = Hpq - Hp;
+      const ppl = Math.exp(Hpq);
+
+      Plotly.react("ch21-dist-plot", [
+        {x: tokens, y: p, type: "bar", name: "empirical p"},
+        {x: tokens, y: q, type: "bar", name: "model q"}
+      ], {
+        title: "Empirical distribution p versus model distribution q",
+        yaxis: {range: [0, 0.7], title: "probability"},
+        margin: {t: 50, r: 20, b: 50, l: 50}
+      }, {responsive: true});
+
+      Plotly.react("ch21-metrics-plot", [{
+        x: ["H(p)", "H(q)", "H(p,q)", "KL(p||q)", "PPL"],
+        y: [Hp, Hq, Hpq, KL, ppl],
+        type: "bar"
+      }], {
+        title: "Information-theoretic quantities",
+        yaxis: {title: "value in nats, except PPL"},
+        margin: {t: 50, r: 20, b: 60, l: 60}
+      }, {responsive: true});
+
+      summary.textContent =
+        "H(p) = " + Hp.toFixed(4) + " nats\n" +
+        "H(q) = " + Hq.toFixed(4) + " nats\n" +
+        "H(p,q) = " + Hpq.toFixed(4) + " nats\n" +
+        "KL(p || q) = H(p,q) - H(p) = " + KL.toFixed(4) + " nats\n" +
+        "Perplexity = exp(H(p,q)) = " + ppl.toFixed(4);
+    }
+
+    sliders.forEach(s => s.addEventListener("input", update));
+    update();
+  }
+
+  function ready(callback) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback);
+    } else {
+      callback();
+    }
+  }
+
+  ready(function() { loadPlotly(initCh21); });
+})();
+</script>
+```
+
+## 21.15 Python example: empirical entropy
+
+The first example computes token counts, an empirical distribution, and entropy from scratch.
+
+```{python}
+from collections import Counter
+import math
+
+text = "machine learning models learn from data and language models learn from text data"
+tokens = text.split()
+counts = Counter(tokens)
+N = sum(counts.values())
+probs = {w: c / N for w, c in counts.items()}
+
+entropy = -sum(p * math.log(p) for p in probs.values())
+perplexity = math.exp(entropy)
+
+print("Counts:", counts)
+print("Empirical probabilities:")
+for w, p in sorted(probs.items()):
+    print(f"  {w:10s} {p:.3f}")
+print("Entropy in nats:", round(entropy, 4))
+print("Entropy in bits:", round(entropy / math.log(2), 4))
+print("Empirical perplexity:", round(perplexity, 4))
+```
+
+Entropy is not merely a vocabulary-size measure.
+It depends on the full distribution.
+A corpus with many rare tokens can have high vocabulary size but still lower entropy if a few tokens dominate.
+
+## 21.16 Python example: cross-entropy, KL divergence, and smoothing
+
+Now compare an empirical distribution $p$ with two model distributions $q$.
+
+```{python}
+import numpy as np
+
+vocab = ["machine", "language", "data", "model"]
+p = np.array([0.45, 0.30, 0.20, 0.05])
+q_good = np.array([0.40, 0.32, 0.20, 0.08])
+q_bad = np.array([0.10, 0.20, 0.30, 0.40])
+
+def entropy_np(p):
+    p = np.asarray(p, dtype=float)
+    return -np.sum(np.where(p > 0, p * np.log(p), 0.0))
+
+def cross_entropy_np(p, q):
+    p = np.asarray(p, dtype=float)
+    q = np.asarray(q, dtype=float)
+    return -np.sum(p * np.log(q))
+
+def kl_np(p, q):
+    return cross_entropy_np(p, q) - entropy_np(p)
+
+for name, q in [("good", q_good), ("bad", q_bad)]:
+    print(name)
+    print("  cross entropy:", round(cross_entropy_np(p, q), 4))
+    print("  KL divergence:", round(kl_np(p, q), 4))
+    print("  perplexity:", round(np.exp(cross_entropy_np(p, q)), 4))
+```
+
+If a model assigns zero probability to an event with positive empirical probability, the cross-entropy becomes infinite.
+Additive smoothing prevents this.
+
+```{python}
+counts = np.array([9, 6, 4, 1])
+alpha = 0.5
+p_unsmoothed = counts / counts.sum()
+p_smoothed = (counts + alpha) / (counts.sum() + alpha * len(counts))
+
+print("Unsmoothed:", np.round(p_unsmoothed, 3))
+print("Smoothed:  ", np.round(p_smoothed, 3))
+print("Entropy unsmoothed:", round(entropy_np(p_unsmoothed), 4))
+print("Entropy smoothed:", round(entropy_np(p_smoothed), 4))
+```
+
+## 21.17 Python example: sequence entropy for a bigram model
+
+For a bigram Markov chain, conditional entropy is computed row by row.
+If $P$ is a transition matrix and $\pi$ is the stationary or empirical distribution over previous tokens, then
+
+$$
+H(W_t\mid W_{t-1})=\sum_i \pi_i H(P_{i,\cdot}).
+$$
+
+```{python}
+import numpy as np
+
+vocab = ["<s>", "the", "model", "learns"]
+P = np.array([
+    [0.00, 0.70, 0.20, 0.10],
+    [0.00, 0.05, 0.80, 0.15],
+    [0.00, 0.10, 0.10, 0.80],
+    [0.00, 0.60, 0.20, 0.20]
+])
+pi = np.array([0.10, 0.35, 0.30, 0.25])
+
+def row_entropy(row):
+    positive = row[row > 0]
+    return -np.sum(positive * np.log(positive))
+
+row_entropies = np.array([row_entropy(row) for row in P])
+conditional_entropy = np.sum(pi * row_entropies)
+
+for word, h in zip(vocab, row_entropies):
+    print(f"H(next | {word:6s}) = {h:.4f} nats")
+print("Average conditional entropy:", round(conditional_entropy, 4))
+print("Conditional perplexity:", round(np.exp(conditional_entropy), 4))
+```
+
+This calculation shows why context matters.
+If the previous token makes the next-token distribution sharper, then conditional entropy decreases.
+
+## 21.18 Python example: PMI matrix from co-occurrence counts
+
+The following example computes a PMI matrix from a small word-context count table.
+
+```{python}
+import numpy as np
+import pandas as pd
+
+words = ["king", "queen", "bank", "river"]
+contexts = ["royal", "money", "water"]
+C = np.array([
+    [9, 1, 0],
+    [8, 1, 0],
+    [0, 7, 4],
+    [0, 1, 9]
+], dtype=float)
+
+N = C.sum()
+p_wc = C / N
+p_w = p_wc.sum(axis=1, keepdims=True)
+p_c = p_wc.sum(axis=0, keepdims=True)
+
+with np.errstate(divide="ignore", invalid="ignore"):
+    PMI = np.log(p_wc / (p_w @ p_c))
+PMI = np.where(C > 0, PMI, np.nan)
+PPMI = np.where(np.isnan(PMI), 0.0, np.maximum(PMI, 0.0))
+
+print("PMI matrix")
+display(pd.DataFrame(PMI, index=words, columns=contexts).round(3))
+print("PPMI matrix")
+display(pd.DataFrame(PPMI, index=words, columns=contexts).round(3))
+```
+
+Positive PMI highlights associations beyond chance.
+This is one reason PMI-like transformations are useful before low-rank factorization.
+
+## 21.19 Python example: mutual information between token and label
+
+Suppose $X$ is the indicator of whether a token appears in a document and $Y$ is a binary sentiment label.
+We can compute $I(X;Y)$ from a $2\times 2$ table.
+
+```{python}
+import numpy as np
+
+def mutual_information_from_table(table):
+    table = np.asarray(table, dtype=float)
+    pxy = table / table.sum()
+    px = pxy.sum(axis=1, keepdims=True)
+    py = pxy.sum(axis=0, keepdims=True)
+    expected = px @ py
+    mask = pxy > 0
+    return np.sum(pxy[mask] * np.log(pxy[mask] / expected[mask]))
+
+# rows: token absent/present, columns: negative/positive
+excellent_table = np.array([
+    [40, 20],
+    [5, 35]
+])
+the_table = np.array([
+    [10, 12],
+    [35, 43]
+])
+
+print("I(excellent present; label):", round(mutual_information_from_table(excellent_table), 4))
+print("I(the present; label):      ", round(mutual_information_from_table(the_table), 4))
+```
+
+A sentiment-bearing word usually has higher mutual information with the label than a function word.
+However, mutual information is still a statistical estimate and can be biased upward for rare features.
+
+## 21.20 Python example: coding length and model comparison
+
+For a held-out sequence, compare two language models by average code length.
+
+```{python}
+import numpy as np
+
+observed = ["data", "model", "data", "language", "model", "data"]
+vocab = ["data", "language", "model"]
+
+q1 = {"data": 0.50, "language": 0.20, "model": 0.30}
+q2 = {"data": 0.25, "language": 0.50, "model": 0.25}
+
+def average_code_length_bits(sequence, q):
+    return np.mean([-np.log2(q[token]) for token in sequence])
+
+for name, q in [("model 1", q1), ("model 2", q2)]:
+    bits = average_code_length_bits(observed, q)
+    print(name)
+    print("  average bits per token:", round(bits, 4))
+    print("  perplexity:", round(2 ** bits, 4))
+```
+
+The model with shorter average code length is also the model with lower held-out cross-entropy.
+
+## 21.21 AI-assisted learning activities
+
+Use an AI assistant as a mathematical discussion partner, not as an authority.
+Good prompts ask the model to expose assumptions and verify calculations.
+
+### Prompt 1: entropy audit
+
+```text
+I have a token distribution p = [0.5, 0.25, 0.15, 0.10].
+Compute entropy in nats and bits.
+Then explain which step uses the convention 0 log 0 = 0 and why that convention is mathematically reasonable.
+```
+
+### Prompt 2: cross-entropy versus KL divergence
+
+```text
+Explain the identity H(p,q) = H(p) + KL(p || q) using a four-token example.
+Do not skip the algebra. Then explain why minimizing cross-entropy over q is equivalent to minimizing KL divergence.
+```
+
+### Prompt 3: critique a perplexity comparison
+
+```text
+A paper reports that model A has perplexity 25 using a word tokenizer and model B has perplexity 12 using a subword tokenizer.
+Can we conclude that model B is better? Give a careful mathematical answer.
+```
+
+### Prompt 4: PMI and co-occurrence
+
+```text
+Construct a tiny word-context table where two words have high raw co-occurrence but low PMI because the context word is very frequent.
+Explain the calculation.
+```
+
+::: {.callout-warning}
+## AI caution
+AI systems often confuse entropy, cross-entropy, and KL divergence because the formulas look similar.
+Always check which distribution is inside the expectation and which distribution appears inside the logarithm.
+:::
+
+## 21.22 Common mistakes
+
+1. **Comparing perplexity across tokenizers.**  Perplexity depends on the prediction unit.
+2. **Treating KL divergence as a distance metric.**  KL is asymmetric and does not satisfy the triangle inequality.
+3. **Forgetting support conditions.**  If $q_j=0$ where $p_j>0$, cross-entropy and KL divergence are infinite.
+4. **Confusing entropy and cross-entropy.**  Entropy uses the true distribution inside both the expectation and the logarithm.  Cross-entropy uses the true distribution in the expectation and the model distribution in the logarithm.
+5. **Overinterpreting PMI for rare events.**  PMI can be large for very rare co-occurrences.  Smoothing and minimum-count thresholds are often needed.
+6. **Ignoring logarithm base.**  Natural logs give nats.  Base-$2$ logs give bits.
+7. **Assuming lower entropy always means better language.**  Entropy measures uncertainty under a distribution, not semantic quality by itself.
+
+## 21.23 Worked calculation
+
+Let
+
+$$
+p=(0.5,0.3,0.2), \qquad q=(0.4,0.4,0.2).
+$$
+
+Then
+
+$$
+H(p)=-0.5\log 0.5-0.3\log 0.3-0.2\log 0.2.
+$$
+
+Numerically,
+
+$$
+H(p) \approx 1.0297.
+$$
+
+The cross-entropy is
+
+$$
+H(p,q)=-0.5\log 0.4-0.3\log 0.4-0.2\log 0.2.
+$$
+
+Numerically,
+
+$$
+H(p,q)\approx 1.0559.
+$$
+
+Therefore,
+
+$$
+D_{\mathrm{KL}}(p\|q)=H(p,q)-H(p)\approx 0.0262.
+$$
+
+The perplexity associated with $H(p,q)$ is
+
+$$
+\exp(1.0559)\approx 2.875.
+$$
+
+This means that under model $q$, the average uncertainty is comparable to choosing uniformly from about $2.875$ options.
+
+## 21.24 Exercises
+
+### Conceptual exercises
+
+1. Explain why entropy is maximized by the uniform distribution on a finite vocabulary.
+2. Explain why cross-entropy is always at least entropy.
+3. Give an example showing that $D_{\mathrm{KL}}(p\|q)\ne D_{\mathrm{KL}}(q\|p)$.
+4. Explain why perplexity cannot be compared directly across different tokenizers.
+5. Interpret $I(X;Y)=0$ in terms of independence.
+6. Explain why PMI can be unstable for rare events.
+
+### Computational exercises
+
+7. Write a function that computes entropy, cross-entropy, KL divergence, and perplexity for two discrete distributions.
+8. Given a small corpus, compute unigram entropy and bigram conditional entropy.  Which is smaller?  Why?
+9. Build a word-context matrix for a small corpus and compute PMI and PPMI.
+10. For a binary classification data set, compute mutual information between each token and the class label.
+11. Compare two toy language models by average bits per token on a held-out sequence.
+12. Simulate distributions with increasing vocabulary size and plot entropy as the distribution becomes more uniform.
+
+### Mathematical exercises
+
+13. Prove Gibbs inequality using Jensen's inequality.
+14. Prove the entropy chain rule for two variables: $H(X,Y)=H(X)+H(Y\mid X)$.
+15. Show that $I(X;Y)=H(X)+H(Y)-H(X,Y)$.
+16. Show that $I(X;Y)=D_{\mathrm{KL}}(p(x,y)\|p(x)p(y))$.
+17. Suppose $X\to Z\to Y$ is a Markov chain.  State and interpret the data processing inequality in the context of NLP representations.
+18. For a Markov chain with transition matrix $P$ and stationary distribution $\pi$, derive the entropy rate formula $\sum_i \pi_i H(P_{i,\cdot})$.
+
+## 21.25 Mini-project: information profile of a corpus
+
+Choose a small corpus such as course descriptions, news headlines, abstracts, or student advising questions.
+Build an information-theoretic profile of the corpus.
+
+Your report should include:
+
+1. unigram token distribution and entropy;
+2. entropy as a function of vocabulary truncation;
+3. bigram conditional entropy;
+4. a PMI or PPMI word-context table;
+5. a comparison of at least two simple language models by cross-entropy and perplexity;
+6. a discussion of how tokenization changes the numerical values;
+7. a short reflection on what information theory captures and what it misses.
+
+## 21.26 Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-21-information-theory.ipynb
+```
+
+The lab should be written for independent study and should include:
+
+- a short review of discrete probability distributions;
+- entropy and cross-entropy from scratch;
+- KL divergence and support mismatch examples;
+- perplexity calculations for held-out text;
+- bigram conditional entropy;
+- PMI and PPMI matrices;
+- a small corpus-analysis mini-project.
+
+## 21.27 Summary
+
+Information theory gives a common mathematical vocabulary for many parts of NLP.
+Entropy measures uncertainty, cross-entropy measures predictive loss, KL divergence measures distributional mismatch, and mutual information measures statistical dependence.
+Perplexity is the exponential form of average cross-entropy and is central to language-model evaluation.
+PMI connects co-occurrence statistics with word embeddings.
+KL regularization connects information theory with fine-tuning and alignment.
+
+The most important lesson is that information-theoretic quantities are always defined relative to random variables and probability distributions.
+Before computing entropy, perplexity, or mutual information, first identify the tokenization, the sample space, the data distribution, and the model distribution.
+
+## Notes and references
+
+Classical information theory begins with @shannon_1948 and is developed systematically in @cover_thomas_2006.
+For statistical NLP connections, see @manning_schuetze_1999 and @jurafsky_martin_slp3.
+For neural language modeling and cross-entropy training, see @bengio_neural_2003, @goodfellow_deep_learning_2016, and @vaswani_attention_2017.

@@ -1,0 +1,29 @@
+---
+title: "Final Projects"
+---
+
+Final projects should combine mathematical explanation, computation, and statistical evaluation.  A strong project should state the representation, model, loss function, dataset, metric, and limitations.
+
+## Suggested projects
+
+1. **A small mathematical search engine.**  Build TF-IDF and embedding-based search and compare the geometry of retrieval.
+2. **Naive Bayes versus logistic regression versus transformers.**  Compare assumptions, losses, and empirical behavior on a text classification task.
+3. **Attention from scratch.**  Implement scaled dot-product attention and analyze how attention weights change under perturbations.
+4. **Geometry of sentence embeddings.**  Study clustering, PCA, nearest neighbors, and bias directions.
+5. **A small retrieval-augmented generation system.**  Build a RAG prototype over official course or program documents and evaluate retrieval accuracy.
+6. **Persistent homology of embedding spaces.**  Compare topological summaries of sentence embeddings across genres, topics, or models.
+7. **Information theory of language models.**  Compare entropy, cross-entropy, KL divergence, and perplexity for small language models.
+8. **Bias and distribution shift in text classification.**  Study how model performance changes across groups, topics, or time periods.
+
+## Project report structure
+
+A recommended report has the following sections:
+
+1. Research question
+2. Mathematical formulation
+3. Data and preprocessing
+4. Model or algorithm
+5. Experiments
+6. Evaluation and uncertainty
+7. Limitations
+8. Reproducible code appendix

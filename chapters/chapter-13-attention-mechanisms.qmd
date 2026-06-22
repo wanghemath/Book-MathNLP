@@ -1,0 +1,794 @@
+---
+title: "Attention Mechanisms"
+subtitle: "Queries, keys, values, and weighted information flow"
+---
+
+::: {.chapter-opening}
+Attention is the mathematical operation that allows a model to decide, at each token position, which other token positions are most relevant.  Instead of compressing a whole prefix into a single recurrent state, attention forms many pairwise comparisons between tokens.  These comparisons become nonnegative weights, and the output at each position is a weighted average of value vectors.
+
+This chapter develops attention from first principles.  The central object is the matrix formula
+
+$$
+\operatorname{Attention}(Q,K,V)
+=
+\operatorname{softmax}_{\text{row}}\left(\frac{QK^T}{\sqrt{d_k}}\right)V.
+$$
+
+The goal is not to memorize the formula, but to understand what each matrix means, why the scaling factor appears, why the rows of the attention matrix are probability vectors, and how masking changes the conditional structure of the model.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. explain the role of queries, keys, and values in an attention layer;
+2. check the dimensions in the scaled dot-product attention formula;
+3. interpret the attention matrix as a row-stochastic matrix;
+4. explain why attention outputs are weighted averages of value vectors;
+5. compare hard lookup, nearest-neighbor search, kernel smoothing, and attention;
+6. implement attention from scratch in NumPy;
+7. apply padding masks and causal masks correctly;
+8. use attention weights to inspect token-token interactions;
+9. explain why attention is useful for NLP sequence modeling.
+
+## 13.1 From sequential memory to pairwise interaction
+
+In a recurrent neural network, information flows through a hidden-state recurrence
+
+$$
+h_t = F(h_{t-1},x_t).
+$$
+
+The representation of token $t$ depends on earlier tokens through repeated application of $F$.  This is a natural model for ordered data, but it creates a narrow information path.  If token $t$ needs information from token $s$ with $s\ll t$, the information must pass through all intermediate updates.
+
+Attention uses a different idea.  Given token representations
+
+$$
+x_1,x_2,\ldots,x_T \in R^{d_{\mathrm{model}}},
+$$
+
+attention lets every position compare itself directly with every other position.  Position $i$ asks a question, position $j$ offers a key, and the similarity between the question and the key determines how much information flows from $j$ to $i$.
+
+In one sentence:
+
+::: {.math-card}
+**Attention is adaptive weighted averaging.**  For each output position $i$, attention computes weights $a_{ij}\ge 0$ with $\sum_{j=1}^T a_{ij}=1$, then returns
+
+$$
+z_i = \sum_{j=1}^T a_{ij}v_j.
+$$
+:::
+
+The weights are not fixed in advance.  They are computed from the current sequence.
+
+## 13.2 Input matrix and token representations
+
+Suppose a sequence has length $T$.  Let
+
+$$
+X =
+\begin{bmatrix}
+- & x_1^T & - \\
+- & x_2^T & - \\
+& \vdots & \\
+- & x_T^T & -
+\end{bmatrix}
+\in R^{T\times d_{\mathrm{model}}}.
+$$
+
+The row $x_i^T$ is the representation of token position $i$.  This representation may combine token embedding, positional information, and earlier neural transformations.
+
+Attention does not use $X$ directly.  It first produces three transformed views of the same sequence:
+
+$$
+Q = XW_Q,\qquad K = XW_K,\qquad V = XW_V.
+$$
+
+Here
+
+$$
+W_Q\in R^{d_{\mathrm{model}}\times d_k},\qquad
+W_K\in R^{d_{\mathrm{model}}\times d_k},\qquad
+W_V\in R^{d_{\mathrm{model}}\times d_v}.
+$$
+
+Therefore
+
+$$
+Q,K\in R^{T\times d_k},\qquad V\in R^{T\times d_v}.
+$$
+
+The rows are denoted
+
+$$
+q_i^T = \text{row } i \text{ of } Q,\qquad
+k_j^T = \text{row } j \text{ of } K,\qquad
+v_j^T = \text{row } j \text{ of } V.
+$$
+
+Interpretation:
+
+- $q_i$ is the query at output position $i$;
+- $k_j$ is the key advertised by input position $j$;
+- $v_j$ is the information carried by input position $j$.
+
+The query and key live in the same space $R^{d_k}$ so that their dot product is meaningful.  The value vector may live in a different space $R^{d_v}$.
+
+## 13.3 Scores as pairwise similarities
+
+For each pair of positions $(i,j)$, define the raw attention score
+
+$$
+s_{ij}=q_i^T k_j.
+$$
+
+In matrix form,
+
+$$
+S = QK^T \in R^{T\times T}.
+$$
+
+The entry $S_{ij}$ compares the query at position $i$ with the key at position $j$.
+
+A large positive score means that token $i$ strongly attends to token $j$.  A large negative score means that token $j$ is unlikely to receive much attention from token $i$ after the softmax step.
+
+### Why divide by $\sqrt{d_k}$?
+
+Assume for intuition that the coordinates of $q_i$ and $k_j$ are independent random variables with mean $0$ and variance $1$.  Then
+
+$$
+q_i^T k_j = \sum_{r=1}^{d_k} q_{ir}k_{jr}.
+$$
+
+Each product has mean $0$ and variance approximately $1$, so the sum has variance approximately $d_k$.  Thus the typical size of $q_i^Tk_j$ grows like $\sqrt{d_k}$.
+
+If $d_k$ is large, the unscaled scores may be too large in magnitude.  The softmax then becomes nearly one-hot, which can produce unstable gradients.  The scaled score is
+
+$$
+\tilde{s}_{ij}=\frac{q_i^Tk_j}{\sqrt{d_k}}.
+$$
+
+The scaling keeps the variance of scores more stable as $d_k$ changes.
+
+## 13.4 Row-wise softmax and the attention matrix
+
+Given scaled scores
+
+$$
+\tilde{S}=\frac{QK^T}{\sqrt{d_k}},
+$$
+
+define the attention weights row by row:
+
+$$
+a_{ij}
+=
+\frac{\exp(\tilde{s}_{ij})}{\sum_{\ell=1}^T \exp(\tilde{s}_{i\ell})}.
+$$
+
+Let
+
+$$
+A=\operatorname{softmax}_{\text{row}}(\tilde{S}).
+$$
+
+Then $A\in R^{T\times T}$ and every row of $A$ is a probability vector:
+
+$$
+a_{ij}\ge 0,
+\qquad
+\sum_{j=1}^T a_{ij}=1.
+$$
+
+Thus attention turns arbitrary real-valued similarity scores into a row-stochastic matrix.
+
+::: {.math-card}
+**Attention as a Markov-style matrix.**  The matrix $A$ is row-stochastic, like a transition matrix in a Markov chain.  However, $A$ is not fixed.  It is computed from $X$ and therefore changes from sequence to sequence.
+:::
+
+## 13.5 Weighted averages of values
+
+The output of attention is
+
+$$
+Z=AV.
+$$
+
+Because $A\in R^{T\times T}$ and $V\in R^{T\times d_v}$, the output satisfies
+
+$$
+Z\in R^{T\times d_v}.
+$$
+
+Row $i$ is
+
+$$
+z_i = \sum_{j=1}^T a_{ij}v_j.
+$$
+
+Since $a_{ij}\ge 0$ and $\sum_j a_{ij}=1$, each output vector $z_i$ is a convex combination of the value vectors $v_1,\ldots,v_T$.
+
+This is the basic mechanism by which token representations exchange information.  Token $i$ receives a weighted summary of all value vectors, with weights determined by the similarity between $q_i$ and the keys.
+
+## 13.6 Attention as adaptive kernel smoothing
+
+Students with a statistics background may find the following analogy helpful.  In kernel smoothing, an estimate at a point $x$ often has the form
+
+$$
+\hat{m}(x)=\sum_{j=1}^n w_j(x)y_j,
+$$
+
+where $w_j(x)\ge 0$ and $\sum_j w_j(x)=1$.  The weights depend on the similarity between $x$ and training points $x_j$.
+
+Attention has the same weighted-average form:
+
+$$
+z_i = \sum_{j=1}^T a_{ij}v_j.
+$$
+
+The difference is that the similarity function is learned.  Instead of choosing a fixed kernel, the model learns $W_Q$ and $W_K$, and therefore learns how to compare tokens.
+
+This viewpoint is useful:
+
+- $q_i$ is the location where the model wants information;
+- $k_j$ determines how relevant position $j$ is to that location;
+- $v_j$ is the response or information to be averaged;
+- $a_{ij}$ is a data-dependent weight.
+
+## 13.7 Masking
+
+Not every token should always attend to every other token.  A mask is a matrix $M\in R^{T\times T}$ added to the scaled scores before the softmax:
+
+$$
+A=\operatorname{softmax}_{\text{row}}\left(\frac{QK^T}{\sqrt{d_k}}+M\right).
+$$
+
+Allowed positions have mask value $0$.  Disallowed positions receive a very negative number, such as $-10^9$:
+
+$$
+M_{ij}=\begin{cases}
+0, & \text{if position } j \text{ is allowed for query } i,\\
+-10^9, & \text{otherwise.}
+\end{cases}
+$$
+
+After the softmax, masked positions receive attention weight approximately $0$.
+
+### Padding mask
+
+Sequences in a batch often have different lengths.  Shorter sequences are padded with artificial tokens.  A padding mask prevents real tokens from attending to padding positions.
+
+### Causal mask
+
+In autoregressive language modeling, token $i$ should not attend to future tokens $j>i$.  The causal mask is
+
+$$
+M_{ij}=\begin{cases}
+0, & j\le i,\\
+-10^9, & j>i.
+\end{cases}
+$$
+
+This makes the attention matrix lower triangular after the softmax, up to numerical precision.
+
+## 13.8 Numerical stability
+
+The softmax should be computed using the stable formula
+
+$$
+\operatorname{softmax}(r)_j
+=
+\frac{\exp(r_j-c)}{\sum_{\ell}\exp(r_{\ell}-c)},
+\qquad
+c=\max_{\ell} r_{\ell}.
+$$
+
+Subtracting $c$ does not change the softmax because it multiplies numerator and denominator by the same constant.  It prevents overflow when some scores are large.
+
+For a score row $r\in R^T$, the Jacobian of the softmax is
+
+$$
+\frac{\partial a_j}{\partial r_\ell}
+= a_j(\delta_{j\ell}-a_\ell).
+$$
+
+This formula shows why extremely peaked attention can make learning difficult: when one $a_j$ is almost $1$ and the rest are almost $0$, many derivatives are close to $0$.
+
+## 13.9 Worked example
+
+Suppose a sequence has $T=3$ positions and $d_k=2$.  Let
+
+$$
+Q=K=
+\begin{bmatrix}
+1 & 0\\
+0 & 1\\
+1 & 1
+\end{bmatrix}.
+$$
+
+Then
+
+$$
+QK^T
+=
+\begin{bmatrix}
+1 & 0 & 1\\
+0 & 1 & 1\\
+1 & 1 & 2
+\end{bmatrix}.
+$$
+
+Since $d_k=2$, the scaled score matrix is
+
+$$
+\tilde{S}=\frac{1}{\sqrt{2}}
+\begin{bmatrix}
+1 & 0 & 1\\
+0 & 1 & 1\\
+1 & 1 & 2
+\end{bmatrix}.
+$$
+
+The first row assigns equal raw similarity to positions $1$ and $3$, and lower similarity to position $2$.  After the row-wise softmax, the first output vector becomes a weighted average of $v_1$, $v_2$, and $v_3$, with larger weights on $v_1$ and $v_3$.
+
+This example illustrates a key point: attention is not simply copying one token.  Unless the softmax is very sharp, attention blends information from multiple positions.
+
+## 13.10 Python: scaled dot-product attention from scratch
+
+```{python}
+#| label: py-ch13-scaled-dot-product-attention
+#| echo: true
+
+import numpy as np
+import pandas as pd
+
+np.set_printoptions(precision=3, suppress=True)
+
+def row_softmax(S):
+    """Stable row-wise softmax."""
+    S_shifted = S - S.max(axis=1, keepdims=True)
+    E = np.exp(S_shifted)
+    return E / E.sum(axis=1, keepdims=True)
+
+def attention(Q, K, V, mask=None):
+    """Scaled dot-product attention.
+
+    Q: shape (T_q, d_k)
+    K: shape (T_k, d_k)
+    V: shape (T_k, d_v)
+    mask: optional shape (T_q, T_k), added to scores before softmax
+    """
+    d_k = Q.shape[1]
+    scores = Q @ K.T / np.sqrt(d_k)
+    if mask is not None:
+        scores = scores + mask
+    A = row_softmax(scores)
+    Z = A @ V
+    return Z, A, scores
+
+Q = np.array([[1.0, 0.0],
+              [0.0, 1.0],
+              [1.0, 1.0]])
+K = Q.copy()
+V = np.array([[1.0, 0.0],
+              [0.0, 1.0],
+              [1.0, 1.0]])
+
+Z, A, scores = attention(Q, K, V)
+
+print("scaled scores")
+print(scores)
+print("attention weights")
+print(A)
+print("output")
+print(Z)
+```
+
+The rows of `A` should sum to $1$.
+
+```{python}
+#| label: py-ch13-row-sums
+#| echo: true
+
+A.sum(axis=1)
+```
+
+## 13.11 Python: attention with learned projections
+
+In a neural network, $Q$, $K$, and $V$ are usually obtained from an input matrix $X$ by learned linear maps.
+
+```{python}
+#| label: py-ch13-projections
+#| echo: true
+
+rng = np.random.default_rng(7243)
+
+T = 5
+D_model = 4
+d_k = 3
+d_v = 2
+
+X = rng.normal(size=(T, D_model))
+W_Q = rng.normal(scale=0.3, size=(D_model, d_k))
+W_K = rng.normal(scale=0.3, size=(D_model, d_k))
+W_V = rng.normal(scale=0.3, size=(D_model, d_v))
+
+Q = X @ W_Q
+K = X @ W_K
+V = X @ W_V
+
+Z, A, scores = attention(Q, K, V)
+
+print("X shape:", X.shape)
+print("Q shape:", Q.shape)
+print("K shape:", K.shape)
+print("V shape:", V.shape)
+print("A shape:", A.shape)
+print("Z shape:", Z.shape)
+```
+
+Dimension checking is not bookkeeping only.  It is the fastest way to find conceptual mistakes in an attention implementation.
+
+## 13.12 Python: causal mask
+
+A causal mask prevents position $i$ from using information at future positions $j>i$.
+
+```{python}
+#| label: py-ch13-causal-mask
+#| echo: true
+
+T = 5
+causal_mask = np.triu(np.ones((T, T)), k=1)
+causal_mask = np.where(causal_mask == 1, -1e9, 0.0)
+
+Z_causal, A_causal, scores_causal = attention(Q, K, V, mask=causal_mask)
+
+pd.DataFrame(A_causal, columns=[f"key {j}" for j in range(T)],
+             index=[f"query {i}" for i in range(T)])
+```
+
+The upper triangular entries are approximately zero.
+
+```{python}
+#| label: py-ch13-causal-check
+#| echo: true
+
+np.triu(A_causal, k=1).max()
+```
+
+## 13.13 Python: inspecting token-token attention
+
+The following example uses a tiny sequence.  The numbers are random, so they should not be interpreted semantically.  The purpose is to inspect the shape and row-stochastic structure of the attention matrix.
+
+```{python}
+#| label: py-ch13-token-attention-table
+#| echo: true
+
+tokens = ["the", "model", "attends", "to", "tokens"]
+attention_table = pd.DataFrame(A_causal, columns=tokens, index=tokens)
+attention_table
+```
+
+A table of attention weights can be useful, but it must be interpreted carefully.  Attention weights show one internal routing mechanism; they are not automatically a complete explanation of the model's prediction.
+
+## 13.14 Interactive HTML: scaled attention explorer
+
+The following interactive component lets you vary the scale of the dot-product scores and choose whether to apply a causal mask.  It uses a local Plotly file from `assets/plotly.min.js`, so it does not depend on a CDN.
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: Scaled Dot-Product Attention</h3>
+  <p>
+    The heatmap shows the attention matrix <em>A</em>.  Increase the score scale to make attention more concentrated.
+    Turn on the causal mask to force each token to attend only to itself and previous tokens.
+  </p>
+
+  <label for="ch13-scale-slider"><strong>Score scale:</strong>
+    <span id="ch13-scale-value">1.00</span>
+  </label>
+  <input id="ch13-scale-slider" type="range" min="0.25" max="4" step="0.05" value="1" style="width: 100%;">
+
+  <label style="display:block; margin-top:0.75rem;">
+    <input id="ch13-causal-toggle" type="checkbox">
+    Use causal mask
+  </label>
+
+  <div id="ch13-attention-plot" class="plotly-demo"></div>
+  <div id="ch13-attention-summary" class="plotly-status"></div>
+</div>
+
+<script>
+(function() {
+  function localPlotlySources() {
+    return [
+      "../assets/plotly.min.js",
+      "assets/plotly.min.js",
+      "./assets/plotly.min.js"
+    ];
+  }
+
+  function loadScriptSequentially(sources, onSuccess, onFailure) {
+    if (window.Plotly) {
+      onSuccess();
+      return;
+    }
+    if (!sources.length) {
+      onFailure();
+      return;
+    }
+    const src = sources.shift();
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = function() {
+      if (window.Plotly) {
+        onSuccess();
+      } else {
+        loadScriptSequentially(sources, onSuccess, onFailure);
+      }
+    };
+    script.onerror = function() {
+      loadScriptSequentially(sources, onSuccess, onFailure);
+    };
+    document.head.appendChild(script);
+  }
+
+  function stableSoftmax(row) {
+    const maxVal = Math.max.apply(null, row);
+    const expVals = row.map(v => Math.exp(v - maxVal));
+    const total = expVals.reduce((a, b) => a + b, 0);
+    return expVals.map(v => v / total);
+  }
+
+  function matMul(A, B) {
+    const rows = A.length;
+    const cols = B[0].length;
+    const inner = B.length;
+    const C = [];
+    for (let i = 0; i < rows; i++) {
+      const row = [];
+      for (let j = 0; j < cols; j++) {
+        let total = 0;
+        for (let k = 0; k < inner; k++) total += A[i][k] * B[k][j];
+        row.push(total);
+      }
+      C.push(row);
+    }
+    return C;
+  }
+
+  function transpose(A) {
+    return A[0].map((_, j) => A.map(row => row[j]));
+  }
+
+  function initCh13Attention() {
+    const plotDiv = document.getElementById("ch13-attention-plot");
+    const slider = document.getElementById("ch13-scale-slider");
+    const scaleValue = document.getElementById("ch13-scale-value");
+    const causalToggle = document.getElementById("ch13-causal-toggle");
+    const summary = document.getElementById("ch13-attention-summary");
+
+    if (!plotDiv || !slider || !scaleValue || !causalToggle || !summary) return;
+
+    if (!window.Plotly) {
+      summary.textContent = "Plotly.js was not available, so the interactive figure could not be drawn.";
+      return;
+    }
+
+    const tokens = ["The", "student", "studies", "attention", "carefully"];
+    const Q = [
+      [1.0, 0.1],
+      [0.8, 0.3],
+      [0.2, 1.0],
+      [0.4, 0.9],
+      [0.1, 0.7]
+    ];
+    const K = [
+      [0.9, 0.0],
+      [0.7, 0.2],
+      [0.1, 0.9],
+      [0.3, 1.0],
+      [0.2, 0.8]
+    ];
+    const V = [
+      [1.0, 0.0],
+      [0.8, 0.2],
+      [0.2, 0.9],
+      [0.3, 1.0],
+      [0.1, 0.7]
+    ];
+
+    function update() {
+      const scale = Number(slider.value);
+      const useCausal = causalToggle.checked;
+      scaleValue.textContent = scale.toFixed(2);
+
+      const rawScores = matMul(Q, transpose(K));
+      const dK = Q[0].length;
+      const scores = rawScores.map((row, i) => row.map((v, j) => {
+        if (useCausal && j > i) return -1e9;
+        return scale * v / Math.sqrt(dK);
+      }));
+      const A = scores.map(row => stableSoftmax(row));
+      const Z = matMul(A, V);
+
+      const heatmap = {
+        z: A,
+        x: tokens,
+        y: tokens,
+        type: "heatmap",
+        zmin: 0,
+        zmax: 1,
+        colorscale: "Viridis",
+        hovertemplate: "query=%{y}<br>key=%{x}<br>weight=%{z:.3f}<extra></extra>"
+      };
+
+      const layout = {
+        title: "Attention weights A = softmax(QKᵀ / sqrt(d_k))",
+        xaxis: {title: "key/value token", automargin: true},
+        yaxis: {title: "query token", automargin: true},
+        margin: {l: 90, r: 30, t: 70, b: 90}
+      };
+
+      Plotly.react(plotDiv, [heatmap], layout, {responsive: true});
+
+      const rowEntropies = A.map(row => {
+        return -row.reduce((total, p) => total + (p > 0 ? p * Math.log(p) : 0), 0);
+      });
+      const avgEntropy = rowEntropies.reduce((a, b) => a + b, 0) / rowEntropies.length;
+      summary.textContent = "Average row entropy: " + avgEntropy.toFixed(3) +
+        ". Output for query token 'attention': [" + Z[3].map(v => v.toFixed(3)).join(", ") + "].";
+    }
+
+    slider.addEventListener("input", update);
+    causalToggle.addEventListener("change", update);
+    update();
+  }
+
+  function boot() {
+    loadScriptSequentially(localPlotlySources(), initCh13Attention, function() {
+      const summary = document.getElementById("ch13-attention-summary");
+      if (summary) {
+        summary.textContent = "Plotly.js was not available. Check that assets/plotly.min.js is included in the rendered site.";
+      }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+```
+
+The slider changes the sharpness of the attention distribution.  Low scale gives diffuse averaging.  High scale gives attention weights closer to hard selection.
+
+## 13.15 Multi-head attention preview
+
+A single attention head compares tokens in one learned query-key space.  Multi-head attention uses several heads in parallel:
+
+$$
+\operatorname{head}_h
+=
+\operatorname{Attention}(XW_Q^{(h)},XW_K^{(h)},XW_V^{(h)}).
+$$
+
+The heads are concatenated and projected:
+
+$$
+\operatorname{MultiHead}(X)
+=
+\operatorname{Concat}(\operatorname{head}_1,\ldots,\operatorname{head}_H)W_O.
+$$
+
+Different heads can learn different comparison rules.  One head may attend to local syntax, another to long-range agreement, and another to delimiter or position-like patterns.  The next chapter studies self-attention and multi-head attention in more detail.
+
+## 13.16 AI-assisted learning: attention audit
+
+Use an AI system as a mathematical critic, not as an authority.
+
+### Prompt 1: dimension checking
+
+Ask:
+
+> I have $X\in R^{T\times d_{\mathrm{model}}}$, $W_Q,W_K\in R^{d_{\mathrm{model}}\times d_k}$, and $W_V\in R^{d_{\mathrm{model}}\times d_v}$.  Check every dimension in scaled dot-product attention and explain the shape of the final output.
+
+Then verify every matrix product yourself.
+
+### Prompt 2: interpretation critique
+
+Ask:
+
+> Explain why attention weights should not automatically be interpreted as a complete explanation of a transformer model's prediction.
+
+A good answer should distinguish internal routing from causal explanation.
+
+### Prompt 3: mask debugging
+
+Ask:
+
+> I implemented a causal mask for self-attention.  What numerical checks should I run to verify that future positions have zero attention weight?
+
+You should expect checks involving the upper triangular part of the attention matrix.
+
+## 13.17 Common mistakes
+
+1. **Confusing keys and values.**  Keys determine weights; values carry the information being averaged.
+2. **Applying softmax over the wrong axis.**  In standard attention, softmax is applied row by row over keys for each query.
+3. **Forgetting the scaling factor.**  Without $1/\sqrt{d_k}$, scores may become too large when $d_k$ is large.
+4. **Using a mask after softmax.**  Masks should be applied to scores before softmax, followed by renormalization.
+5. **Ignoring dimensions.**  Most attention implementation errors are shape errors in disguise.
+
+## 13.18 Exercises
+
+1. **Dimension check.**  Suppose $T=12$, $d_{\mathrm{model}}=64$, $d_k=16$, and $d_v=20$.  Write the shapes of $X$, $W_Q$, $W_K$, $W_V$, $Q$, $K$, $V$, $QK^T$, $A$, and $Z$.
+
+2. **Row-stochastic proof.**  Prove that each row of $A=\operatorname{softmax}_{\text{row}}(S)$ sums to $1$ and has nonnegative entries.
+
+3. **Convex combination.**  Prove that each attention output $z_i$ lies in the convex hull of the value vectors $v_1,\ldots,v_T$.
+
+4. **Scaling argument.**  Assume the coordinates of $q$ and $k$ are independent with mean $0$ and variance $1$.  Compute the mean and variance of $q^Tk$.
+
+5. **Masking.**  For $T=4$, write the causal mask matrix using $0$ and $-\infty$ notation.
+
+6. **Attention versus kernel smoothing.**  Compare attention with Nadaraya-Watson kernel regression.  What is fixed in kernel regression but learned in attention?
+
+7. **Implementation.**  Implement attention in NumPy.  Verify that the attention matrix is row-stochastic before and after applying a causal mask.
+
+8. **Interpretation.**  Give an example where a token receives high attention weight but is not necessarily the sole explanation for the model's final prediction.
+
+## 13.19 Mini-project
+
+Build a small attention visualizer for a short sentence.  Use randomly initialized query, key, and value matrices first.  Then manually choose query and key vectors that make one token attend strongly to another token.  Your report should include:
+
+- the sentence and token list;
+- the matrices $Q$, $K$, and $V$;
+- the scaled score matrix;
+- the attention matrix;
+- a heatmap visualization;
+- a short explanation of how changing the scale changes entropy;
+- a comparison of unmasked and causal attention.
+
+## 13.20 Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-13-attention-mechanisms.ipynb
+```
+
+The lab should be written for independent study and should include:
+
+- a review of matrix multiplication and row-wise softmax;
+- attention from scratch in NumPy;
+- masking examples;
+- numerical stability checks;
+- attention heatmaps;
+- a short bridge to multi-head self-attention.
+
+## 13.21 What to remember
+
+Attention is a learned, data-dependent weighted-average operator.  The mathematical structure is simple and powerful:
+
+$$
+Q=XW_Q,
+\qquad
+K=XW_K,
+\qquad
+V=XW_V,
+$$
+
+$$
+A=\operatorname{softmax}_{\text{row}}\left(\frac{QK^T}{\sqrt{d_k}}+M\right),
+\qquad
+Z=AV.
+$$
+
+The matrix $A$ determines how information moves among token positions.  Because $A$ is computed from the sequence itself, attention can adapt its information flow to each input.
+
+## Notes and references
+
+Attention was introduced into neural sequence modeling before the transformer architecture and became central in encoder-decoder models for machine translation.  Scaled dot-product attention and multi-head attention are the core operations in the transformer architecture.  Useful references include @bahdanau_attention_2015, @vaswani_attention_2017, @jurafsky_martin_slp3, and @goodfellow_deep_learning_2016.

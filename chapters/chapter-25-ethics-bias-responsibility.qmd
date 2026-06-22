@@ -1,0 +1,918 @@
+---
+title: "Ethics, Bias, and Mathematical Responsibility"
+subtitle: "Fairness, uncertainty, privacy, and responsible NLP deployment"
+---
+
+::: {.chapter-opening}
+Modern NLP systems are mathematical systems deployed in social environments.  A language model is trained on data, optimized under a loss function, evaluated by metrics, and then used by people.  Ethical analysis therefore cannot be separated from mathematical analysis.  Before we can ask whether a system is fair, safe, or trustworthy, we must specify the random variables, the population, the representation, the target, the loss, the metric, and the deployment setting.
+
+This chapter develops a mathematical language for responsibility in NLP.  The goal is not to reduce ethics to formulas.  Rather, the goal is to make assumptions visible.  A formula can clarify what is being measured, what is being ignored, and where statistical uncertainty enters.
+:::
+
+## 25.1 Learning goals
+
+After reading this chapter, students should be able to:
+
+- formulate bias, fairness, uncertainty, and privacy questions using random variables and distributions;
+- distinguish sampling bias, measurement bias, label bias, representation bias, optimization bias, and deployment bias;
+- compute common group fairness metrics from a confusion matrix;
+- explain why different fairness metrics can conflict;
+- analyze distribution shift using training and deployment distributions;
+- compute calibration error and understand why accuracy alone is insufficient;
+- use embedding association scores to audit representation bias;
+- describe selective prediction, abstention, and uncertainty-aware deployment;
+- connect mathematical clarity with responsible AI-assisted NLP practice.
+
+## 25.2 The statistical object behind a responsible NLP system
+
+Let $X$ denote an input text, such as a document, prompt, search query, or conversation.  Let $Y$ denote the target variable, such as a class label, relevance judgment, next token, toxicity rating, or answer-quality score.  Let $A$ denote a group attribute or context variable relevant for auditing.  Depending on the application, $A$ may represent language variety, geography, institution type, dialect, writing style, document source, demographic group, or another variable that may affect model behavior.
+
+A responsible statistical analysis begins with a joint distribution
+
+$$
+P(X,A,Y).
+$$
+
+A trained NLP model is a function, or a conditional distribution, built from data:
+
+$$
+f_\theta:X \mapsto \widehat{Y},
+\qquad
+p_\theta(y\mid x).
+$$
+
+A deployment decision is usually not just the model output.  It also includes a threshold, abstention rule, retrieval rule, or human-review rule.  We therefore write the full deployed rule as
+
+$$
+d(x)=\text{decision made after observing }x.
+$$
+
+A performance claim has mathematical meaning only relative to a distribution and a loss.  If $L(d(X),Y)$ is the loss, then the population risk is
+
+$$
+R(d)=E_P[L(d(X),Y)].
+$$
+
+The empirical risk computed on a test set is an estimator:
+
+$$
+\widehat{R}(d)=\frac{1}{n}\sum_{i=1}^n L(d(x_i),y_i).
+$$
+
+The key point is simple but important: **a metric is not an ethical conclusion**.  A metric is a statistic computed under assumptions.
+
+::: {.math-card}
+**Responsible NLP as a mathematical workflow.**
+
+1. Specify the population $P(X,A,Y)$.
+2. Specify the model or decision rule $d$.
+3. Specify the loss $L$.
+4. Estimate performance and uncertainty.
+5. Audit performance conditionally on relevant subpopulations.
+6. Study behavior under distribution shift.
+7. Decide whether the system should be deployed, constrained, redesigned, or rejected.
+:::
+
+## 25.3 Sources of bias in NLP
+
+The word **bias** has several meanings.  In statistics, bias often refers to
+
+$$
+\operatorname{Bias}(\widehat{\theta})=E[\widehat{\theta}]-\theta.
+$$
+
+In responsible NLP, bias is broader.  It often refers to systematic error, unequal performance, stereotyped representation, or harmful behavior.  These notions are related, but not identical.
+
+A useful mathematical decomposition is the following.
+
+| Source | Mathematical form | NLP example |
+|---|---|---|
+| Sampling bias | $P_{\text{train}}(X,A,Y) \ne P_{\text{target}}(X,A,Y)$ | training corpus overrepresents certain genres |
+| Measurement bias | observed $\widetilde{Y}$ differs from intended $Y$ | noisy toxicity labels or vague annotation instructions |
+| Representation bias | $\phi(X)$ loses relevant information | tokenization fails for names, dialects, or multilingual text |
+| Label bias | $P(\widetilde{Y}\mid X,A)$ reflects annotator/systematic bias | same text rated differently depending on dialect |
+| Optimization bias | objective weights some errors more than others | minimizing average loss hides subgroup error |
+| Deployment bias | use differs from training/evaluation assumptions | classifier used as a gatekeeping tool outside original context |
+| Feedback bias | future data depends on earlier model decisions | search ranking affects what users click next |
+
+For MA Applied Math and MS Statistics students, the important habit is to ask:
+
+$$
+\text{Which distribution generated the data, and which distribution will use the model?}
+$$
+
+If those distributions differ, a test-set score may not estimate deployment behavior.
+
+## 25.4 Group fairness metrics
+
+Consider a binary decision problem with label $Y\in\{0,1\}$ and prediction $\widehat{Y}\in\{0,1\}$.  Suppose $A$ is a group variable.  For a fixed group $a$, define:
+
+$$
+\operatorname{TPR}_a=P(\widehat{Y}=1\mid Y=1,A=a),
+$$
+
+$$
+\operatorname{FPR}_a=P(\widehat{Y}=1\mid Y=0,A=a),
+$$
+
+$$
+\operatorname{PPV}_a=P(Y=1\mid \widehat{Y}=1,A=a),
+$$
+
+$$
+\operatorname{SR}_a=P(\widehat{Y}=1\mid A=a),
+$$
+
+where TPR is true positive rate, FPR is false positive rate, PPV is positive predictive value, and SR is selection rate.
+
+Common fairness criteria include:
+
+| Criterion | Mathematical condition | Interpretation |
+|---|---|---|
+| Demographic parity | $P(\widehat{Y}=1\mid A=a)=P(\widehat{Y}=1\mid A=b)$ | equal selection rates |
+| Equal opportunity | $P(\widehat{Y}=1\mid Y=1,A=a)=P(\widehat{Y}=1\mid Y=1,A=b)$ | equal true positive rates |
+| Equalized odds | $\widehat{Y}\perp A\mid Y$ | equal TPR and FPR |
+| Predictive parity | $P(Y=1\mid \widehat{Y}=1,A=a)=P(Y=1\mid \widehat{Y}=1,A=b)$ | equal precision among selected cases |
+| Calibration by group | $P(Y=1\mid S=s,A=a)=s$ | scores mean the same probability in each group |
+
+Here $S\in[0,1]$ is a model score, such as a predicted probability.
+
+These criteria are not merely technical.  They encode different normative choices.  Equalizing selection rates, equalizing error rates, and equalizing predictive values may lead to different thresholds and different social consequences.
+
+## 25.5 Why fairness metrics can conflict
+
+Suppose the base rates differ:
+
+$$
+P(Y=1\mid A=a)\ne P(Y=1\mid A=b).
+$$
+
+If a classifier is calibrated within each group and is not perfect, then it is generally impossible to also equalize all error rates across groups.  This is not a paradox.  It is a constraint imposed by conditional probability.
+
+To see the tension, write the selection rate for group $a$ as
+
+$$
+P(\widehat{Y}=1\mid A=a)
+=
+\operatorname{TPR}_a P(Y=1\mid A=a)
++
+\operatorname{FPR}_a P(Y=0\mid A=a).
+$$
+
+If the base rate $P(Y=1\mid A=a)$ changes across groups, then equal TPR and equal FPR generally imply different selection rates.  Conversely, forcing equal selection rates may require unequal error rates.
+
+::: {.callout-important}
+Fairness metrics should not be selected mechanically.  In a real application, one must ask what the decision means, what errors cost, who is affected, what appeal process exists, and whether the model should be used at all.
+:::
+
+## 25.6 Confusion matrices by group
+
+For a fixed group $a$, the confusion matrix counts are
+
+$$
+\begin{array}{c|cc}
+& Y=1 & Y=0 \\
+\hline
+\widehat{Y}=1 & TP_a & FP_a \\
+\widehat{Y}=0 & FN_a & TN_a
+\end{array}
+$$
+
+From these counts,
+
+$$
+\operatorname{TPR}_a=\frac{TP_a}{TP_a+FN_a},
+\qquad
+\operatorname{FPR}_a=\frac{FP_a}{FP_a+TN_a},
+$$
+
+$$
+\operatorname{PPV}_a=\frac{TP_a}{TP_a+FP_a},
+\qquad
+\operatorname{SR}_a=\frac{TP_a+FP_a}{TP_a+FP_a+FN_a+TN_a}.
+$$
+
+The following Python example computes these quantities.
+
+```{python}
+import numpy as np
+import pandas as pd
+
+data = pd.DataFrame({
+    "group": ["A"] * 8 + ["B"] * 8,
+    "y":     [1, 1, 1, 1, 0, 0, 0, 0,  1, 1, 0, 0, 0, 0, 0, 0],
+    "yhat":  [1, 1, 0, 0, 1, 0, 0, 0,  1, 0, 1, 0, 0, 0, 0, 0]
+})
+
+def group_metrics(frame):
+    rows = []
+    for g, df in frame.groupby("group"):
+        y = df["y"].to_numpy()
+        yhat = df["yhat"].to_numpy()
+        tp = int(((yhat == 1) & (y == 1)).sum())
+        fp = int(((yhat == 1) & (y == 0)).sum())
+        fn = int(((yhat == 0) & (y == 1)).sum())
+        tn = int(((yhat == 0) & (y == 0)).sum())
+        rows.append({
+            "group": g,
+            "TP": tp,
+            "FP": fp,
+            "FN": fn,
+            "TN": tn,
+            "TPR": tp / (tp + fn) if tp + fn > 0 else np.nan,
+            "FPR": fp / (fp + tn) if fp + tn > 0 else np.nan,
+            "PPV": tp / (tp + fp) if tp + fp > 0 else np.nan,
+            "selection_rate": (tp + fp) / len(df),
+            "base_rate": y.mean()
+        })
+    return pd.DataFrame(rows)
+
+group_metrics(data)
+```
+
+The output is not the end of the analysis.  It is the beginning.  A subgroup with a small sample size may have high uncertainty, so confidence intervals or bootstrap intervals are often needed.
+
+## 25.7 Interactive: threshold fairness explorer
+
+The following interactive illustrates how a single threshold changes accuracy, selection rate, TPR, FPR, PPV, and fairness gaps across two groups.  The scores are synthetic.  The point is to understand the geometry of thresholding, not to claim a universal fairness rule.
+
+::: {.interactive-card}
+<h3>Thresholding, error rates, and group gaps</h3>
+<p>Move the threshold and compare group-wise rates.  The model score is a one-dimensional summary $S\in[0,1]$; the deployed decision is $\widehat{Y}=1\{S\ge t\}$.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;align-items:end;">
+  <label>Decision threshold t:
+    <input id="ch25-threshold" type="range" min="0.05" max="0.95" step="0.01" value="0.50" style="width:100%;">
+    <span id="ch25-threshold-label">0.50</span>
+  </label>
+  <label>Group B score shift:
+    <input id="ch25-shift" type="range" min="-0.20" max="0.20" step="0.01" value="-0.05" style="width:100%;">
+    <span id="ch25-shift-label">-0.05</span>
+  </label>
+  <label>Show metric:
+    <select id="ch25-metric" style="width:100%;">
+      <option value="TPR">TPR gap</option>
+      <option value="FPR">FPR gap</option>
+      <option value="SR">selection-rate gap</option>
+      <option value="PPV">PPV gap</option>
+    </select>
+  </label>
+</div>
+
+<div id="ch25-status" class="plotly-status">Loading local Plotly...</div>
+<div id="ch25-score-plot" class="plotly-demo"></div>
+<pre id="ch25-summary" style="white-space:pre-wrap;"></pre>
+</div>
+:::
+
+<script>
+(function() {
+  function loadPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    const candidates = [
+      "../assets/plotly.min.js",
+      "assets/plotly.min.js",
+      "./assets/plotly.min.js"
+    ];
+    let i = 0;
+    function tryNext() {
+      if (window.Plotly) {
+        callback();
+        return;
+      }
+      if (i >= candidates.length) {
+        const status = document.getElementById("ch25-status");
+        if (status) {
+          status.textContent = "Plotly.js was not available, so the interactive figure could not be drawn. Check that assets/plotly.min.js exists in the rendered site.";
+        }
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = candidates[i++];
+      script.onload = function() { callback(); };
+      script.onerror = tryNext;
+      document.head.appendChild(script);
+    }
+    tryNext();
+  }
+
+  function sigmoid(z) {
+    return 1 / (1 + Math.exp(-z));
+  }
+
+  function makeData(shiftB) {
+    const rows = [];
+    for (let i = 0; i < 220; i++) {
+      const yA = i < 95 ? 1 : 0;
+      const baseA = yA === 1 ? 0.68 : 0.32;
+      const waveA = 0.10 * Math.sin(1.7 * i) + 0.06 * Math.cos(0.31 * i);
+      rows.push({group: "A", y: yA, score: Math.max(0.01, Math.min(0.99, baseA + waveA))});
+
+      const yB = i < 65 ? 1 : 0;
+      const baseB = yB === 1 ? 0.64 : 0.30;
+      const waveB = 0.11 * Math.sin(1.3 * i + 0.4) + 0.05 * Math.cos(0.27 * i);
+      rows.push({group: "B", y: yB, score: Math.max(0.01, Math.min(0.99, baseB + shiftB + waveB))});
+    }
+    return rows;
+  }
+
+  function metrics(rows, threshold, group) {
+    const sub = rows.filter(function(r) { return r.group === group; });
+    let tp = 0, fp = 0, fn = 0, tn = 0;
+    sub.forEach(function(r) {
+      const pred = r.score >= threshold ? 1 : 0;
+      if (pred === 1 && r.y === 1) tp++;
+      if (pred === 1 && r.y === 0) fp++;
+      if (pred === 0 && r.y === 1) fn++;
+      if (pred === 0 && r.y === 0) tn++;
+    });
+    const tpr = tp + fn > 0 ? tp / (tp + fn) : NaN;
+    const fpr = fp + tn > 0 ? fp / (fp + tn) : NaN;
+    const ppv = tp + fp > 0 ? tp / (tp + fp) : NaN;
+    const sr = (tp + fp) / sub.length;
+    const acc = (tp + tn) / sub.length;
+    const br = sub.filter(function(r) { return r.y === 1; }).length / sub.length;
+    return {TP: tp, FP: fp, FN: fn, TN: tn, TPR: tpr, FPR: fpr, PPV: ppv, SR: sr, ACC: acc, BR: br};
+  }
+
+  function format(x) {
+    if (!isFinite(x)) return "NA";
+    return x.toFixed(3);
+  }
+
+  function histogram(rows, group, y) {
+    return rows.filter(function(r) { return r.group === group && r.y === y; }).map(function(r) { return r.score; });
+  }
+
+  function initCh25() {
+    const thresholdSlider = document.getElementById("ch25-threshold");
+    const shiftSlider = document.getElementById("ch25-shift");
+    const metricSelect = document.getElementById("ch25-metric");
+    const status = document.getElementById("ch25-status");
+    const summary = document.getElementById("ch25-summary");
+    if (!thresholdSlider || !shiftSlider || !metricSelect || !window.Plotly) return;
+    if (status) status.textContent = "";
+
+    function update() {
+      const t = parseFloat(thresholdSlider.value);
+      const shiftB = parseFloat(shiftSlider.value);
+      thresholdSlider.nextElementSibling.textContent = t.toFixed(2);
+      shiftSlider.nextElementSibling.textContent = shiftB.toFixed(2);
+      const rows = makeData(shiftB);
+      const mA = metrics(rows, t, "A");
+      const mB = metrics(rows, t, "B");
+      const chosen = metricSelect.value;
+
+      const traces = [
+        {x: histogram(rows, "A", 1), type: "histogram", opacity: 0.55, name: "A, Y=1", nbinsx: 20},
+        {x: histogram(rows, "A", 0), type: "histogram", opacity: 0.55, name: "A, Y=0", nbinsx: 20},
+        {x: histogram(rows, "B", 1), type: "histogram", opacity: 0.55, name: "B, Y=1", nbinsx: 20},
+        {x: histogram(rows, "B", 0), type: "histogram", opacity: 0.55, name: "B, Y=0", nbinsx: 20}
+      ];
+
+      const gap = Math.abs(mA[chosen] - mB[chosen]);
+      Plotly.react("ch25-score-plot", traces, {
+        title: "Score distributions and threshold t = " + t.toFixed(2) + " | " + chosen + " gap = " + gap.toFixed(3),
+        barmode: "overlay",
+        xaxis: {title: "score S", range: [0, 1]},
+        yaxis: {title: "count"},
+        shapes: [{type: "line", x0: t, x1: t, y0: 0, y1: 1, yref: "paper", line: {width: 3, dash: "dash"}}],
+        margin: {t: 55, r: 20, b: 45, l: 45},
+        legend: {orientation: "h", y: -0.25}
+      }, {responsive: true});
+
+      summary.textContent =
+        "Group-wise metrics at threshold t = " + t.toFixed(2) + "\n" +
+        "\n" +
+        "Metric      Group A   Group B   absolute gap\n" +
+        "base rate   " + format(mA.BR) + "     " + format(mB.BR) + "     " + format(Math.abs(mA.BR - mB.BR)) + "\n" +
+        "accuracy    " + format(mA.ACC) + "     " + format(mB.ACC) + "     " + format(Math.abs(mA.ACC - mB.ACC)) + "\n" +
+        "TPR         " + format(mA.TPR) + "     " + format(mB.TPR) + "     " + format(Math.abs(mA.TPR - mB.TPR)) + "\n" +
+        "FPR         " + format(mA.FPR) + "     " + format(mB.FPR) + "     " + format(Math.abs(mA.FPR - mB.FPR)) + "\n" +
+        "PPV         " + format(mA.PPV) + "     " + format(mB.PPV) + "     " + format(Math.abs(mA.PPV - mB.PPV)) + "\n" +
+        "selection   " + format(mA.SR) + "     " + format(mB.SR) + "     " + format(Math.abs(mA.SR - mB.SR)) + "\n\n" +
+        "Changing the threshold can improve one gap while worsening another.  This is why a fairness audit must state which condition is being studied and why that condition is appropriate for the application.";
+    }
+
+    [thresholdSlider, shiftSlider, metricSelect].forEach(function(node) {
+      node.addEventListener("input", update);
+      node.addEventListener("change", update);
+    });
+    update();
+  }
+
+  function ready(callback) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback);
+    } else {
+      callback();
+    }
+  }
+
+  ready(function() { loadPlotly(initCh25); });
+})();
+</script>
+
+## 25.8 Python example: threshold metrics by group
+
+The interactive above uses the same mathematical idea as the following Python simulation.  We generate scores $S$, choose a threshold $t$, and compute group-wise rates.
+
+```{python}
+import numpy as np
+import pandas as pd
+
+rng = np.random.default_rng(2025)
+
+nA = 400
+nB = 400
+YA = rng.binomial(1, 0.45, size=nA)
+YB = rng.binomial(1, 0.30, size=nB)
+
+def clipped_normal(mean, sd, size):
+    return np.clip(rng.normal(mean, sd, size=size), 0.01, 0.99)
+
+SA = np.where(YA == 1, clipped_normal(0.70, 0.14, nA), clipped_normal(0.32, 0.15, nA))
+SB = np.where(YB == 1, clipped_normal(0.64, 0.15, nB), clipped_normal(0.30, 0.15, nB))
+
+scores = pd.DataFrame({
+    "group": np.r_[np.repeat("A", nA), np.repeat("B", nB)],
+    "y": np.r_[YA, YB],
+    "score": np.r_[SA, SB]
+})
+
+def threshold_report(df, threshold):
+    out = []
+    for g, sub in df.groupby("group"):
+        y = sub["y"].to_numpy()
+        yhat = (sub["score"].to_numpy() >= threshold).astype(int)
+        tp = ((yhat == 1) & (y == 1)).sum()
+        fp = ((yhat == 1) & (y == 0)).sum()
+        fn = ((yhat == 0) & (y == 1)).sum()
+        tn = ((yhat == 0) & (y == 0)).sum()
+        out.append({
+            "group": g,
+            "base_rate": y.mean(),
+            "selection_rate": yhat.mean(),
+            "TPR": tp / (tp + fn),
+            "FPR": fp / (fp + tn),
+            "PPV": tp / (tp + fp) if tp + fp > 0 else np.nan,
+            "accuracy": (tp + tn) / len(sub)
+        })
+    return pd.DataFrame(out)
+
+threshold_report(scores, threshold=0.50)
+```
+
+A useful classroom activity is to search over thresholds and compare the threshold that maximizes accuracy with the threshold that reduces a chosen fairness gap.
+
+```{python}
+thresholds = np.linspace(0.05, 0.95, 91)
+rows = []
+
+for t in thresholds:
+    rep = threshold_report(scores, t).set_index("group")
+    rows.append({
+        "threshold": t,
+        "mean_accuracy": rep["accuracy"].mean(),
+        "TPR_gap": abs(rep.loc["A", "TPR"] - rep.loc["B", "TPR"]),
+        "FPR_gap": abs(rep.loc["A", "FPR"] - rep.loc["B", "FPR"]),
+        "selection_gap": abs(rep.loc["A", "selection_rate"] - rep.loc["B", "selection_rate"]),
+        "PPV_gap": abs(rep.loc["A", "PPV"] - rep.loc["B", "PPV"])
+    })
+
+scan = pd.DataFrame(rows)
+scan.sort_values("mean_accuracy", ascending=False).head()
+```
+
+```{python}
+scan.sort_values("TPR_gap").head()
+```
+
+These two tables usually point to different thresholds.  This is a mathematical signal that the design decision is not purely technical.
+
+## 25.9 Calibration and uncertainty
+
+A model score $S\in[0,1]$ is calibrated if
+
+$$
+P(Y=1\mid S=s)=s.
+$$
+
+In practice we approximate this condition using bins.  If bin $B_m$ contains examples whose scores lie in an interval, define
+
+$$
+\operatorname{acc}(B_m)=\frac{1}{|B_m|}\sum_{i\in B_m} y_i,
+\qquad
+\operatorname{conf}(B_m)=\frac{1}{|B_m|}\sum_{i\in B_m} s_i.
+$$
+
+The expected calibration error is commonly estimated by
+
+$$
+\operatorname{ECE}=\sum_{m=1}^M \frac{|B_m|}{n}\left|\operatorname{acc}(B_m)-\operatorname{conf}(B_m)\right|.
+$$
+
+Calibration matters because a score of $0.9$ should not merely rank higher than a score of $0.6$; it should mean something probabilistic.  In NLP, calibration is important for moderation, retrieval confidence, question-answering uncertainty, and decision support.
+
+```{python}
+def calibration_table(y, s, bins=8):
+    y = np.asarray(y)
+    s = np.asarray(s)
+    edges = np.linspace(0, 1, bins + 1)
+    rows = []
+    ece = 0.0
+    for j in range(bins):
+        left, right = edges[j], edges[j + 1]
+        if j == bins - 1:
+            mask = (s >= left) & (s <= right)
+        else:
+            mask = (s >= left) & (s < right)
+        if mask.sum() == 0:
+            continue
+        acc = y[mask].mean()
+        conf = s[mask].mean()
+        weight = mask.mean()
+        ece += weight * abs(acc - conf)
+        rows.append({
+            "bin": f"[{left:.2f}, {right:.2f}]",
+            "count": int(mask.sum()),
+            "accuracy": acc,
+            "mean_score": conf,
+            "abs_gap": abs(acc - conf)
+        })
+    return pd.DataFrame(rows), ece
+
+cal_table, ece = calibration_table(scores["y"], scores["score"], bins=8)
+cal_table, ece
+```
+
+A classifier can have high accuracy and poor calibration.  Conversely, a calibrated classifier may not have the best thresholded accuracy.  These are different mathematical properties.
+
+## 25.10 Distribution shift
+
+Let $P$ be the training distribution and $Q$ be the deployment distribution.  Distribution shift means
+
+$$
+P(X,A,Y)\ne Q(X,A,Y).
+$$
+
+Important special cases include:
+
+- **Covariate shift:** $P(X)\ne Q(X)$ but $P(Y\mid X)=Q(Y\mid X)$.
+- **Label shift:** $P(Y)\ne Q(Y)$ but $P(X\mid Y)=Q(X\mid Y)$.
+- **Concept shift:** $P(Y\mid X)\ne Q(Y\mid X)$.
+
+In text applications, distribution shift appears when a model trained on one source is used on another source: social media versus formal essays, one university's policy pages versus another's, one time period versus another, or one language variety versus another.
+
+Under covariate shift, if the density ratio $w(x)=q(x)/p(x)$ is known or estimated, then
+
+$$
+R_Q(d)=E_Q[L(d(X),Y)]
+=E_P\left[\frac{q(X)}{p(X)}L(d(X),Y)\right].
+$$
+
+Thus weighted empirical risk can estimate deployment risk:
+
+$$
+\widehat{R}_Q(d)=\frac{1}{n}\sum_{i=1}^n w(x_i)L(d(x_i),y_i).
+$$
+
+```{python}
+# A toy covariate-shift example with two text sources.
+shift_df = pd.DataFrame({
+    "source": ["train"] * 6 + ["deploy"] * 6,
+    "text_type": ["short", "short", "short", "long", "long", "long", "short", "short", "long", "long", "long", "long"],
+    "loss": [0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1]
+})
+
+train = shift_df[shift_df["source"] == "train"]
+deploy = shift_df[shift_df["source"] == "deploy"]
+
+p_train = train["text_type"].value_counts(normalize=True)
+p_deploy = deploy["text_type"].value_counts(normalize=True)
+
+weights = train["text_type"].map(lambda z: p_deploy[z] / p_train[z])
+unweighted_risk = train["loss"].mean()
+weighted_risk = np.average(train["loss"], weights=weights)
+deploy_risk = deploy["loss"].mean()
+
+pd.DataFrame({
+    "estimate": ["unweighted train risk", "weighted train risk", "observed deploy risk"],
+    "risk": [unweighted_risk, weighted_risk, deploy_risk]
+})
+```
+
+The weighted estimate moves toward the deployment risk because it accounts for the changed mixture of text types.  In real NLP, estimating $q(x)/p(x)$ is itself a hard statistical problem.
+
+## 25.11 Embedding association and representation bias
+
+Embedding models represent words, sentences, or documents as vectors.  Bias can appear as geometric association.  Let $X$ and $Y$ be two sets of target words, and let $A$ and $B$ be two sets of attribute words.  A simple association score is
+
+$$
+s(w,A,B)=\frac{1}{|A|}\sum_{a\in A}\cos(e_w,e_a)
+-
+\frac{1}{|B|}\sum_{b\in B}\cos(e_w,e_b).
+$$
+
+A set-level effect score is
+
+$$
+S(X,Y,A,B)=\sum_{x\in X}s(x,A,B)-\sum_{y\in Y}s(y,A,B).
+$$
+
+This type of score is inspired by word-embedding association tests and related representation-auditing methods @caliskan_semantics_2017, @bolukbasi_man_is_2016.
+
+```{python}
+# A small toy embedding audit.  These numbers are artificial and for pedagogy only.
+emb = {
+    "nurse": np.array([0.10, 0.80]),
+    "engineer": np.array([0.80, 0.10]),
+    "teacher": np.array([0.20, 0.70]),
+    "programmer": np.array([0.75, 0.20]),
+    "care": np.array([0.00, 1.00]),
+    "family": np.array([0.10, 0.95]),
+    "logic": np.array([1.00, 0.00]),
+    "machine": np.array([0.95, 0.10]),
+}
+
+def cosine(u, v):
+    u = np.asarray(u)
+    v = np.asarray(v)
+    return float(u @ v / (np.linalg.norm(u) * np.linalg.norm(v)))
+
+def assoc(word, A, B):
+    return np.mean([cosine(emb[word], emb[a]) for a in A]) - np.mean([cosine(emb[word], emb[b]) for b in B])
+
+X = ["nurse", "teacher"]
+Y = ["engineer", "programmer"]
+A = ["care", "family"]
+B = ["logic", "machine"]
+
+pd.DataFrame({
+    "word": X + Y,
+    "association_to_A_minus_B": [assoc(w, A, B) for w in X + Y]
+})
+```
+
+A linear debiasing operation can be written as orthogonal projection.  If $b$ is a unit direction representing an unwanted association, then the projection removing that direction is
+
+$$
+\Pi_{b^\perp}(v)=v-(v^Tb)b.
+$$
+
+This operation is mathematically clean, but it is not a complete solution.  Bias may be nonlinear, contextual, or encoded in many directions.  Projection can also remove useful information or create a false sense of safety.
+
+```{python}
+# Remove the direction from "logic/machine" to "care/family" in the toy example.
+mean_A = np.mean([emb[a] for a in A], axis=0)
+mean_B = np.mean([emb[b] for b in B], axis=0)
+bias_direction = mean_A - mean_B
+bias_direction = bias_direction / np.linalg.norm(bias_direction)
+
+def remove_direction(v, b):
+    return v - (v @ b) * b
+
+emb_projected = {w: remove_direction(v, bias_direction) for w, v in emb.items()}
+
+def assoc_projected(word, A, B):
+    return np.mean([cosine(emb_projected[word], emb_projected[a]) for a in A]) - np.mean([cosine(emb_projected[word], emb_projected[b]) for b in B])
+
+pd.DataFrame({
+    "word": X + Y,
+    "before": [assoc(w, A, B) for w in X + Y],
+    "after_projection": [assoc_projected(w, A, B) for w in X + Y]
+})
+```
+
+## 25.12 Selective prediction and abstention
+
+Responsible deployment often requires a model not to answer every query.  A selective classifier returns either a prediction or an abstention symbol $\bot$:
+
+$$
+g(x)\in\{0,1,\bot\}.
+$$
+
+For a confidence score $c(x)$ and threshold $\tau$, a simple rule is
+
+$$
+g_\tau(x)=
+\begin{cases}
+\widehat{y}(x), & c(x)\ge \tau,\\
+\bot, & c(x)<\tau.
+\end{cases}
+$$
+
+Two quantities are central:
+
+$$
+\operatorname{coverage}(\tau)=P(c(X)\ge \tau),
+$$
+
+$$
+\operatorname{selective\ risk}(\tau)
+=E[L(\widehat{Y},Y)\mid c(X)\ge \tau].
+$$
+
+Increasing $\tau$ often decreases risk among answered cases but also decreases coverage.
+
+```{python}
+conf = np.maximum(scores["score"].to_numpy(), 1 - scores["score"].to_numpy())
+y = scores["y"].to_numpy()
+yhat = (scores["score"].to_numpy() >= 0.50).astype(int)
+loss = (yhat != y).astype(float)
+
+selective_rows = []
+for tau in np.linspace(0.50, 0.95, 10):
+    keep = conf >= tau
+    selective_rows.append({
+        "confidence_threshold": tau,
+        "coverage": keep.mean(),
+        "selective_error": loss[keep].mean() if keep.sum() > 0 else np.nan
+    })
+
+pd.DataFrame(selective_rows)
+```
+
+In high-stakes applications, abstention should usually trigger a defined alternative process, such as human review, retrieval of source documents, or refusal to answer.
+
+## 25.13 Privacy and memorization
+
+NLP systems can leak information from training data, prompts, logs, or retrieved documents.  A mathematical privacy guarantee should describe how the output distribution changes when one individual's data is changed.
+
+A randomized algorithm $M$ is $\varepsilon$-differentially private if for all neighboring datasets $D$ and $D'$ differing in one individual, and for all measurable output sets $S$,
+
+$$
+P(M(D)\in S)\le e^\varepsilon P(M(D')\in S).
+$$
+
+Smaller $\varepsilon$ means stronger privacy.  Differential privacy is not the only privacy concept, but it is mathematically precise @dwork_roth_2014.
+
+A simple example is randomized response.  Suppose a private binary answer is $Y\in\{0,1\}$.  The released answer $Z$ equals $Y$ with probability $p$ and is flipped with probability $1-p$.  The privacy parameter is
+
+$$
+\varepsilon=\log\frac{p}{1-p}.
+$$
+
+```{python}
+ps = np.array([0.55, 0.60, 0.70, 0.80, 0.90])
+eps = np.log(ps / (1 - ps))
+pd.DataFrame({"truth_probability_p": ps, "epsilon": eps})
+```
+
+Privacy has a utility tradeoff.  As $p$ approaches $1/2$, the released answer becomes more private but less informative.  As $p$ approaches $1$, the answer is accurate but less private.
+
+## 25.14 Hallucination, factuality, and RAG responsibility
+
+For a generated answer $Z$ to a prompt $X$, factuality cannot be determined from fluency alone.  A response may be syntactically excellent and factually false.  A clean way to describe a retrieval-augmented system is
+
+$$
+D_1,\ldots,D_k \sim r_\eta(d\mid x),
+\qquad
+Z\sim p_\theta(z\mid x,D_1,\ldots,D_k).
+$$
+
+Errors can enter through retrieval or generation:
+
+- relevant documents may not be retrieved;
+- retrieved documents may be outdated, ambiguous, or contradictory;
+- the generator may ignore retrieved evidence;
+- the generator may blend evidence with unsupported prior knowledge;
+- the final answer may omit uncertainty or citations.
+
+For mathematical responsibility, it is useful to separate:
+
+$$
+P(\text{correct answer})
+=P(\text{retrieval sufficient})P(\text{generation faithful}\mid \text{retrieval sufficient})+
+\cdots.
+$$
+
+This is not a complete causal model, but it forces students to separate retrieval failure from generation failure.
+
+## 25.15 AI-assisted auditing workflow
+
+AI tools can help audit NLP systems, but they should not replace statistical reasoning.  A useful AI-assisted workflow is:
+
+1. Ask the AI system to state the task, target variable, decision rule, and possible harms.
+2. Ask it to propose subgroup variables that might matter.
+3. Ask it to list plausible distribution shifts.
+4. Convert the suggestions into mathematical quantities.
+5. Compute metrics and uncertainty using data.
+6. Ask the AI system to critique the audit for missing assumptions.
+7. Document the final human judgment.
+
+::: {.callout-note}
+AI assistance is useful for brainstorming failure modes and drafting audit checklists.  It is not evidence.  Evidence comes from data, source documents, mathematical definitions, and careful evaluation.
+:::
+
+## 25.16 Worked example: two classifiers with the same accuracy
+
+Suppose two classifiers have the same overall accuracy, but their group-specific errors differ.
+
+```{python}
+comparison = pd.DataFrame({
+    "model": ["M1", "M1", "M2", "M2"],
+    "group": ["A", "B", "A", "B"],
+    "n": [100, 100, 100, 100],
+    "accuracy": [0.90, 0.70, 0.80, 0.80],
+    "TPR": [0.92, 0.58, 0.80, 0.79],
+    "FPR": [0.10, 0.22, 0.16, 0.15]
+})
+comparison
+```
+
+Both models have average accuracy $0.80$, but Model M1 has a much larger group performance disparity.  Whether M2 is preferable depends on the application, but the overall metric alone hides the difference.
+
+```{python}
+summary = comparison.groupby("model").agg(
+    mean_accuracy=("accuracy", "mean"),
+    TPR_gap=("TPR", lambda z: z.max() - z.min()),
+    FPR_gap=("FPR", lambda z: z.max() - z.min())
+)
+summary
+```
+
+The mathematical lesson is that aggregation is a projection.  It can remove information.  Responsible evaluation often requires conditional metrics.
+
+## 25.17 Common mistakes
+
+1. **Treating accuracy as responsibility.** Accuracy is one statistic, not an ethical guarantee.
+2. **Ignoring the deployment distribution.** A test set estimates performance only for the distribution it represents.
+3. **Using group metrics without uncertainty.** Small subgroups can produce unstable estimates.
+4. **Assuming one fairness metric is always correct.** Different metrics encode different choices.
+5. **Assuming debiasing projection solves bias.** Geometric correction can help but is incomplete.
+6. **Confusing fluency with factuality.** Language quality does not imply truth.
+7. **Using AI critiques as evidence.** AI-generated audits must be checked against data and definitions.
+
+## 25.18 Exercises
+
+1. **Group metrics.**  Given the following counts for groups A and B, compute TPR, FPR, PPV, selection rate, and accuracy.  Which fairness criteria are approximately satisfied?
+
+2. **Threshold tradeoff.**  For a score-based classifier, write code that searches over thresholds and plots TPR gap, FPR gap, selection-rate gap, and accuracy.
+
+3. **Calibration.**  Construct a model that has high accuracy but poor calibration.  Compute ECE.
+
+4. **Distribution shift.**  Suppose the training data contains $70\%$ formal text and $30\%$ informal text, but deployment contains $30\%$ formal text and $70\%$ informal text.  If error rates differ by text type, compute the shifted risk.
+
+5. **Embedding association.**  Build a small toy embedding example and compute association scores before and after projection.
+
+6. **Selective prediction.**  For a classifier with confidence scores, compute coverage and selective risk as functions of the abstention threshold.
+
+7. **Privacy.**  For randomized response with $p=0.75$, compute $\varepsilon$.  Interpret the result.
+
+8. **RAG audit.**  Design separate metrics for retrieval sufficiency and generation faithfulness.
+
+## 25.19 Mini-project: mathematical audit of an NLP classifier
+
+Choose a small text classification task, such as sentiment classification, topic classification, helpfulness prediction, or moderation.  Your project should include:
+
+1. a precise definition of $X$, $Y$, and any auditing variable $A$;
+2. a baseline model and decision rule;
+3. group-wise confusion matrices;
+4. at least two fairness metrics;
+5. calibration analysis;
+6. a distribution-shift experiment;
+7. an uncertainty discussion;
+8. a written statement about whether the model should be used and under what constraints.
+
+The goal is not to produce the highest-performing model.  The goal is to practice mathematically responsible evaluation.
+
+## 25.20 Python lab connection
+
+The associated independent-study lab is planned as:
+
+```text
+labs/chapter-25-ethics-bias-responsibility.ipynb
+```
+
+The lab should contain:
+
+- a self-contained explanation of group fairness metrics;
+- Python implementations from scratch;
+- threshold scanning and visualization;
+- calibration and ECE;
+- distribution-shift weighting;
+- embedding association and projection;
+- selective prediction and abstention;
+- a final audit report template.
+
+## 25.21 Chapter summary
+
+Ethics in NLP is not only a philosophical add-on after model training.  It begins when we choose the data distribution, target variable, representation, model class, objective function, metric, and deployment rule.  Mathematics helps because it forces these choices to become explicit.
+
+The core lessons are:
+
+- responsible NLP starts with random variables and distributions;
+- bias can enter through data, measurement, representation, optimization, and deployment;
+- fairness metrics are conditional probabilities, not universal moral truths;
+- different fairness metrics can conflict when base rates differ;
+- calibration, uncertainty, and distribution shift are central to deployment;
+- privacy and factuality require separate mathematical treatment;
+- AI assistance can support auditing, but evidence must come from definitions, data, and transparent evaluation.
+
+## 25.22 Notes and references
+
+This chapter connects statistical evaluation, fairness in machine learning, privacy, and representation auditing.  Useful background includes the fairness text of Barocas, Hardt, and Narayanan @barocas_hardt_narayanan_2019, the equalized-odds framework of Hardt, Price, and Srebro @hardt_price_srebro_2016, differential privacy foundations @dwork_roth_2014, embedding bias studies @bolukbasi_man_is_2016, @caliskan_semantics_2017, and broader discussions of dataset and language-model risk @buolamwini_gebru_2018, @bender_stochastic_parrots_2021.

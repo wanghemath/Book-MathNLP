@@ -1,0 +1,1058 @@
+---
+title: "Neural Networks for Text"
+subtitle: "Embeddings, softmax classifiers, and trainable nonlinear maps"
+---
+
+::: {.chapter-opening}
+Classical text models often use a fixed representation such as a count vector, TF--IDF vector, or SVD coordinate.  A **neural network for text** replaces part of this representation pipeline by a trainable map.  Tokens become vectors, vectors are combined into a document or sequence representation, and the resulting representation is sent through nonlinear maps and a softmax output layer.
+
+The goal of this chapter is not to treat neural networks as black boxes.  The goal is to write down the maps, dimensions, losses, and gradients clearly enough that the model becomes a familiar object from linear algebra, probability, and optimization.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. describe a neural text classifier as a composition of maps;
+2. distinguish fixed text features from trainable embeddings;
+3. compute softmax probabilities and cross-entropy loss;
+4. derive the gradient of softmax cross-entropy with respect to logits;
+5. explain how an embedding layer receives gradients from a sentence-level loss;
+6. implement a small neural text classifier from scratch in Python;
+7. interpret regularization, temperature, and calibration for neural text models.
+
+## 10.1 The modeling pipeline
+
+A simple neural text classifier has four conceptual steps.
+
+$$
+\text{text}
+\longrightarrow
+\text{token indices}
+\longrightarrow
+\text{token embeddings}
+\longrightarrow
+\text{text representation}
+\longrightarrow
+\text{class probabilities}.
+$$
+
+Let $V = \{1,\ldots,d\}$ be a finite vocabulary.  A document or sentence is represented as a token sequence
+
+$$
+x=(x_1,\ldots,x_T) \in V^T.
+$$
+
+A neural model is a parameterized function
+
+$$
+f_\theta: V^T \to \Delta^{K-1},
+$$
+
+where $K$ is the number of classes and
+
+$$
+\Delta^{K-1}
+=
+\left\{p \in \mathbb R^K: p_k \ge 0,\ \sum_{k=1}^K p_k=1\right\}
+$$
+
+is the probability simplex.  The output $f_\theta(x)$ is interpreted as a conditional distribution over labels:
+
+$$
+f_\theta(x)_k \approx P(Y=k\mid X=x).
+$$
+
+A minimal neural text classifier can be written as
+
+$$
+\begin{aligned}
+e_i &= E_{x_i} \in \mathbb R^m, \qquad i=1,\ldots,T,\\
+h(x) &= \frac{1}{T}\sum_{i=1}^T e_i \in \mathbb R^m,\\
+r(x) &= \sigma(Ah(x)+a) \in \mathbb R^q,\\
+z(x) &= Wr(x)+b \in \mathbb R^K,\\
+f_\theta(x) &= \operatorname{softmax}(z(x)).
+\end{aligned}
+$$
+
+Here:
+
+- $E\in \mathbb R^{d\times m}$ is an **embedding matrix**;
+- $E_j$ is the row vector representing token $j$;
+- $h(x)$ is an averaged sentence representation;
+- $A\in \mathbb R^{q\times m}$ and $a\in \mathbb R^q$ define a hidden layer;
+- $\sigma$ is a nonlinear activation such as ReLU or tanh;
+- $W\in \mathbb R^{K\times q}$ and $b\in \mathbb R^K$ define the output logits;
+- $\theta=(E,A,a,W,b)$ denotes all trainable parameters.
+
+::: {.math-card}
+**Core idea.**  A neural text classifier is a composition of a discrete lookup map, vector averaging or sequence aggregation, nonlinear transformations, and a probabilistic output map.
+:::
+
+## 10.2 From fixed features to trainable features
+
+Earlier chapters studied fixed representation maps such as
+
+$$
+\phi(x) \in \mathbb R^d,
+$$
+
+where $\phi(x)$ may be a count vector, a TF--IDF vector, or an SVD coordinate.  A linear classifier then uses
+
+$$
+z(x)=W\phi(x)+b.
+$$
+
+In a neural model, part of $\phi$ is learned from data.  For example, an embedding layer defines
+
+$$
+\phi_E(x)
+=
+\frac{1}{T}\sum_{i=1}^T E_{x_i}.
+$$
+
+The representation depends on trainable parameters $E$.  Therefore training changes not only the classifier weights, but also the geometry in which tokens are represented.
+
+This is the main mathematical shift:
+
+$$
+\text{fixed representation } \phi
+\quad \longrightarrow \quad
+\text{trainable representation } \phi_\theta.
+$$
+
+The statistical question also changes.  We are no longer only estimating class probabilities after selecting features.  We are jointly estimating a feature map and a classifier.
+
+## 10.3 The embedding layer as a matrix lookup
+
+Let $E\in \mathbb R^{d\times m}$.  If token $j\in V$ is represented by the one-hot vector $u_j\in \mathbb R^d$, then its embedding is
+
+$$
+E^T u_j \in \mathbb R^m.
+$$
+
+Equivalently, if $E_j$ denotes the $j$th row of $E$, then
+
+$$
+E^T u_j = E_j^T.
+$$
+
+Thus an embedding layer is just a matrix multiplication by a one-hot vector, implemented efficiently as a row lookup.
+
+For a sequence $x=(x_1,\ldots,x_T)$, the embedding layer produces a matrix
+
+$$
+M(x)
+=
+\begin{bmatrix}
+E_{x_1}\\
+E_{x_2}\\
+\vdots\\
+E_{x_T}
+\end{bmatrix}
+\in \mathbb R^{T\times m}.
+$$
+
+A simple sentence representation is average pooling:
+
+$$
+h(x)=\frac{1}{T}\mathbf 1_T^T M(x).
+$$
+
+This representation is permutation-invariant.  It ignores word order.  That is a serious limitation for some language tasks, but it is a useful first model because its mathematics is transparent.
+
+::: {.math-card}
+**Dimension check.**  If $E\in \mathbb R^{d\times m}$ and $M(x)\in \mathbb R^{T\times m}$, then average pooling gives $h(x)\in \mathbb R^m$.  If the hidden layer has width $q$ and there are $K$ classes, then $A\in \mathbb R^{q\times m}$ and $W\in \mathbb R^{K\times q}$.
+:::
+
+## 10.4 Activations and nonlinear maps
+
+A neural network becomes more than a linear classifier because of nonlinear activation functions.  Common choices include
+
+$$
+\operatorname{ReLU}(t)=\max\{0,t\},
+$$
+
+$$
+\tanh(t)=\frac{e^t-e^{-t}}{e^t+e^{-t}},
+$$
+
+and the logistic sigmoid
+
+$$
+\sigma(t)=\frac{1}{1+e^{-t}}.
+$$
+
+Applied coordinatewise, an activation maps vectors to vectors:
+
+$$
+\sigma(v)=(\sigma(v_1),\ldots,\sigma(v_q)).
+$$
+
+A one-hidden-layer classifier is
+
+$$
+z(x)=W\sigma(Ah(x)+a)+b.
+$$
+
+Without the activation, this collapses to another affine map:
+
+$$
+W(Ah+a)+b=(WA)h+(Wa+b).
+$$
+
+Therefore the activation is what allows the model to represent nonlinear decision boundaries in the representation space.
+
+## 10.5 Softmax output and class probabilities
+
+For $K$ classes, the model produces logits
+
+$$
+z=(z_1,\ldots,z_K)\in \mathbb R^K.
+$$
+
+The softmax function maps logits to probabilities:
+
+$$
+\operatorname{softmax}(z)_k
+=
+\frac{e^{z_k}}{\sum_{\ell=1}^K e^{z_\ell}}.
+$$
+
+Softmax is invariant under adding a constant to all logits:
+
+$$
+\operatorname{softmax}(z+c\mathbf 1)=\operatorname{softmax}(z).
+$$
+
+This identity is important for numerical stability.  In computation, we usually evaluate
+
+$$
+\operatorname{softmax}(z)
+=
+\operatorname{softmax}(z-\max_j z_j\mathbf 1).
+$$
+
+For binary classification with classes $0$ and $1$, the two-class softmax is equivalent to logistic regression.  If
+
+$$
+z_1-z_0=s,
+$$
+
+then
+
+$$
+P(Y=1\mid x)=\frac{1}{1+e^{-s}}.
+$$
+
+Thus a neural binary classifier can be interpreted as logistic regression applied after a learned nonlinear representation.
+
+## 10.6 Cross-entropy and maximum likelihood
+
+Suppose the training data are
+
+$$
+\mathcal D_n=\{(x_i,y_i)\}_{i=1}^n,
+$$
+
+where $y_i\in\{1,\ldots,K\}$.  Let $p_\theta(x_i)=f_\theta(x_i)$.  The model assigns probability
+
+$$
+p_\theta(y_i\mid x_i)=p_\theta(x_i)_{y_i}.
+$$
+
+The conditional likelihood is
+
+$$
+L(\theta)
+=
+\prod_{i=1}^n p_\theta(y_i\mid x_i).
+$$
+
+Maximizing likelihood is equivalent to minimizing negative log-likelihood:
+
+$$
+\ell(\theta)
+=
+-
+\sum_{i=1}^n \log p_\theta(y_i\mid x_i).
+$$
+
+If $e_{y_i}\in\mathbb R^K$ is the one-hot vector for the true label, the per-example loss is
+
+$$
+\ell_i(\theta)
+=
+-
+\sum_{k=1}^K (e_{y_i})_k \log p_\theta(x_i)_k.
+$$
+
+This is the cross-entropy between the empirical one-hot label distribution and the model's predicted distribution.
+
+For empirical risk minimization, we usually minimize the average loss:
+
+$$
+\widehat R_n(\theta)
+=
+\frac{1}{n}\sum_{i=1}^n \ell_i(\theta).
+$$
+
+## 10.7 The key gradient: softmax plus cross-entropy
+
+The softmax cross-entropy gradient has a remarkably simple form.  Let
+
+$$
+p=\operatorname{softmax}(z),
+\qquad
+\ell(z,y)=-\log p_y.
+$$
+
+Then
+
+$$
+\frac{\partial \ell}{\partial z_k}=p_k-\mathbf 1\{k=y\}.
+$$
+
+In vector notation,
+
+$$
+\nabla_z \ell=p-e_y.
+$$
+
+This formula is one reason softmax cross-entropy is convenient for classification.
+
+### Derivation
+
+First note that
+
+$$
+\log p_y
+=
+\log\left(\frac{e^{z_y}}{\sum_{\ell=1}^K e^{z_\ell}}\right)
+=
+z_y-
+\log\left(\sum_{\ell=1}^K e^{z_\ell}\right).
+$$
+
+Thus
+
+$$
+\ell(z,y)
+=
+-z_y+
+\log\left(\sum_{\ell=1}^K e^{z_\ell}\right).
+$$
+
+Differentiating with respect to $z_k$ gives
+
+$$
+\frac{\partial \ell}{\partial z_k}
+=
+-\mathbf 1\{k=y\}
++
+\frac{e^{z_k}}{\sum_{\ell=1}^K e^{z_\ell}}
+=
+p_k-\mathbf 1\{k=y\}.
+$$
+
+::: {.math-card}
+**Statistical interpretation.**  The vector $p-e_y$ is the difference between the predicted class distribution and the empirical one-hot class distribution.  Gradient descent pushes predicted probabilities toward the observed labels.
+:::
+
+## 10.8 Backpropagation through an averaged embedding model
+
+Consider the simple model
+
+$$
+h=\frac{1}{T}\sum_{i=1}^T E_{x_i},
+\qquad
+z=Wh+b,
+\qquad
+p=\operatorname{softmax}(z),
+\qquad
+\ell=-\log p_y.
+$$
+
+Let
+
+$$
+g_z=\nabla_z\ell=p-e_y.
+$$
+
+Then the gradients are
+
+$$
+\nabla_W\ell=g_z h^T,
+$$
+
+$$
+\nabla_b\ell=g_z,
+$$
+
+and
+
+$$
+g_h=\nabla_h\ell=W^Tg_z.
+$$
+
+Since
+
+$$
+h=\frac{1}{T}\sum_{i=1}^T E_{x_i},
+$$
+
+each token embedding in the document receives the gradient
+
+$$
+\nabla_{E_{x_i}}\ell = \frac{1}{T}g_h.
+$$
+
+If the same token appears multiple times, its row in $E$ accumulates multiple contributions.  This is why embedding layers are trainable even though token indices are discrete: the gradient flows into the continuous row vectors selected by the indices.
+
+## 10.9 Optimization and regularization
+
+Neural text models are usually trained with stochastic optimization.  For a mini-batch $B\subset\{1,\ldots,n\}$, define
+
+$$
+\widehat R_B(\theta)
+=
+\frac{1}{|B|}\sum_{i\in B}\ell_i(\theta).
+$$
+
+A stochastic gradient descent update is
+
+$$
+\theta_{t+1}=\theta_t-\eta_t\nabla_\theta \widehat R_B(\theta_t),
+$$
+
+where $\eta_t>0$ is a learning rate.
+
+A regularized objective may be written as
+
+$$
+J(\theta)=\widehat R_n(\theta)+\lambda\|\theta\|_2^2.
+$$
+
+In practice, one often regularizes only selected parameters, such as $A$ and $W$, not necessarily the embedding matrix.  Dropout, early stopping, and weight decay are also commonly used.
+
+From a statistical perspective, regularization is important because neural models often have many more parameters than training examples.  Without regularization or inductive bias, empirical loss alone may not control generalization.
+
+## 10.10 Temperature, confidence, and calibration
+
+For logits $z$, define temperature-scaled softmax by
+
+$$
+p_k(\tau)
+=
+\frac{\exp(z_k/\tau)}{\sum_{\ell=1}^K\exp(z_\ell/\tau)},
+\qquad \tau>0.
+$$
+
+Small $\tau$ makes the distribution sharper.  Large $\tau$ makes it flatter.  Temperature does not change the ranking of logits, but it changes the confidence assigned to predictions.
+
+This distinction matters in NLP because a model can be accurate but poorly calibrated.  Calibration asks whether predicted probabilities match empirical frequencies.  For example, among all examples to which a model assigns confidence near $0.8$, approximately $80\%$ should be correct if the model is calibrated.
+
+## 10.11 Interactive: Softmax classifier and temperature
+
+The following interactive illustrates a binary softmax classifier in a two-feature representation space.  Think of the horizontal coordinate as the strength of evidence for technical or mathematical language and the vertical coordinate as the strength of evidence for casual or nontechnical language.  The sliders control the logit difference
+
+$$
+s(x)=w_1x_1+w_2x_2+b,
+$$
+
+and the model probability
+
+$$
+P(Y=1\mid x)=\frac{1}{1+\exp(-s(x)/\tau)}.
+$$
+
+::: {.content-visible when-format="html"}
+<div class="interactive-card">
+  <h3>Interactive: Softmax classifier and temperature</h3>
+  <p>Adjust the weights, bias, and temperature.  The contour shows the predicted probability of class 1.</p>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; align-items:end;">
+    <label>Weight w1<br><input id="ch10-w1" type="range" min="-4" max="4" step="0.1" value="1.5"><span id="ch10-w1-val">1.5</span></label>
+    <label>Weight w2<br><input id="ch10-w2" type="range" min="-4" max="4" step="0.1" value="-1.2"><span id="ch10-w2-val">-1.2</span></label>
+    <label>Bias b<br><input id="ch10-b" type="range" min="-3" max="3" step="0.1" value="0.0"><span id="ch10-b-val">0.0</span></label>
+    <label>Temperature tau<br><input id="ch10-tau" type="range" min="0.25" max="4" step="0.05" value="1.0"><span id="ch10-tau-val">1.0</span></label>
+  </div>
+
+  <div id="ch10-softmax-plot" class="plotly-demo"></div>
+  <div id="ch10-softmax-status" class="plotly-status">Loading interactive figure...</div>
+</div>
+
+<script>
+(function() {
+  function byId(id) { return document.getElementById(id); }
+  function status(message) {
+    var node = byId("ch10-softmax-status");
+    if (node) node.textContent = message;
+  }
+  function plotlyPath() {
+    return window.location.pathname.indexOf("/chapters/") >= 0 ? "../assets/plotly.min.js" : "assets/plotly.min.js";
+  }
+  function loadPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    var existing = document.querySelector("script[data-local-plotly='true']");
+    if (existing) {
+      existing.addEventListener("load", callback, { once: true });
+      existing.addEventListener("error", function() {
+        status("Plotly.js was not available, so the interactive figure could not be drawn.");
+      }, { once: true });
+      return;
+    }
+    var script = document.createElement("script");
+    script.src = plotlyPath();
+    script.defer = true;
+    script.setAttribute("data-local-plotly", "true");
+    script.onload = callback;
+    script.onerror = function() {
+      status("Plotly.js was not available, so the interactive figure could not be drawn. Check that assets/plotly.min.js exists in the rendered site.");
+    };
+    document.head.appendChild(script);
+  }
+  function sigmoid(t) { return 1 / (1 + Math.exp(-t)); }
+  function gridValues(w1, w2, b, tau) {
+    var xs = [];
+    var ys = [];
+    var z = [];
+    for (var i = 0; i <= 60; i++) xs.push(-3 + i * 0.1);
+    for (var j = 0; j <= 60; j++) ys.push(-3 + j * 0.1);
+    for (var row = 0; row < ys.length; row++) {
+      var zr = [];
+      for (var col = 0; col < xs.length; col++) {
+        var s = (w1 * xs[col] + w2 * ys[row] + b) / tau;
+        zr.push(sigmoid(s));
+      }
+      z.push(zr);
+    }
+    return { xs: xs, ys: ys, z: z };
+  }
+  function init() {
+    var div = byId("ch10-softmax-plot");
+    if (!div || !window.Plotly) return;
+
+    var controls = ["w1", "w2", "b", "tau"].map(function(name) {
+      return { name: name, input: byId("ch10-" + name), value: byId("ch10-" + name + "-val") };
+    });
+
+    var positive = {
+      x: [1.8, 2.2, 1.2, 2.6, 0.9],
+      y: [-1.4, -0.8, -2.0, -1.5, -0.5],
+      mode: "markers",
+      type: "scatter",
+      name: "class 1 examples",
+      marker: { size: 10, symbol: "circle" }
+    };
+    var negative = {
+      x: [-1.8, -2.2, -1.0, -2.5, -0.8],
+      y: [1.5, 0.9, 2.1, 1.2, 0.4],
+      mode: "markers",
+      type: "scatter",
+      name: "class 0 examples",
+      marker: { size: 10, symbol: "x" }
+    };
+
+    function readParams() {
+      var w1 = parseFloat(byId("ch10-w1").value);
+      var w2 = parseFloat(byId("ch10-w2").value);
+      var b = parseFloat(byId("ch10-b").value);
+      var tau = parseFloat(byId("ch10-tau").value);
+      return { w1: w1, w2: w2, b: b, tau: tau };
+    }
+
+    function updateLabels(params) {
+      byId("ch10-w1-val").textContent = params.w1.toFixed(1);
+      byId("ch10-w2-val").textContent = params.w2.toFixed(1);
+      byId("ch10-b-val").textContent = params.b.toFixed(1);
+      byId("ch10-tau-val").textContent = params.tau.toFixed(2);
+    }
+
+    function draw() {
+      var params = readParams();
+      updateLabels(params);
+      var g = gridValues(params.w1, params.w2, params.b, params.tau);
+      var heat = {
+        x: g.xs,
+        y: g.ys,
+        z: g.z,
+        type: "contour",
+        colorscale: "Viridis",
+        contours: { start: 0, end: 1, size: 0.1, coloring: "heatmap" },
+        colorbar: { title: "P(class 1)" },
+        name: "probability"
+      };
+      var boundary = {
+        x: g.xs,
+        y: g.ys,
+        z: g.z,
+        type: "contour",
+        showscale: false,
+        contours: { start: 0.5, end: 0.5, size: 0.5, coloring: "lines" },
+        line: { width: 4 },
+        name: "decision boundary"
+      };
+      var layout = {
+        margin: { l: 50, r: 20, t: 35, b: 45 },
+        title: "Binary softmax probability in a two-feature space",
+        xaxis: { title: "feature x1", range: [-3, 3] },
+        yaxis: { title: "feature x2", range: [-3, 3] },
+        legend: { orientation: "h" }
+      };
+      Plotly.react(div, [heat, boundary, positive, negative], layout, { responsive: true, displayModeBar: false });
+      status("Drag the sliders to change the logit surface and the confidence of the classifier.");
+    }
+
+    controls.forEach(function(c) {
+      if (c.input) c.input.addEventListener("input", draw);
+    });
+    draw();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() { loadPlotly(init); });
+  } else {
+    loadPlotly(init);
+  }
+})();
+</script>
+:::
+
+::: {.content-visible unless-format="html"}
+The HTML version of this chapter contains an interactive Plotly.js visualization of a two-feature softmax classifier.  In PDF format, the same mathematical object is
+
+$$
+P(Y=1\mid x)=\frac{1}{1+\exp(-(w_1x_1+w_2x_2+b)/\tau)}.
+$$
+
+The decision boundary is the line $w_1x_1+w_2x_2+b=0$.  Temperature $\tau$ changes confidence but not the boundary.
+:::
+
+## 10.12 Python example: data, tokenization, and vocabulary
+
+The following example builds a tiny text classification dataset.  The goal is not high performance.  The goal is to expose every mathematical object in a neural text classifier.
+
+```{python}
+import re
+from collections import Counter
+
+texts = [
+    "linear algebra and probability are useful for machine learning",
+    "statistics studies uncertainty and data",
+    "neural networks learn representations from data",
+    "the theorem gives a clean mathematical proof",
+    "the movie was funny and enjoyable",
+    "the dinner was tasty and relaxing",
+    "music and stories made the evening fun",
+    "the game was exciting and easy to watch",
+]
+
+# 1 = mathematical/technical, 0 = casual/nontechnical
+labels = [1, 1, 1, 1, 0, 0, 0, 0]
+
+def tokenize(text):
+    return re.findall(r"[a-z]+", text.lower())
+
+tokenized = [tokenize(t) for t in texts]
+counts = Counter(tok for doc in tokenized for tok in doc)
+vocab = {tok: j for j, (tok, _) in enumerate(counts.most_common())}
+
+print("Vocabulary size:", len(vocab))
+print("First 10 vocabulary items:", list(vocab.items())[:10])
+print("First document tokens:", tokenized[0])
+```
+
+Convert each document to a list of token indices.
+
+```{python}
+indexed = [[vocab[tok] for tok in doc] for doc in tokenized]
+print(indexed[0])
+```
+
+## 10.13 Python example: softmax and cross-entropy
+
+A numerically stable softmax subtracts the largest logit.
+
+```{python}
+import numpy as np
+
+rng = np.random.default_rng(7243)
+
+def softmax(Z):
+    Z_shift = Z - Z.max(axis=1, keepdims=True)
+    expZ = np.exp(Z_shift)
+    return expZ / expZ.sum(axis=1, keepdims=True)
+
+def cross_entropy(P, y):
+    n = len(y)
+    return -np.mean(np.log(P[np.arange(n), y] + 1e-12))
+
+Z = np.array([[2.0, 0.5], [0.2, 1.7]])
+P = softmax(Z)
+print(P)
+print("loss:", cross_entropy(P, np.array([0, 1])))
+```
+
+## 10.14 Python example: averaged embedding classifier from scratch
+
+We now train the model
+
+$$
+h_i=\frac{1}{T_i}\sum_{t=1}^{T_i}E_{x_{it}},
+\qquad
+z_i=h_iW+b,
+\qquad
+p_i=\operatorname{softmax}(z_i).
+$$
+
+Here $E\in\mathbb R^{d\times m}$ and $W\in\mathbb R^{m\times K}$.
+
+```{python}
+# Model dimensions
+D = len(vocab)
+m = 6
+K = 2
+n = len(indexed)
+
+y = np.array(labels, dtype=int)
+E = 0.05 * rng.normal(size=(D, m))
+W = 0.05 * rng.normal(size=(m, K))
+b = np.zeros(K)
+
+def forward(indexed_docs, E, W, b):
+    H = np.zeros((len(indexed_docs), E.shape[1]))
+    for i, doc in enumerate(indexed_docs):
+        H[i] = E[doc].mean(axis=0)
+    Z = H @ W + b
+    P = softmax(Z)
+    return H, Z, P
+
+H, Z, P = forward(indexed, E, W, b)
+print("H shape:", H.shape)
+print("Z shape:", Z.shape)
+print("Initial loss:", cross_entropy(P, y))
+```
+
+Training by full-batch gradient descent.
+
+```{python}
+lr = 1.0
+history = []
+
+for epoch in range(300):
+    H, Z, P = forward(indexed, E, W, b)
+    loss = cross_entropy(P, y)
+    history.append(loss)
+
+    # Gradient of average cross-entropy with respect to logits
+    Gz = P.copy()
+    Gz[np.arange(n), y] -= 1
+    Gz /= n
+
+    # Gradients for W and b
+    grad_W = H.T @ Gz
+    grad_b = Gz.sum(axis=0)
+
+    # Gradient with respect to averaged document representations
+    grad_H = Gz @ W.T
+
+    # Gradient for embedding matrix
+    grad_E = np.zeros_like(E)
+    for i, doc in enumerate(indexed):
+        contribution = grad_H[i] / len(doc)
+        for token_id in doc:
+            grad_E[token_id] += contribution
+
+    E -= lr * grad_E
+    W -= lr * grad_W
+    b -= lr * grad_b
+
+H, Z, P = forward(indexed, E, W, b)
+pred = P.argmax(axis=1)
+print("Final loss:", cross_entropy(P, y))
+print("Predictions:", pred.tolist())
+print("Training accuracy:", float(np.mean(pred == y)))
+print("First five losses:", [float(np.round(v, 4)) for v in history[:5]])
+print("Last five losses:", [float(np.round(v, 4)) for v in history[-5:]])
+```
+
+Plot the loss curve.
+
+```{python}
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(7, 4))
+plt.plot(history)
+plt.xlabel("epoch")
+plt.ylabel("cross-entropy loss")
+plt.title("Training loss for an averaged-embedding classifier")
+plt.show()
+```
+
+## 10.15 Python example: inspecting learned token directions
+
+For binary classification, the difference between the two output weight columns gives a direction in embedding space:
+
+$$
+v=W_{:,1}-W_{:,0}.
+$$
+
+For an embedded token $E_j$, the score
+
+$$
+E_j^T v
+$$
+
+measures how much that token pushes the classifier toward class $1$ rather than class $0$, at least in the averaged linear model.
+
+```{python}
+direction = W[:, 1] - W[:, 0]
+scores = E @ direction
+id_to_token = {j: tok for tok, j in vocab.items()}
+
+ranked = sorted([(id_to_token[j], scores[j]) for j in range(D)], key=lambda t: t[1], reverse=True)
+print("Most class-1-associated tokens:")
+for tok, score in ranked[:8]:
+    print(f"{tok:>15s}  {score: .3f}")
+
+print("\nMost class-0-associated tokens:")
+for tok, score in ranked[-8:]:
+    print(f"{tok:>15s}  {score: .3f}")
+```
+
+This kind of inspection is limited but useful.  It helps students see that a trainable embedding model still has interpretable linear algebra inside it.
+
+## 10.16 Python example: adding one hidden ReLU layer
+
+A one-hidden-layer model uses
+
+$$
+r_i=\operatorname{ReLU}(h_iA+a),
+\qquad
+z_i=r_iW+b.
+$$
+
+The additional nonlinear layer can represent more complicated decision regions in $h$-space.
+
+```{python}
+def relu(U):
+    return np.maximum(U, 0.0)
+
+def relu_grad(U):
+    return (U > 0).astype(float)
+
+q = 8
+E2 = 0.05 * rng.normal(size=(D, m))
+A = 0.05 * rng.normal(size=(m, q))
+a = np.zeros(q)
+W2 = 0.05 * rng.normal(size=(q, K))
+b2 = np.zeros(K)
+
+def forward_relu(indexed_docs, E, A, a, W, b):
+    H = np.zeros((len(indexed_docs), E.shape[1]))
+    for i, doc in enumerate(indexed_docs):
+        H[i] = E[doc].mean(axis=0)
+    U = H @ A + a
+    R = relu(U)
+    Z = R @ W + b
+    P = softmax(Z)
+    return H, U, R, Z, P
+
+history_relu = []
+lr = 0.8
+for epoch in range(400):
+    H, U, R, Z, P = forward_relu(indexed, E2, A, a, W2, b2)
+    loss = cross_entropy(P, y)
+    history_relu.append(loss)
+
+    Gz = P.copy()
+    Gz[np.arange(n), y] -= 1
+    Gz /= n
+
+    grad_W2 = R.T @ Gz
+    grad_b2 = Gz.sum(axis=0)
+    grad_R = Gz @ W2.T
+    grad_U = grad_R * relu_grad(U)
+    grad_A = H.T @ grad_U
+    grad_a = grad_U.sum(axis=0)
+    grad_H = grad_U @ A.T
+
+    grad_E2 = np.zeros_like(E2)
+    for i, doc in enumerate(indexed):
+        contribution = grad_H[i] / len(doc)
+        for token_id in doc:
+            grad_E2[token_id] += contribution
+
+    E2 -= lr * grad_E2
+    A -= lr * grad_A
+    a -= lr * grad_a
+    W2 -= lr * grad_W2
+    b2 -= lr * grad_b2
+
+H, U, R, Z, P = forward_relu(indexed, E2, A, a, W2, b2)
+print("Final ReLU-model loss:", cross_entropy(P, y))
+print("Training accuracy:", float(np.mean(P.argmax(axis=1) == y)))
+```
+
+## 10.17 Worked calculation: one softmax gradient
+
+Suppose a three-class model gives logits
+
+$$
+z=(2,1,0).
+$$
+
+Then
+
+$$
+p=\operatorname{softmax}(z)
+=\frac{1}{e^2+e+1}(e^2,e,1).
+$$
+
+If the true class is $1$ using zero-based indexing, then $e_y=(0,1,0)$ and
+
+$$
+\nabla_z\ell=p-e_y.
+$$
+
+Using approximate values,
+
+$$
+p\approx(0.665,0.245,0.090),
+$$
+
+so
+
+$$
+\nabla_z\ell\approx(0.665,-0.755,0.090).
+$$
+
+The negative entry for the true class means gradient descent will increase the true-class logit.  The positive entries for the other classes mean gradient descent will decrease the competing logits.
+
+## 10.18 Neural networks versus classical text classifiers
+
+The table summarizes important contrasts.
+
+| Model | Representation | Decision function | Strength | Limitation |
+|---|---|---|---|---|
+| Naive Bayes | counts | log posterior score | simple probabilistic model | strong independence assumption |
+| Logistic regression | fixed feature vector | linear logits | interpretable and convex | depends on chosen features |
+| Averaged embeddings | trainable token vectors | linear or nonlinear logits | learns representation | weak treatment of word order |
+| RNN/LSTM | sequence of embeddings | recurrent hidden state | uses order | harder to parallelize |
+| Transformer | sequence of contextual embeddings | attention-based maps | long-range interactions | expensive and data-hungry |
+
+This chapter studies the third row.  The next two chapters develop recurrent models that use word order more explicitly.
+
+## 10.19 AI component: using AI to audit a neural text model
+
+Modern AI tools can help students debug, explain, and critique models, but they should not replace mathematical verification.  Use AI as a structured reviewer.
+
+### Prompt 1: dimension checking
+
+> I have a vocabulary of size $d$, embedding dimension $m$, hidden width $q$, and $K$ classes.  My model is $E\in R^{d\times m}$, $h$ is the average of token embeddings, $r=\operatorname{ReLU}(Ah+a)$, and $z=Wr+b$.  Check all dimensions and tell me which convention I am using for row versus column vectors.
+
+### Prompt 2: gradient auditing
+
+> For the averaged embedding classifier $h=T^{-1}\sum_i E_{x_i}$, $z=Wh+b$, and $\ell=-\log\operatorname{softmax}(z)_y$, derive the gradients with respect to $W$, $b$, $h$, and each selected embedding row.  State every shape.
+
+### Prompt 3: modeling critique
+
+> I trained an averaged-embedding sentiment classifier.  It performs well on short reviews but fails on sentences with negation, such as "not good".  Explain mathematically why averaging embeddings may fail and suggest a model class that can represent word order.
+
+### Prompt 4: statistical caution
+
+> My neural text classifier achieves perfect training accuracy on 40 examples.  List possible statistical explanations and propose validation diagnostics.
+
+The best use of AI is to ask it for checks that you can verify.  In this book, every AI-generated explanation should be reduced to mathematical objects: maps, losses, gradients, distributions, and evaluation metrics.
+
+## 10.20 Common pitfalls
+
+1. **Confusing tokens and embeddings.**  Token indices are discrete.  Embeddings are continuous row vectors.
+2. **Ignoring dimensions.**  Many implementation errors are shape errors disguised as conceptual errors.
+3. **Interpreting softmax scores as calibrated probabilities without checking calibration.**
+4. **Believing that more nonlinear layers always improve generalization.**  Larger models can overfit small text datasets.
+5. **Forgetting word order.**  Averaging embeddings is simple but cannot distinguish many different sequences.
+6. **Reading too much into learned embedding coordinates.**  Individual coordinates are usually not uniquely meaningful because rotations or reparameterizations can preserve predictions.
+
+## 10.21 Exercises
+
+### Conceptual exercises
+
+1. Let $E\in\mathbb R^{d\times m}$ and $x=(x_1,\ldots,x_T)$.  Write average pooling as a matrix operation using one-hot token vectors.
+2. Prove that softmax is invariant under adding a constant multiple of $\mathbf 1$ to the logits.
+3. Show that two-class softmax is equivalent to logistic regression on the logit difference.
+4. Explain why an averaged-embedding classifier is invariant under permutations of the input tokens.
+5. Give an example of two sentences with different meanings but the same averaged embedding representation.
+
+### Computational exercises
+
+1. Modify the from-scratch classifier so that it uses sum pooling instead of average pooling.  Compare the behavior on short and long documents.
+2. Add $\ell_2$ regularization to the output weight matrix $W$ and study how the learned token scores change.
+3. Split the toy dataset into train and test sets.  Repeat training under several random seeds.
+4. Replace ReLU by tanh in the one-hidden-layer model.  Compare the training loss curve.
+5. Implement mini-batch stochastic gradient descent for the averaged-embedding classifier.
+
+### Mathematical exercises
+
+1. Derive the gradient of the regularized loss
+   $$
+   \widehat R_n(W)+\lambda\|W\|_F^2
+   $$
+   with respect to $W$.
+2. For the model $z=Wh+b$, derive the Hessian of the binary logistic loss with respect to $h$ for one observation.
+3. Let $Q\in\mathbb R^{m\times m}$ be orthogonal.  If embeddings are transformed by $E_j\mapsto E_jQ$ and output weights by $W\mapsto Q^TW$, show that logits are unchanged in the linear averaged-embedding model.
+4. Suppose a token occurs $c_j$ times in a document.  Derive its contribution to the gradient of $E_j$ under average pooling.
+5. Explain why the empirical risk is generally nonconvex in $(E,W)$ even when there is no hidden layer.
+
+## 10.22 Mini-project: from count vectors to trainable embeddings
+
+Build three classifiers on the same small text dataset:
+
+1. multinomial Naive Bayes;
+2. logistic regression on TF--IDF features;
+3. averaged trainable embeddings with a softmax output layer.
+
+Compare them using accuracy, confusion matrix, validation loss, and interpretability.  Your report should answer:
+
+- Which model has the clearest probabilistic assumptions?
+- Which model has the most interpretable features?
+- Which model is most sensitive to random initialization?
+- Which model is most likely to overfit on a small dataset?
+- What mathematical object changes when embeddings are trainable?
+
+## 10.23 Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-10-neural-networks-for-text.ipynb
+```
+
+The lab should be written for independent study and should include:
+
+- a review of softmax and cross-entropy;
+- dimension exercises for embedding layers;
+- a from-scratch averaged-embedding classifier;
+- a one-hidden-layer ReLU classifier;
+- a comparison with TF--IDF logistic regression;
+- a short AI-assisted debugging reflection.
+
+## 10.24 Chapter summary
+
+A neural text classifier is a trainable composition of maps:
+
+$$
+V^T \to \mathbb R^{T\times m} \to \mathbb R^m \to \mathbb R^q \to \mathbb R^K \to \Delta^{K-1}.
+$$
+
+The embedding layer is a matrix lookup.  Pooling turns token embeddings into a document representation.  Hidden layers apply nonlinear transformations.  Softmax turns logits into class probabilities.  Cross-entropy corresponds to negative conditional log-likelihood.  The gradient $p-e_y$ links probabilistic prediction to optimization.
+
+The model in this chapter is intentionally simple.  It is powerful enough to introduce trainable representations, but simple enough to analyze by hand.  The next chapters explain how recurrent models and gated models add explicit sequence dependence.
+
+## Notes and references
+
+This chapter connects classical neural network ideas with text classification.  Useful background sources include @goodfellow_bengio_courville_2016 for neural networks, @bishop_2006 for probabilistic classification and optimization, @jurafsky_martin_slp3 for NLP context, and @manning_ir_2008 for text representations and classification.

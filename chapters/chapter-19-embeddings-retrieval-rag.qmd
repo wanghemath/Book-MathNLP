@@ -1,0 +1,1139 @@
+---
+title: "Chapter 19. Embeddings, Retrieval, and RAG"
+subtitle: "Semantic search, nearest neighbors, and retrieval-augmented generation"
+format:
+  html:
+    code-fold: true
+    code-tools: true
+jupyter: python3
+---
+
+## 19.1 Why retrieval belongs in a mathematical NLP book
+
+Large language models estimate conditional distributions over tokens.  In an autoregressive model, the central object is
+
+$$
+p_\theta(w_t \mid w_{<t}).
+$$
+
+This distribution is learned from training data and depends on the information contained in the prompt.  A model may have learned general linguistic and statistical patterns, but it may not know the contents of a new course policy, a recent paper, a private document collection, or a local advising rule.  Retrieval-augmented generation, usually abbreviated as **RAG**, addresses this limitation by adding an explicit search step.
+
+A RAG system separates two mathematical operations:
+
+1. **Retrieval:** given a query $q$, choose documents or chunks $c_1,\dots,c_k$ from a collection $C$.
+2. **Generation:** produce an answer from a conditional model using both the query and the retrieved context.
+
+A simplified RAG model has the form
+
+$$
+p_\theta(y \mid q)
+\approx
+p_\theta(y \mid q, r_k(q)),
+$$
+
+where
+
+$$
+r_k(q) = (c_{i_1},\dots,c_{i_k})
+$$
+
+is the top-$k$ retrieved context.  In a more probabilistic formulation, the retrieved document is treated as a latent variable:
+
+$$
+p(y \mid q)
+= \sum_{c \in C} p_\theta(y \mid q,c) p_\eta(c \mid q).
+$$
+
+This chapter studies the mathematics behind $p_\eta(c \mid q)$: embeddings, similarity functions, nearest-neighbor search, vector indexes, ranking, and retrieval evaluation.  The emphasis is not on building a production search engine, but on understanding the objects that make semantic retrieval possible.
+
+::: {.callout-tip}
+## Main mathematical theme
+
+RAG turns part of language modeling into a problem in finite-dimensional geometry.  Queries and documents are mapped into vectors; retrieval becomes an optimization problem over a point cloud; generation becomes conditional modeling with selected external evidence.
+:::
+
+## 19.2 Learning goals
+
+After studying this chapter, students should be able to:
+
+- define a sentence or document embedding as a map into $R^m$;
+- compare sparse lexical retrieval and dense semantic retrieval;
+- compute dot-product, cosine, and Euclidean nearest neighbors;
+- explain why normalization changes retrieval geometry;
+- formulate retrieval as a maximum-score optimization problem;
+- understand approximate nearest-neighbor search at a high level;
+- explain chunking, indexing, retrieval, reranking, and context construction;
+- evaluate retrieval using precision, recall, MRR, and nDCG;
+- describe failure modes of RAG using probability and geometry.
+
+## 19.3 From word embeddings to document embeddings
+
+In Chapter 8 we represented individual words using an embedding map
+
+$$
+e: V \to R^m.
+$$
+
+For retrieval, we usually need embeddings of longer text units: queries, sentences, paragraphs, document chunks, or full documents.  Let $T$ denote the set of all finite token sequences.  A text embedding model is a map
+
+$$
+f_\theta: T \to R^m.
+$$
+
+For a query $q \in T$ and a document chunk $c \in T$, we compute
+
+$$
+z_q = f_\theta(q),
+\qquad
+z_c = f_\theta(c).
+$$
+
+The retrieval score is then a function
+
+$$
+s(q,c) = S(z_q,z_c),
+$$
+
+where $S:R^m \times R^m \to R$ is a similarity measure.  Common choices are
+
+$$
+S_{\text{dot}}(z_q,z_c)=z_q^T z_c,
+$$
+
+$$
+S_{\text{cos}}(z_q,z_c)=\frac{z_q^T z_c}{\|z_q\|\|z_c\|},
+$$
+
+and
+
+$$
+S_{\text{neg-dist}}(z_q,z_c)=-\|z_q-z_c\|_2^2.
+$$
+
+The top-$k$ retrieval problem is
+
+$$
+\operatorname{TopK}(q)
+=
+\operatorname{argtopk}_{c \in C} S(f_\theta(q),f_\theta(c)).
+$$
+
+This is a finite optimization problem over a collection of vectors.
+
+## 19.4 Sparse retrieval versus dense retrieval
+
+Classical information retrieval often represents a document by a sparse vector.  If the vocabulary has size $d$, then a document $c$ may be represented as
+
+$$
+x_c \in R^d,
+$$
+
+where $x_{cj}$ is a count or TF-IDF weight for token $j$.  A query $q$ is represented similarly by $x_q$, and the score is often a dot product or cosine similarity.
+
+Dense retrieval instead represents the same text by
+
+$$
+z_c \in R^m,
+$$
+
+where $m$ is usually much smaller than $d$, and the coordinates are learned.  Dense embeddings are designed so that semantically related texts can be close even when they do not share exact words.
+
+| Representation | Vector dimension | Coordinates mean | Strength | Weakness |
+|---|---:|---|---|---|
+| Bag-of-words or TF-IDF | $d=|V|$ | token weights | exact lexical matching | weak semantic matching |
+| Dense embedding | $m$ | learned features | semantic matching | can miss exact constraints |
+| Hybrid retrieval | both | lexical and semantic | often robust | more complex |
+
+The mathematical difference is important.  Sparse retrieval mostly uses explicit coordinates corresponding to words.  Dense retrieval uses an embedding map learned from data.  Thus, dense retrieval transfers part of the retrieval problem into representation learning.
+
+## 19.5 Similarity geometry
+
+Suppose all embeddings are nonzero.  Define normalized embeddings by
+
+$$
+\widehat z = \frac{z}{\|z\|_2}.
+$$
+
+For normalized vectors,
+
+$$
+\widehat z_q^T \widehat z_c
+= \cos(\widehat z_q,\widehat z_c).
+$$
+
+Also,
+
+$$
+\|\widehat z_q - \widehat z_c\|_2^2
+= \|\widehat z_q\|^2 + \|\widehat z_c\|^2 - 2\widehat z_q^T\widehat z_c
+= 2 - 2\widehat z_q^T\widehat z_c.
+$$
+
+Therefore, for normalized vectors, maximizing cosine similarity is equivalent to minimizing Euclidean distance:
+
+$$
+\operatorname{argmax}_c \widehat z_q^T \widehat z_c
+=
+\operatorname{argmin}_c \|\widehat z_q-\widehat z_c\|_2.
+$$
+
+This is why many vector databases support both inner-product search and Euclidean nearest-neighbor search.  With normalized embeddings, these objectives are equivalent up to a monotone transformation.
+
+::: {.callout-warning}
+## Normalization changes the retrieval problem
+
+Without normalization, the dot product depends on both direction and vector length:
+
+$$
+z_q^T z_c = \|z_q\|\|z_c\|\cos(z_q,z_c).
+$$
+
+Thus, a long vector can score highly because of its norm, not only because of semantic alignment.  Cosine similarity removes this norm effect.
+:::
+
+## 19.6 Retrieval as matrix multiplication
+
+Let the collection contain $n$ chunks $c_1,\dots,c_n$.  Stack their embeddings as rows of a matrix
+
+$$
+Z =
+\begin{bmatrix}
+- z_{c_1}^T - \\
+- z_{c_2}^T - \\
+\vdots \\
+- z_{c_n}^T -
+\end{bmatrix}
+\in R^{n \times m}.
+$$
+
+For a query embedding $z_q \in R^m$, dot-product scores are
+
+$$
+s = Z z_q \in R^n.
+$$
+
+The $i$th component is
+
+$$
+s_i = z_{c_i}^T z_q.
+$$
+
+For cosine retrieval, first normalize each row of $Z$ and the query vector:
+
+$$
+\widehat Z_i = \frac{z_{c_i}}{\|z_{c_i}\|},
+\qquad
+\widehat z_q = \frac{z_q}{\|z_q\|}.
+$$
+
+Then
+
+$$
+s = \widehat Z \widehat z_q.
+$$
+
+So dense retrieval is mathematically simple: compute an embedding, multiply by a matrix, sort the scores.
+
+## 19.7 A small retrieval example
+
+Consider six short chunks:
+
+1. "students may transfer graduate credits with approval"
+2. "the course covers stochastic processes and Markov chains"
+3. "the library has study rooms and research databases"
+4. "machine learning uses embeddings and optimization"
+5. "applied mathematics students study probability and linear algebra"
+6. "transfer credit forms require the program director signature"
+
+A query such as "How do I transfer credits?" should retrieve chunks 1 and 6.  A query such as "What math background is needed for machine learning?" should retrieve chunks 4 and 5.
+
+A sparse lexical system will rely on words like "transfer" and "credit."  A dense embedding system may also learn that "approval," "form," and "signature" are related to administrative transfer rules.  The central question is how well the embedding map preserves the task-relevant notion of similarity.
+
+## 19.8 Python: dense retrieval from scratch with toy embeddings
+
+The following example builds a tiny semantic search engine using manually designed low-dimensional embeddings.  The goal is not to train a real embedding model; the goal is to make the retrieval geometry transparent.
+
+```{python}
+#| label: ch19-toy-dense-retrieval
+#| warning: false
+#| message: false
+
+import numpy as np
+import pandas as pd
+
+chunks = [
+    "students may transfer graduate credits with approval",
+    "the course covers stochastic processes and Markov chains",
+    "the library has study rooms and research databases",
+    "machine learning uses embeddings and optimization",
+    "applied mathematics students study probability and linear algebra",
+    "transfer credit forms require the program director signature",
+]
+
+# Coordinates are interpretable toy semantic features:
+# [administration, probability/math, ML/AI, campus resources]
+toy_embeddings = np.array([
+    [0.95, 0.10, 0.05, 0.05],
+    [0.05, 0.95, 0.05, 0.02],
+    [0.02, 0.10, 0.05, 0.95],
+    [0.05, 0.25, 0.95, 0.05],
+    [0.05, 0.90, 0.30, 0.05],
+    [0.98, 0.05, 0.05, 0.02],
+], dtype=float)
+
+queries = {
+    "How do I transfer credits?": np.array([1.0, 0.05, 0.05, 0.02]),
+    "What math background helps ML?": np.array([0.03, 0.75, 0.75, 0.03]),
+    "Where can I study on campus?": np.array([0.02, 0.05, 0.05, 1.0]),
+}
+
+def normalize_rows(A):
+    norms = np.linalg.norm(A, axis=1, keepdims=True)
+    return A / np.maximum(norms, 1e-12)
+
+def cosine_search(query_vec, doc_matrix, k=3):
+    Z = normalize_rows(doc_matrix)
+    q = query_vec / max(np.linalg.norm(query_vec), 1e-12)
+    scores = Z @ q
+    order = np.argsort(scores)[::-1][:k]
+    return pd.DataFrame({
+        "rank": np.arange(1, len(order) + 1),
+        "chunk": [chunks[i] for i in order],
+        "score": scores[order].round(3),
+    })
+
+cosine_search(queries["How do I transfer credits?"], toy_embeddings, k=3)
+```
+
+The retrieval score is not a probability.  It is a geometric score.  Later we may convert scores to a probability-like distribution using a softmax, but this adds modeling assumptions.
+
+## 19.9 Sparse retrieval with TF-IDF
+
+Dense retrieval is not always better than sparse retrieval.  If a query contains a precise course number, policy phrase, chemical name, theorem name, or error message, exact lexical matching can be essential.
+
+The following code builds a small TF-IDF retriever without relying on a specialized library.
+
+```{python}
+#| label: ch19-tfidf-retrieval
+#| warning: false
+#| message: false
+
+import re
+from collections import Counter
+
+def tokenize(text):
+    return re.findall(r"[a-z]+", text.lower())
+
+vocab = sorted(set(token for c in chunks for token in tokenize(c)))
+idx = {w: j for j, w in enumerate(vocab)}
+
+X = np.zeros((len(chunks), len(vocab)))
+for i, c in enumerate(chunks):
+    counts = Counter(tokenize(c))
+    for w, count in counts.items():
+        X[i, idx[w]] = count
+
+# smoothed IDF
+n_docs = X.shape[0]
+df = (X > 0).sum(axis=0)
+idf = np.log((1 + n_docs) / (1 + df)) + 1
+X_tfidf = X * idf
+
+def vectorize_query(text):
+    q = np.zeros(len(vocab))
+    counts = Counter(tokenize(text))
+    for w, count in counts.items():
+        if w in idx:
+            q[idx[w]] = count
+    return q * idf
+
+def sparse_search(query, k=3):
+    q = vectorize_query(query)
+    Z = normalize_rows(X_tfidf)
+    q = q / max(np.linalg.norm(q), 1e-12)
+    scores = Z @ q
+    order = np.argsort(scores)[::-1][:k]
+    return pd.DataFrame({
+        "rank": np.arange(1, len(order) + 1),
+        "chunk": [chunks[i] for i in order],
+        "score": scores[order].round(3),
+    })
+
+sparse_search("transfer credit approval form", k=3)
+```
+
+TF-IDF can be understood as a diagonal rescaling of a document-term matrix.  If $X \in R^{n \times d}$ is a count matrix and $D \in R^{d \times d}$ is a diagonal matrix of inverse-document-frequency weights, then the TF-IDF matrix is
+
+$$
+X_{\text{tfidf}} = X D.
+$$
+
+Retrieval is then performed using row-normalized vectors from $X_{\text{tfidf}}$.
+
+## 19.10 Hybrid retrieval
+
+In many applications, sparse and dense retrieval are complementary.  One simple hybrid score is
+
+$$
+s_{\text{hybrid}}(q,c)
+= \lambda s_{\text{dense}}(q,c)
++ (1-\lambda)s_{\text{sparse}}(q,c),
+\qquad 0 \leq \lambda \leq 1.
+$$
+
+Here $\lambda$ controls the tradeoff between semantic matching and exact-word matching.  This formula is simple but useful.  It also makes a conceptual point: retrieval design is often a choice of scoring function.
+
+```{python}
+#| label: ch19-hybrid-search
+#| warning: false
+#| message: false
+
+def dense_scores(query_vec):
+    Z = normalize_rows(toy_embeddings)
+    q = query_vec / max(np.linalg.norm(query_vec), 1e-12)
+    return Z @ q
+
+def sparse_scores(query_text):
+    q = vectorize_query(query_text)
+    Z = normalize_rows(X_tfidf)
+    q = q / max(np.linalg.norm(q), 1e-12)
+    return Z @ q
+
+def hybrid_search(query_text, query_vec, lam=0.5, k=3):
+    d = dense_scores(query_vec)
+    s = sparse_scores(query_text)
+    score = lam * d + (1 - lam) * s
+    order = np.argsort(score)[::-1][:k]
+    return pd.DataFrame({
+        "rank": np.arange(1, len(order) + 1),
+        "chunk": [chunks[i] for i in order],
+        "dense": d[order].round(3),
+        "sparse": s[order].round(3),
+        "hybrid": score[order].round(3),
+    })
+
+hybrid_search(
+    "transfer credit approval form",
+    queries["How do I transfer credits?"],
+    lam=0.5,
+    k=4,
+)
+```
+
+## 19.11 Reranking
+
+A common retrieval pipeline has two stages:
+
+1. **Retriever:** quickly returns a candidate set $C_k(q)$.
+2. **Reranker:** applies a more expensive scoring function to reorder the candidates.
+
+Mathematically, the first stage solves an approximate top-$k$ problem:
+
+$$
+C_k(q) \approx \operatorname{argtopk}_{c \in C} S_1(q,c).
+$$
+
+The reranker then solves
+
+$$
+\operatorname{argtopr}_{c \in C_k(q)} S_2(q,c),
+\qquad r \leq k.
+$$
+
+The first score $S_1$ is usually cheap, such as vector similarity.  The second score $S_2$ may use a cross-encoder or a larger language model that jointly reads the query and candidate chunk.  This is more expensive because the representation of the pair $(q,c)$ must be computed jointly for each candidate.
+
+## 19.12 Chunking as a mathematical design choice
+
+Before indexing a document collection, long documents are usually split into chunks.  Let a document be a sequence
+
+$$
+d = (w_1,\dots,w_T).
+$$
+
+A chunking function maps $d$ to shorter subsequences:
+
+$$
+g(d) = (c_1,\dots,c_M).
+$$
+
+For example, fixed-length chunking with length $L$ and stride $s$ creates chunks
+
+$$
+c_j = (w_{1+(j-1)s},\dots,w_{L+(j-1)s}).
+$$
+
+Chunking is not merely a technical preprocessing step.  It affects retrieval quality.
+
+- If chunks are too short, they may lack context.
+- If chunks are too long, they may contain irrelevant material and waste the model context window.
+- If chunks overlap too much, the index becomes redundant.
+- If chunks do not respect document structure, important definitions or assumptions may be separated.
+
+In mathematical terms, chunking determines the finite candidate set $C$ over which retrieval is performed.  A poor candidate set cannot be fixed completely by a good similarity function.
+
+## 19.13 RAG as conditional generation
+
+A simple RAG pipeline is:
+
+$$
+q \xrightarrow{\text{embed}} z_q
+\xrightarrow{\text{retrieve}} c_{i_1},\dots,c_{i_k}
+\xrightarrow{\text{prompt}} x
+\xrightarrow{\text{LM}} y.
+$$
+
+The context-augmented prompt may be written as
+
+$$
+x = \operatorname{concat}(q,c_{i_1},\dots,c_{i_k},I),
+$$
+
+where $I$ denotes the instruction template.  The generator then samples or chooses
+
+$$
+y \sim p_\theta(\cdot \mid x).
+$$
+
+This clarifies an important point: retrieval does not force the generator to be correct.  Retrieval changes the conditioning information.  The final answer still depends on the conditional distribution learned by the language model and on the decoding procedure.
+
+## 19.14 A probabilistic latent-document view
+
+A more formal RAG model treats retrieved documents as latent variables.  Let $C$ be the collection.  Then
+
+$$
+p(y \mid q)
+= \sum_{c \in C} p_\theta(y \mid q,c) p_\eta(c \mid q).
+$$
+
+In practice, summing over all $c \in C$ is expensive, so we approximate by the top-$k$ retrieved chunks:
+
+$$
+p(y \mid q)
+\approx
+\sum_{c \in C_k(q)} p_\theta(y \mid q,c) p_\eta(c \mid q).
+$$
+
+If the retriever assigns scores $s(q,c)$, a soft retrieval distribution can be defined by
+
+$$
+p_\eta(c \mid q)
+= \frac{\exp(s(q,c)/\tau)}{\sum_{c' \in C} \exp(s(q,c')/\tau)}.
+$$
+
+The temperature $\tau$ controls concentration.  A small $\tau$ concentrates probability on the top chunks.  A large $\tau$ spreads probability across many chunks.
+
+This formulation makes retrieval uncertainty explicit.  If several chunks have similar scores, then the system should be less confident about which evidence is most relevant.
+
+## 19.15 Evaluating retrieval
+
+Suppose for a query $q$ we know a set of relevant documents $R(q) \subseteq C$.  If a retriever returns an ordered list
+
+$$
+L_k(q) = (c_{i_1},\dots,c_{i_k}),
+$$
+
+then precision at $k$ is
+
+$$
+\operatorname{Precision@}k(q)
+= \frac{|L_k(q) \cap R(q)|}{k}.
+$$
+
+Recall at $k$ is
+
+$$
+\operatorname{Recall@}k(q)
+= \frac{|L_k(q) \cap R(q)|}{|R(q)|}.
+$$
+
+The reciprocal rank is
+
+$$
+\operatorname{RR}(q)
+= \frac{1}{\min\{j:c_{i_j}\in R(q)\}},
+$$
+
+if a relevant result appears, and $0$ otherwise.  Mean reciprocal rank averages this quantity over queries.
+
+For graded relevance labels $rel_j$, discounted cumulative gain is
+
+$$
+\operatorname{DCG@}k
+= \sum_{j=1}^k \frac{2^{rel_j}-1}{\log_2(j+1)}.
+$$
+
+Normalized DCG divides by the best possible DCG:
+
+$$
+\operatorname{nDCG@}k
+= \frac{\operatorname{DCG@}k}{\operatorname{IDCG@}k}.
+$$
+
+These metrics measure retrieval, not necessarily final answer quality.  A RAG system can retrieve the right document and still generate a poor answer; it can also retrieve incomplete evidence and produce an answer that sounds plausible but is unsupported.
+
+## 19.16 Python: retrieval metrics
+
+```{python}
+#| label: ch19-retrieval-metrics
+#| warning: false
+#| message: false
+
+retrieved = ["c6", "c1", "c4", "c2", "c3"]
+relevant = {"c1", "c6"}
+
+def precision_at_k(retrieved, relevant, k):
+    top = retrieved[:k]
+    return sum(item in relevant for item in top) / k
+
+def recall_at_k(retrieved, relevant, k):
+    top = retrieved[:k]
+    return sum(item in relevant for item in top) / len(relevant)
+
+def reciprocal_rank(retrieved, relevant):
+    for j, item in enumerate(retrieved, start=1):
+        if item in relevant:
+            return 1 / j
+    return 0.0
+
+def dcg_at_k(relevances, k):
+    relevances = np.asarray(relevances[:k], dtype=float)
+    discounts = np.log2(np.arange(2, k + 2))
+    return np.sum((2 ** relevances - 1) / discounts)
+
+print("Precision@3:", precision_at_k(retrieved, relevant, 3))
+print("Recall@3:", recall_at_k(retrieved, relevant, 3))
+print("Reciprocal rank:", reciprocal_rank(retrieved, relevant))
+
+relevance_scores = [2, 2, 0, 0, 0]
+ideal_scores = sorted(relevance_scores, reverse=True)
+ndcg3 = dcg_at_k(relevance_scores, 3) / dcg_at_k(ideal_scores, 3)
+print("nDCG@3:", round(ndcg3, 3))
+```
+
+## 19.17 Approximate nearest-neighbor search
+
+Exact retrieval by matrix multiplication requires computing $Zz_q$ over all $n$ stored vectors.  This costs $O(nm)$ per query.  For small $n$, this is fine.  For millions or billions of chunks, exact search may be too expensive.
+
+Approximate nearest-neighbor methods build an index that returns a candidate set quickly.  The mathematical tradeoff is between:
+
+- **speed:** how fast queries are answered;
+- **memory:** how large the index is;
+- **recall:** how often the true nearest neighbors are returned;
+- **update cost:** how hard it is to add or remove vectors.
+
+At a high level, many methods use one of the following ideas.
+
+### Partitioning
+
+Partition the vector space into regions.  Search only regions near the query.  This reduces the number of candidate vectors.
+
+### Graph search
+
+Build a graph whose vertices are stored vectors and whose edges connect nearby vectors.  Starting from an entry point, greedily move through the graph toward vectors closer to the query.
+
+### Quantization
+
+Approximate vectors by compressed codes.  Search is faster and uses less memory, but distances are approximate.
+
+For this book, the key point is that vector indexing is an algorithmic approximation to the mathematical top-$k$ problem.
+
+## 19.18 Worked calculation: cosine retrieval
+
+Suppose a query and three chunk embeddings are
+
+$$
+z_q = (1,1),
+\qquad
+z_1=(2,2),
+\qquad
+z_2=(2,0),
+\qquad
+z_3=(0,3).
+$$
+
+Dot-product scores are
+
+$$
+z_1^Tz_q=4,
+\qquad
+z_2^Tz_q=2,
+\qquad
+z_3^Tz_q=3.
+$$
+
+Thus dot-product retrieval ranks $z_1,z_3,z_2$.  Cosine scores are
+
+$$
+\cos(z_q,z_1)=1,
+$$
+
+$$
+\cos(z_q,z_2)=\frac{2}{\sqrt{2}\cdot 2}=\frac{1}{\sqrt 2},
+$$
+
+$$
+\cos(z_q,z_3)=\frac{3}{\sqrt{2}\cdot 3}=\frac{1}{\sqrt 2}.
+$$
+
+Under cosine similarity, $z_2$ and $z_3$ tie.  The difference occurs because dot product rewards the longer norm of $z_3$.
+
+## 19.19 Interactive: dense retrieval and hybrid scoring
+
+The interactive below uses a two-dimensional toy embedding space.  Each point is a document chunk.  The query direction can be changed, and the slider $\lambda$ blends dense semantic score with sparse lexical score:
+
+$$
+s_{\text{hybrid}} = \lambda s_{\text{dense}} + (1-\lambda)s_{\text{sparse}}.
+$$
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: dense retrieval and hybrid scoring</h3>
+  <p>
+    Move the query in a two-dimensional embedding space and adjust the hybrid weight.  The table reports the top retrieved chunks under the blended score.
+  </p>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.75rem; align-items:end;">
+    <label>Query x-coordinate
+      <input id="ch19-qx" type="range" min="-1" max="1" step="0.01" value="0.85" style="width:100%;">
+      <span id="ch19-qx-value">0.85</span>
+    </label>
+    <label>Query y-coordinate
+      <input id="ch19-qy" type="range" min="-1" max="1" step="0.01" value="0.15" style="width:100%;">
+      <span id="ch19-qy-value">0.15</span>
+    </label>
+    <label>Hybrid weight lambda
+      <input id="ch19-lambda" type="range" min="0" max="1" step="0.01" value="0.70" style="width:100%;">
+      <span id="ch19-lambda-value">0.70</span>
+    </label>
+  </div>
+
+  <div id="ch19-retrieval-plot" class="plotly-demo"></div>
+  <div id="ch19-rank-table" style="overflow-x:auto; margin-top:0.75rem;"></div>
+  <p id="ch19-retrieval-status" class="plotly-status"></p>
+</div>
+
+<script>
+(function(){
+  function showStatus(message) {
+    var node = document.getElementById('ch19-retrieval-status');
+    if (node) node.textContent = message;
+  }
+
+  function loadLocalPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    var existing = document.querySelector('script[data-local-plotly="true"]');
+    if (existing) {
+      existing.addEventListener('load', callback);
+      existing.addEventListener('error', function(){ showStatus('Plotly.js was not available, so the interactive figure could not be drawn.'); });
+      return;
+    }
+    var script = document.createElement('script');
+    script.src = '../assets/plotly.min.js';
+    script.async = true;
+    script.dataset.localPlotly = 'true';
+    script.onload = callback;
+    script.onerror = function(){ showStatus('Plotly.js was not available, so the interactive figure could not be drawn. Check that assets/plotly.min.js exists.'); };
+    document.head.appendChild(script);
+  }
+
+  var docs = [
+    {name:'transfer credit policy', x:0.95, y:0.10, sparse:0.90},
+    {name:'program director signature', x:0.88, y:0.05, sparse:0.75},
+    {name:'probability and linear algebra', x:0.05, y:0.92, sparse:0.10},
+    {name:'machine learning embeddings', x:0.35, y:0.83, sparse:0.20},
+    {name:'library study rooms', x:-0.80, y:0.20, sparse:0.05},
+    {name:'course schedule', x:0.50, y:-0.55, sparse:0.40}
+  ];
+
+  function norm(v) {
+    return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+  }
+
+  function cosine(a, b) {
+    var denom = norm(a) * norm(b);
+    if (denom < 1e-12) return 0;
+    return (a[0] * b[0] + a[1] * b[1]) / denom;
+  }
+
+  function sortedScores(qx, qy, lambda) {
+    var q = [qx, qy];
+    return docs.map(function(d) {
+      var dense = cosine(q, [d.x, d.y]);
+      var hybrid = lambda * dense + (1 - lambda) * d.sparse;
+      return {name:d.name, x:d.x, y:d.y, dense:dense, sparse:d.sparse, hybrid:hybrid};
+    }).sort(function(a, b) { return b.hybrid - a.hybrid; });
+  }
+
+  function tableHtml(rows) {
+    // Build the table string without literal raw HTML table tags in the source.
+    // This avoids Quarto/Pandoc raw-HTML table parsing warnings during rendering.
+    var html = '<' + 'table class="table table-sm"><' + 'thead><' + 'tr><' + 'th>Rank</' + 'th><' + 'th>Chunk</' + 'th><' + 'th>Dense</' + 'th><' + 'th>Sparse</' + 'th><' + 'th>Hybrid</' + 'th></' + 'tr></' + 'thead><' + 'tbody>';
+    rows.slice(0, 4).forEach(function(r, i) {
+      html += '<' + 'tr><' + 'td>' + (i + 1) + '</' + 'td><' + 'td>' + r.name + '</' + 'td><' + 'td>' + r.dense.toFixed(3) + '</' + 'td><' + 'td>' + r.sparse.toFixed(3) + '</' + 'td><' + 'td>' + r.hybrid.toFixed(3) + '</' + 'td></' + 'tr>';
+    });
+    html += '</' + 'tbody></' + 'table>';
+    return html;
+  }
+
+  function init() {
+    var plot = document.getElementById('ch19-retrieval-plot');
+    if (!plot || !window.Plotly) return;
+
+    var qxSlider = document.getElementById('ch19-qx');
+    var qySlider = document.getElementById('ch19-qy');
+    var lambdaSlider = document.getElementById('ch19-lambda');
+    var qxValue = document.getElementById('ch19-qx-value');
+    var qyValue = document.getElementById('ch19-qy-value');
+    var lambdaValue = document.getElementById('ch19-lambda-value');
+    var table = document.getElementById('ch19-rank-table');
+
+    function update() {
+      var qx = parseFloat(qxSlider.value);
+      var qy = parseFloat(qySlider.value);
+      var lambda = parseFloat(lambdaSlider.value);
+      qxValue.textContent = qx.toFixed(2);
+      qyValue.textContent = qy.toFixed(2);
+      lambdaValue.textContent = lambda.toFixed(2);
+
+      var rows = sortedScores(qx, qy, lambda);
+      var topNames = rows.slice(0, 3).map(function(r) { return r.name; });
+
+      var traceDocs = {
+        x: docs.map(function(d) { return d.x; }),
+        y: docs.map(function(d) { return d.y; }),
+        text: docs.map(function(d) { return d.name; }),
+        mode: 'markers+text',
+        type: 'scatter',
+        textposition: 'top center',
+        marker: {size: 12},
+        name: 'chunks'
+      };
+
+      var traceQuery = {
+        x: [0, qx],
+        y: [0, qy],
+        mode: 'lines+markers+text',
+        type: 'scatter',
+        text: ['', 'query'],
+        textposition: 'bottom right',
+        marker: {size: [4, 14]},
+        line: {width: 4},
+        name: 'query direction'
+      };
+
+      var topRows = rows.slice(0, 3);
+      var traceTop = {
+        x: topRows.map(function(r) { return r.x; }),
+        y: topRows.map(function(r) { return r.y; }),
+        text: topRows.map(function(r, i) { return 'rank ' + (i + 1); }),
+        mode: 'markers+text',
+        type: 'scatter',
+        textposition: 'bottom center',
+        marker: {size: [22, 18, 16], symbol: 'circle-open'},
+        name: 'top retrieved'
+      };
+
+      var layout = {
+        margin: {l: 45, r: 20, t: 30, b: 45},
+        xaxis: {title: 'administrative direction', range: [-1.1, 1.1], zeroline: true},
+        yaxis: {title: 'mathematical/ML direction', range: [-1.1, 1.1], zeroline: true},
+        showlegend: true,
+        title: 'Top results: ' + topNames.join(', ')
+      };
+
+      window.Plotly.react(plot, [traceDocs, traceQuery, traceTop], layout, {responsive: true, displaylogo: false});
+      if (table) table.innerHTML = tableHtml(rows);
+      showStatus('');
+    }
+
+    [qxSlider, qySlider, lambdaSlider].forEach(function(slider) {
+      slider.addEventListener('input', update);
+    });
+    update();
+  }
+
+  function ready(callback) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', callback);
+    } else {
+      callback();
+    }
+  }
+
+  ready(function(){ loadLocalPlotly(init); });
+})();
+</script>
+```
+
+## 19.20 Python Plotly version
+
+The HTML interactive above is useful in the rendered book.  The following Python version is useful in a notebook.
+
+```{python}
+#| label: ch19-python-plotly-retrieval-map
+#| warning: false
+#| message: false
+#| eval: false
+
+import plotly.graph_objects as go
+
+points = toy_embeddings[:, [0, 1]]
+query_vec = queries["How do I transfer credits?"][[0, 1]]
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=points[:, 0], y=points[:, 1],
+    mode="markers+text",
+    text=[f"chunk {i+1}" for i in range(len(chunks))],
+    textposition="top center",
+    name="chunks"
+))
+fig.add_trace(go.Scatter(
+    x=[0, query_vec[0]], y=[0, query_vec[1]],
+    mode="lines+markers+text",
+    text=["", "query"],
+    textposition="bottom right",
+    name="query"
+))
+fig.update_layout(
+    title="Toy retrieval embedding space",
+    xaxis_title="administration coordinate",
+    yaxis_title="math/ML coordinate"
+)
+fig.show()
+```
+
+## 19.21 Error modes in RAG
+
+RAG systems can fail for mathematically distinct reasons.
+
+### Retrieval failure
+
+The relevant chunk is not retrieved:
+
+$$
+R(q) \cap L_k(q) = \varnothing.
+$$
+
+This may happen because the embedding model fails to place the query near the right document, because the relevant document was not indexed, or because the chunking strategy split the answer from its context.
+
+### Ranking failure
+
+A relevant chunk is retrieved, but ranked too low to be included in the final context.  This is a recall and ranking problem.
+
+### Context overload
+
+Too many chunks are provided.  The answer-relevant evidence may be present, but the generator may attend to the wrong material or combine incompatible chunks.
+
+### Generation failure
+
+The correct evidence is present, but the language model misreads it, ignores it, or produces unsupported text.
+
+### Citation failure
+
+The answer may be mostly correct but cite the wrong chunk.  This is a mismatch between answer generation and evidence attribution.
+
+::: {.callout-note}
+## A useful diagnostic separation
+
+When debugging a RAG system, separate three questions:
+
+1. Did retrieval find the right evidence?
+2. Did the prompt place the evidence in a usable form?
+3. Did the generator faithfully use the evidence?
+
+These are different mathematical and engineering problems.
+:::
+
+## 19.22 RAG for academic advising and course resources
+
+A university resource chatbot is a natural RAG application.  The document collection may include:
+
+- program requirements;
+- course descriptions;
+- transfer-credit policies;
+- advising FAQs;
+- academic calendar pages;
+- graduate catalog entries;
+- official forms and procedures.
+
+For such a system, mathematical care matters.  The answer should be grounded in retrieved official sources, and the system should communicate uncertainty when retrieval is weak.
+
+A minimal retrieval-aware answer generator should keep track of:
+
+$$
+\text{query},\quad
+\text{retrieved chunks},\quad
+\text{similarity scores},\quad
+\text{source metadata},\quad
+\text{answer}.
+$$
+
+The source metadata are essential.  Without them, the system may generate fluent but unverifiable responses.
+
+## 19.23 AI-assisted learning activities
+
+Use an AI assistant as a mathematical critic, not only as a code generator.
+
+### Activity 1: explain the scoring geometry
+
+Ask an AI assistant:
+
+> In dense retrieval, explain the difference between dot-product similarity and cosine similarity.  Give a two-dimensional example where they rank documents differently.
+
+Then verify the example by hand.
+
+### Activity 2: audit a RAG pipeline
+
+Give the assistant a proposed RAG design and ask:
+
+> Identify possible retrieval failure modes, ranking failure modes, and generation failure modes.  For each one, suggest a quantitative diagnostic.
+
+Check whether the suggested metrics actually correspond to the failure modes.
+
+### Activity 3: create adversarial queries
+
+Ask the assistant to produce queries that are likely to confuse a retriever:
+
+- queries with synonyms;
+- queries with exact codes or course numbers;
+- queries requiring negation;
+- queries requiring date-sensitive information;
+- queries requiring multiple documents.
+
+Then test whether dense, sparse, or hybrid retrieval handles each case better.
+
+## 19.24 Common mistakes
+
+1. **Treating similarity scores as probabilities.**  A cosine score is not automatically a calibrated probability of relevance.
+2. **Ignoring chunking.**  Retrieval quality depends on the candidate units.
+3. **Using only dense retrieval.**  Exact keywords, identifiers, and policy names often require lexical matching.
+4. **Assuming retrieved means true.**  Retrieved text may be outdated, irrelevant, or misinterpreted.
+5. **Evaluating only final answers.**  Retrieval metrics and generation metrics should be separated.
+6. **Overloading the context window.**  More retrieved text is not always better.
+
+## 19.25 Exercises
+
+### Exercise 1: normalized dot product
+
+Prove that for unit vectors $u$ and $v$,
+
+$$
+\|u-v\|_2^2 = 2 - 2u^Tv.
+$$
+
+Explain why nearest-neighbor search by Euclidean distance is equivalent to maximum cosine similarity on the unit sphere.
+
+### Exercise 2: hybrid score
+
+Suppose two chunks have scores
+
+$$
+(s_{\text{dense}},s_{\text{sparse}})_1=(0.9,0.1),
+$$
+
+and
+
+$$
+(s_{\text{dense}},s_{\text{sparse}})_2=(0.6,0.8).
+$$
+
+For which values of $\lambda$ does chunk 1 rank above chunk 2 under
+
+$$
+s_{\text{hybrid}}=\lambda s_{\text{dense}}+(1-\lambda)s_{\text{sparse}}?
+$$
+
+### Exercise 3: retrieval metrics
+
+For a query, the returned list is
+
+$$
+(c_3,c_5,c_1,c_2,c_4),
+$$
+
+and the relevant set is
+
+$$
+\{c_1,c_4,c_6\}.
+$$
+
+Compute Precision@3, Recall@3, and reciprocal rank.
+
+### Exercise 4: chunking design
+
+Consider a 4000-token document.  You use chunk length $L=500$ and stride $s=250$.  How many chunks are produced if every chunk must fit inside the document?  What changes if the last partial chunk is kept?
+
+### Exercise 5: latent-document RAG
+
+Starting from
+
+$$
+p(y \mid q)=\sum_{c \in C}p_\theta(y\mid q,c)p_\eta(c\mid q),
+$$
+
+explain why top-$k$ truncation can introduce bias.  When might the approximation be reasonable?
+
+## 19.26 Mini-project: build a small mathematical RAG retriever
+
+Build a small retriever for a collection of course or program documents.
+
+Minimum requirements:
+
+1. Split documents into chunks.
+2. Implement sparse TF-IDF retrieval.
+3. Implement dense retrieval using either a toy embedding, a pretrained sentence embedding model, or an API embedding model.
+4. Implement hybrid scoring.
+5. Create at least 10 test queries with known relevant chunks.
+6. Report Precision@3, Recall@3, and MRR.
+7. Analyze at least three failure cases.
+
+A strong project should also include reranking, source metadata, and a short discussion of how retrieval affects generated answers.
+
+## 19.27 Lab connection
+
+The companion lab for this chapter should guide students through:
+
+- constructing a document collection;
+- chunking text;
+- building TF-IDF vectors;
+- building dense vectors;
+- comparing cosine and dot-product retrieval;
+- implementing hybrid search;
+- computing retrieval metrics;
+- connecting retrieved chunks to a simple answer-generation prompt.
+
+The lab should emphasize that RAG is not magic.  It is a pipeline made of mathematical components: representation maps, similarity functions, ranking rules, and conditional generation.
+
+## 19.28 Summary
+
+Retrieval-augmented generation combines language modeling with search.  The retrieval part is fundamentally geometric: map queries and chunks to vectors, compute similarities, and return top-ranked evidence.  The generation part is probabilistic: condition a language model on the query and retrieved context.
+
+The main mathematical objects in this chapter were:
+
+$$
+f_\theta:T \to R^m,
+$$
+
+$$
+S(z_q,z_c),
+$$
+
+$$
+\operatorname{TopK}(q)=\operatorname{argtopk}_{c\in C}S(f_\theta(q),f_\theta(c)),
+$$
+
+and
+
+$$
+p(y\mid q)\approx p_\theta(y\mid q,r_k(q)).
+$$
+
+Understanding these objects helps us design better retrieval systems, evaluate them separately from generation, and diagnose failure modes in applied NLP systems.
+
+## 19.29 Further reading
+
+The original retrieval-augmented generation framework is due to Lewis et al. [@lewis_rag_2020].  For approximate nearest-neighbor search and vector indexing, see Johnson, Douze, and Jegou [@johnson_faiss_2019].  For background on vector space models and embeddings, see earlier chapters and the references on latent semantic analysis, Word2Vec, GloVe, and Transformers.

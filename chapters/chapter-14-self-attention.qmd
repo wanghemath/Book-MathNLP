@@ -1,0 +1,1047 @@
+---
+title: "Self-Attention"
+subtitle: "Contextual token representations, permutation equivariance, and multi-head structure"
+---
+
+::: {.chapter-opening}
+Self-attention is the operation that made the Transformer architecture possible.  In an RNN, information moves through a time-indexed hidden state.  In self-attention, all token positions in a sequence compare themselves with all other token positions directly.  The result is a new representation for each token, called a **contextual embedding**, whose meaning depends on the entire sequence.
+
+The mathematical object in this chapter is the self-attention map
+
+$$
+X \mapsto \operatorname{softmax}_{\text{row}}\left(\frac{XW_QW_K^TX^T}{\sqrt{d_k}}+M\right)XW_V.
+$$
+
+This formula is compact, but it hides several important ideas: learned pairwise similarity, row-stochastic averaging, masking, positional information, permutation equivariance, and parallel attention heads.  We study each idea carefully.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. define self-attention as attention with $Q,K,V$ all computed from the same sequence matrix $X$;
+2. check every matrix dimension in a self-attention layer;
+3. explain why self-attention produces contextual token embeddings;
+4. prove the permutation equivariance of self-attention without positional encodings;
+5. explain why positional information is necessary for language modeling;
+6. construct padding masks and causal masks;
+7. interpret multi-head attention as several learned comparison geometries in parallel;
+8. implement single-head and multi-head self-attention from scratch in NumPy;
+9. use attention heatmaps carefully without over-interpreting them;
+10. explain the computational cost of self-attention.
+
+## 14.1 From attention to self-attention
+
+In Chapter 13, attention was defined for three matrices
+
+$$
+Q\in R^{T_q\times d_k},\qquad K\in R^{T_k\times d_k},\qquad V\in R^{T_k\times d_v},
+$$
+
+by
+
+$$
+\operatorname{Attention}(Q,K,V)
+=
+\operatorname{softmax}_{\text{row}}\left(\frac{QK^T}{\sqrt{d_k}}\right)V.
+$$
+
+In **self-attention**, the queries, keys, and values are all computed from the same sequence.  Let
+
+$$
+X\in R^{T\times d_{\mathrm{model}}}
+$$
+
+be the matrix of token representations for a sequence of length $T$.  The $i$th row $x_i^T$ represents token position $i$.  A self-attention head uses learned matrices
+
+$$
+W_Q\in R^{d_{\mathrm{model}}\times d_k},\qquad
+W_K\in R^{d_{\mathrm{model}}\times d_k},\qquad
+W_V\in R^{d_{\mathrm{model}}\times d_v}
+$$
+
+to form
+
+$$
+Q=XW_Q,
+\qquad
+K=XW_K,
+\qquad
+V=XW_V.
+$$
+
+Then
+
+$$
+Z
+=
+\operatorname{SelfAttn}(X)
+=
+\operatorname{softmax}_{\text{row}}\left(\frac{XW_QW_K^TX^T}{\sqrt{d_k}}\right)XW_V.
+$$
+
+The output $Z\in R^{T\times d_v}$ has one row for each token position.  Each row is a weighted average of transformed value vectors from the same sequence.
+
+::: {.math-card}
+**One sentence summary.**  Self-attention lets every token position build a new representation by asking: which other token positions in this same sequence are relevant to me?
+:::
+
+## 14.2 Token matrices and dimension bookkeeping
+
+A sequence of tokens
+
+$$
+w_1,w_2,\ldots,w_T
+$$
+
+is first mapped to vectors.  If $E\in R^{|V|\times d_{\mathrm{model}}}$ is a token embedding matrix and token $w_i$ has integer index $r_i$, then
+
+$$
+e_i=E_{r_i,:}\in R^{d_{\mathrm{model}}}.
+$$
+
+Usually we also add positional information $p_i\in R^{d_{\mathrm{model}}}$:
+
+$$
+x_i=e_i+p_i.
+$$
+
+Stacking rows gives
+
+$$
+X=
+\begin{bmatrix}
+x_1^T\\
+x_2^T\\
+\vdots\\
+x_T^T
+\end{bmatrix}
+\in R^{T\times d_{\mathrm{model}}}.
+$$
+
+For one attention head:
+
+$$
+XW_Q\in R^{T\times d_k},
+\qquad
+XW_K\in R^{T\times d_k},
+\qquad
+XW_V\in R^{T\times d_v}.
+$$
+
+The score matrix is
+
+$$
+S=\frac{QK^T}{\sqrt{d_k}}\in R^{T\times T}.
+$$
+
+The attention matrix is
+
+$$
+A=\operatorname{softmax}_{\text{row}}(S)\in R^{T\times T}.
+$$
+
+The output is
+
+$$
+Z=AV\in R^{T\times d_v}.
+$$
+
+The row $z_i^T$ is the new representation of token position $i$.
+
+## 14.3 Contextual embeddings
+
+A static word embedding assigns one vector to each token type.  For example, the word `bank` might have a single embedding vector.  But the meaning of `bank` changes in different contexts:
+
+- `river bank`
+- `bank loan`
+- `central bank`
+
+Self-attention produces **contextual embeddings**.  The output vector $z_i$ at position $i$ depends not only on $x_i$, but also on all rows of $X$ through the attention weights.
+
+Row $i$ of the output is
+
+$$
+z_i
+=
+\sum_{j=1}^T a_{ij}v_j,
+$$
+
+where
+
+$$
+a_{ij}
+=
+\frac{\exp(q_i^Tk_j/\sqrt{d_k})}
+{\sum_{\ell=1}^T \exp(q_i^Tk_\ell/\sqrt{d_k})}.
+$$
+
+Since $q_i$, $k_j$, and $v_j$ are all functions of the input token representations, the vector $z_i$ changes when the surrounding sentence changes.
+
+::: {.math-card}
+**Contextualization.**  A token representation is contextual if changing another token in the same sequence can change the representation at the original position.
+:::
+
+### A small mathematical test for contextuality
+
+Let $F:R^{T\times d}\to R^{T\times d_v}$ be a sequence model.  The representation at position $i$ is contextual if there exists some $j\ne i$ such that
+
+$$
+\frac{\partial F_i(X)}{\partial x_j}\ne 0.
+$$
+
+For self-attention, this derivative is usually nonzero because the scores $q_i^Tk_j$ and the value $v_j$ both depend on $x_j$.
+
+## 14.4 Self-attention as a learned graph on tokens
+
+For a fixed input sequence $X$, the attention matrix
+
+$$
+A(X)\in R^{T\times T}
+$$
+
+can be viewed as the weighted adjacency matrix of a directed graph on token positions.  The edge weight from query position $i$ to key/value position $j$ is $a_{ij}$.
+
+This graph is:
+
+- **weighted**, because $a_{ij}\in[0,1]$;
+- **directed**, because usually $a_{ij}\ne a_{ji}$;
+- **row-stochastic**, because $\sum_j a_{ij}=1$;
+- **data-dependent**, because $A$ changes with $X$.
+
+Self-attention therefore constructs a sequence-specific graph and then performs a weighted message-passing step:
+
+$$
+z_i=\sum_{j=1}^T a_{ij}v_j.
+$$
+
+This connects self-attention with graph neural networks.  The difference is that the graph is not given externally; it is inferred from learned similarities inside the sequence.
+
+## 14.5 Permutation equivariance without positional information
+
+A subtle but important mathematical property of self-attention is permutation equivariance.  Without positional information or masks, self-attention does not know the order of tokens.  It only sees a set of input rows.
+
+Let $P\in R^{T\times T}$ be a permutation matrix.  The matrix $PX$ is obtained by permuting the rows of $X$.  Define one-head self-attention by
+
+$$
+F(X)=\operatorname{softmax}_{\text{row}}\left(\frac{XW_QW_K^TX^T}{\sqrt{d_k}}\right)XW_V.
+$$
+
+Then
+
+$$
+F(PX)=PF(X).
+$$
+
+This property is called **permutation equivariance**.
+
+### Proof
+
+Let
+
+$$
+Q=XW_Q,
+\qquad
+K=XW_K,
+\qquad
+V=XW_V.
+$$
+
+For the permuted input $PX$,
+
+$$
+Q'=PXW_Q=PQ,
+\qquad
+K'=PXW_K=PK,
+\qquad
+V'=PXW_V=PV.
+$$
+
+The score matrix becomes
+
+$$
+S'
+=
+\frac{Q'(K')^T}{\sqrt{d_k}}
+=
+\frac{(PQ)(PK)^T}{\sqrt{d_k}}
+=
+\frac{P Q K^T P^T}{\sqrt{d_k}}
+=
+P S P^T.
+$$
+
+Row-wise softmax commutes with simultaneous row and column permutation, so
+
+$$
+\operatorname{softmax}_{\text{row}}(S')
+=
+P\operatorname{softmax}_{\text{row}}(S)P^T
+=
+PAP^T.
+$$
+
+Therefore
+
+$$
+F(PX)
+=
+(PAP^T)(PV)
+=PA(P^TP)V
+=PAV
+=PF(X).
+$$
+
+This proves the claim.
+
+### Why this matters
+
+A language model must distinguish
+
+```text
+student studies model
+```
+
+from
+
+```text
+model studies student
+```
+
+because the order changes the meaning.  Self-attention without positional information treats these as row permutations of the same collection of token vectors.  The output rows are permuted in the same way, but the model has no intrinsic sense of first, second, or third position.
+
+Therefore Transformers add positional information.
+
+## 14.6 Positional information breaks pure permutation symmetry
+
+A common input representation is
+
+$$
+x_i=e(w_i)+p_i,
+$$
+
+where $e(w_i)$ is the token embedding and $p_i$ is a position vector.  The sequence matrix is then
+
+$$
+X=
+\begin{bmatrix}
+(e(w_1)+p_1)^T\\
+\cdots\\
+(e(w_T)+p_T)^T
+\end{bmatrix}.
+$$
+
+Now token identity and token position are mixed in each row.  The model can learn different behaviors for early positions, nearby positions, or relative patterns.
+
+There are several common approaches:
+
+- learned absolute position embeddings;
+- sinusoidal position encodings;
+- relative position biases;
+- rotary position embeddings.
+
+Chapter 16 studies these in more detail.  For now, the key point is simple: self-attention provides token-token interaction, but positional information provides order.
+
+## 14.7 Masked self-attention
+
+A mask is added to the score matrix before softmax:
+
+$$
+A
+=
+\operatorname{softmax}_{\text{row}}
+\left(
+\frac{QK^T}{\sqrt{d_k}}+M
+\right).
+$$
+
+Allowed entries of $M$ are $0$.  Disallowed entries are large negative numbers.
+
+### Padding mask
+
+A padding mask prevents real tokens from attending to artificial padding tokens.  If token position $j$ is padding, then set
+
+$$
+M_{ij}=-10^9
+$$
+
+for every query position $i$.
+
+### Causal mask
+
+A causal mask prevents position $i$ from attending to future positions $j>i$:
+
+$$
+M_{ij}=\begin{cases}
+0, & j\le i,\\
+-10^9, & j>i.
+\end{cases}
+$$
+
+Causal masking is necessary for autoregressive language modeling.  When predicting token $w_{t+1}$, the representation at position $t$ must not use information from tokens after $t$.
+
+The causal factorization is
+
+$$
+P(w_1,\ldots,w_T)
+=
+\prod_{t=1}^T P(w_t\mid w_1,\ldots,w_{t-1}).
+$$
+
+Causal self-attention enforces this conditional structure inside the network.
+
+## 14.8 Multi-head self-attention
+
+A single attention head uses one learned query-key geometry.  Multi-head attention uses $H$ such heads in parallel.
+
+For head $h$, define
+
+$$
+Q^{(h)}=XW_Q^{(h)},
+\qquad
+K^{(h)}=XW_K^{(h)},
+\qquad
+V^{(h)}=XW_V^{(h)}.
+$$
+
+The head output is
+
+$$
+Z^{(h)}
+=
+\operatorname{softmax}_{\text{row}}
+\left(
+\frac{Q^{(h)}(K^{(h)})^T}{\sqrt{d_k}}+M
+\right)V^{(h)}.
+$$
+
+The head outputs are concatenated:
+
+$$
+Z_{\mathrm{cat}}
+=
+\operatorname{Concat}(Z^{(1)},\ldots,Z^{(H)})
+\in R^{T\times Hd_v}.
+$$
+
+Then an output projection maps back to the model dimension:
+
+$$
+\operatorname{MHA}(X)
+=
+Z_{\mathrm{cat}}W_O,
+\qquad
+W_O\in R^{Hd_v\times d_{\mathrm{model}}}.
+$$
+
+If $d_v=d_k=d_{\mathrm{model}}/H$, then the concatenated output has dimension $d_{\mathrm{model}}$, which is convenient for residual connections.
+
+::: {.math-card}
+**Multi-head viewpoint.**  Each head learns a different similarity geometry.  One head may emphasize nearby tokens, another may emphasize matching syntax, and another may emphasize semantic roles.  The architecture does not force these roles; they emerge, if useful, from the training objective.
+:::
+
+## 14.9 Self-attention as matrix-valued feature construction
+
+From a statistical learning point of view, a self-attention layer is a data-dependent feature map.
+
+For a fixed parameter collection $\theta=(W_Q,W_K,W_V)$,
+
+$$
+F_\theta(X)=A_\theta(X)XW_V,
+$$
+
+where
+
+$$
+A_\theta(X)
+=
+\operatorname{softmax}_{\text{row}}
+\left(\frac{XW_QW_K^TX^T}{\sqrt{d_k}}\right).
+$$
+
+This is nonlinear in $X$ because $A_\theta(X)$ itself depends on $X$.  However, conditional on the attention matrix $A_\theta(X)$, the output is linear in the values:
+
+$$
+Z=A_\theta(X)V.
+$$
+
+So self-attention has two layers of structure:
+
+1. construct a similarity matrix from $X$;
+2. use that matrix to average transformed vectors.
+
+This decomposition is often the cleanest way to understand the operation.
+
+## 14.10 Attention entropy and sharpness
+
+For each query position $i$, the attention row $a_i=(a_{i1},\ldots,a_{iT})$ is a probability vector.  Its entropy is
+
+$$
+H(a_i)=-\sum_{j=1}^T a_{ij}\log a_{ij}.
+$$
+
+Low entropy means the query attends mostly to a few positions.  High entropy means the query averages broadly across the sequence.
+
+If the scores are multiplied by a scale parameter $\gamma>0$,
+
+$$
+a_{ij}(\gamma)
+=
+\frac{\exp(\gamma s_{ij})}{\sum_{\ell=1}^T \exp(\gamma s_{i\ell})},
+$$
+
+then increasing $\gamma$ usually makes attention sharper.  Decreasing $\gamma$ makes attention more uniform.
+
+This is one reason the factor $1/\sqrt{d_k}$ matters: it controls the typical scale of the scores before the softmax.
+
+## 14.11 Computational complexity
+
+For sequence length $T$ and key dimension $d_k$, the score matrix
+
+$$
+QK^T
+$$
+
+requires roughly $O(T^2d_k)$ arithmetic operations and stores $O(T^2)$ attention weights.  The multiplication
+
+$$
+AV
+$$
+
+requires roughly $O(T^2d_v)$ operations.
+
+Thus standard full self-attention scales quadratically in sequence length.  This is powerful for moderate sequences but expensive for very long documents.  Many efficient Transformer variants modify the attention pattern to reduce this cost.
+
+For this book, the main mathematical point is:
+
+::: {.math-card}
+The power of full self-attention comes from all-pairs token interaction.  The cost of full self-attention also comes from all-pairs token interaction.
+:::
+
+## 14.12 Worked example: two query positions
+
+Suppose a sequence has three value vectors
+
+$$
+v_1=(1,0),\qquad v_2=(0,1),\qquad v_3=(1,1).
+$$
+
+Assume that after softmax the first two attention rows are
+
+$$
+a_1=(0.7,0.2,0.1),
+\qquad
+a_2=(0.1,0.3,0.6).
+$$
+
+Then
+
+$$
+z_1=0.7v_1+0.2v_2+0.1v_3
+=(0.8,0.3),
+$$
+
+and
+
+$$
+z_2=0.1v_1+0.3v_2+0.6v_3
+=(0.7,0.9).
+$$
+
+The same value vectors produce different contextual embeddings because the attention rows are different.
+
+## 14.13 Python example: single-head self-attention from scratch
+
+The next code block implements one self-attention head using NumPy.
+
+```{python}
+import numpy as np
+
+np.set_printoptions(precision=3, suppress=True)
+
+def row_softmax(S):
+    S_shifted = S - S.max(axis=1, keepdims=True)
+    E = np.exp(S_shifted)
+    return E / E.sum(axis=1, keepdims=True)
+
+def self_attention(X, W_Q, W_K, W_V, mask=None):
+    Q = X @ W_Q
+    K = X @ W_K
+    V = X @ W_V
+    scores = Q @ K.T / np.sqrt(Q.shape[1])
+    if mask is not None:
+        scores = scores + mask
+    A = row_softmax(scores)
+    Z = A @ V
+    return Z, A, scores
+
+# Toy token matrix: T = 4 tokens, d_model = 3 features.
+X = np.array([
+    [1.0, 0.0, 0.2],
+    [0.8, 0.2, 0.1],
+    [0.1, 1.0, 0.3],
+    [0.0, 0.7, 1.0],
+])
+
+W_Q = np.array([
+    [1.0, 0.0],
+    [0.2, 0.8],
+    [0.0, 0.5],
+])
+W_K = np.array([
+    [0.9, 0.1],
+    [0.1, 0.9],
+    [0.2, 0.4],
+])
+W_V = np.array([
+    [1.0, 0.0],
+    [0.0, 1.0],
+    [0.5, 0.5],
+])
+
+Z, A, scores = self_attention(X, W_Q, W_K, W_V)
+print("Attention matrix A:")
+print(A)
+print("\nOutput Z:")
+print(Z)
+print("\nRow sums of A:", A.sum(axis=1))
+```
+
+Each row of $A$ sums to $1$.  The output row $z_i$ is a weighted average of the rows of $V=XW_V$.
+
+## 14.14 Python example: causal masking
+
+The causal mask prevents future attention.
+
+```{python}
+T = X.shape[0]
+causal_mask = np.triu(np.ones((T, T)), k=1)
+causal_mask = np.where(causal_mask == 1, -1e9, 0.0)
+
+Z_causal, A_causal, scores_causal = self_attention(
+    X, W_Q, W_K, W_V, mask=causal_mask
+)
+
+print("Causal attention matrix:")
+print(A_causal)
+print("\nEntries above the diagonal are approximately zero.")
+```
+
+The first token can attend only to itself.  The second token can attend to positions $1$ and $2$.  The last token can attend to all previous positions and itself.
+
+## 14.15 Python example: multi-head self-attention
+
+The following implementation uses a list of projection matrices, one set per head.
+
+```{python}
+def multi_head_self_attention(X, heads, W_O=None, mask=None):
+    outputs = []
+    attentions = []
+    for W_Q_h, W_K_h, W_V_h in heads:
+        Z_h, A_h, _ = self_attention(X, W_Q_h, W_K_h, W_V_h, mask=mask)
+        outputs.append(Z_h)
+        attentions.append(A_h)
+    Z_cat = np.concatenate(outputs, axis=1)
+    if W_O is None:
+        return Z_cat, attentions
+    return Z_cat @ W_O, attentions
+
+heads = [
+    (W_Q, W_K, W_V),
+    (
+        np.array([[0.2, 0.9], [1.0, 0.0], [0.3, 0.4]]),
+        np.array([[0.1, 0.8], [0.8, 0.2], [0.4, 0.6]]),
+        np.array([[0.5, 0.5], [1.0, 0.0], [0.0, 1.0]]),
+    ),
+]
+
+Z_multi, A_heads = multi_head_self_attention(X, heads)
+print("Multi-head output shape:", Z_multi.shape)
+print("Head 1 attention:")
+print(A_heads[0])
+print("Head 2 attention:")
+print(A_heads[1])
+```
+
+The two heads may produce different attention patterns because their projection matrices define different query-key geometries.
+
+## 14.16 Python example: attention entropy
+
+Attention rows are probability vectors, so we can compute row entropies.
+
+```{python}
+def entropy_rows(A):
+    A_safe = np.clip(A, 1e-12, 1.0)
+    return -(A_safe * np.log(A_safe)).sum(axis=1)
+
+print("Unmasked row entropies:", entropy_rows(A))
+print("Causal row entropies:", entropy_rows(A_causal))
+```
+
+Entropy is not automatically good or bad.  It is a diagnostic.  The appropriate sharpness depends on the task, the layer, and the head.
+
+## 14.17 Interactive HTML: self-attention head explorer
+
+The following interactive component compares three hand-designed self-attention heads.  It uses the local Plotly file `assets/plotly.min.js`, so it should work without a network connection after the book is rendered.
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: Self-Attention Head Explorer</h3>
+  <p>
+    Choose a head, adjust the score scale, and optionally apply a causal mask.  The heatmap shows the attention matrix.
+    The bar chart shows the attention distribution for one selected query token.
+  </p>
+
+  <label for="ch14-head-select"><strong>Head type:</strong></label>
+  <select id="ch14-head-select">
+    <option value="semantic">semantic grouping head</option>
+    <option value="local">local-neighborhood head</option>
+    <option value="syntax">syntax-role head</option>
+  </select>
+
+  <label for="ch14-query-select" style="display:block; margin-top:0.75rem;"><strong>Query token:</strong></label>
+  <select id="ch14-query-select"></select>
+
+  <label for="ch14-scale-slider" style="display:block; margin-top:0.75rem;"><strong>Score scale:</strong>
+    <span id="ch14-scale-value">1.00</span>
+  </label>
+  <input id="ch14-scale-slider" type="range" min="0.25" max="4" step="0.05" value="1" style="width: 100%;">
+
+  <label style="display:block; margin-top:0.75rem;">
+    <input id="ch14-causal-toggle" type="checkbox">
+    Use causal mask
+  </label>
+
+  <div id="ch14-attention-heatmap" class="plotly-demo"></div>
+  <div id="ch14-attention-bar" class="plotly-demo"></div>
+  <div id="ch14-attention-summary" class="plotly-status"></div>
+</div>
+
+<script>
+(function() {
+  function localPlotlySources() {
+    return [
+      "../assets/plotly.min.js",
+      "assets/plotly.min.js",
+      "./assets/plotly.min.js"
+    ];
+  }
+
+  function loadScriptSequentially(sources, onSuccess, onFailure) {
+    if (window.Plotly) {
+      onSuccess();
+      return;
+    }
+    if (!sources.length) {
+      onFailure();
+      return;
+    }
+    const src = sources.shift();
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = function() {
+      if (window.Plotly) {
+        onSuccess();
+      } else {
+        loadScriptSequentially(sources, onSuccess, onFailure);
+      }
+    };
+    script.onerror = function() {
+      loadScriptSequentially(sources, onSuccess, onFailure);
+    };
+    document.head.appendChild(script);
+  }
+
+  function stableSoftmax(row) {
+    const maxVal = Math.max.apply(null, row);
+    const expVals = row.map(v => Math.exp(v - maxVal));
+    const total = expVals.reduce((a, b) => a + b, 0);
+    return expVals.map(v => v / total);
+  }
+
+  function dot(a, b) {
+    let total = 0;
+    for (let i = 0; i < a.length; i++) total += a[i] * b[i];
+    return total;
+  }
+
+  function rowEntropy(row) {
+    let total = 0;
+    for (const p of row) {
+      if (p > 0) total -= p * Math.log(p);
+    }
+    return total;
+  }
+
+  function initCh14SelfAttention() {
+    const heatmapDiv = document.getElementById("ch14-attention-heatmap");
+    const barDiv = document.getElementById("ch14-attention-bar");
+    const headSelect = document.getElementById("ch14-head-select");
+    const querySelect = document.getElementById("ch14-query-select");
+    const scaleSlider = document.getElementById("ch14-scale-slider");
+    const scaleValue = document.getElementById("ch14-scale-value");
+    const causalToggle = document.getElementById("ch14-causal-toggle");
+    const summary = document.getElementById("ch14-attention-summary");
+
+    if (!heatmapDiv || !barDiv || !headSelect || !querySelect || !scaleSlider || !scaleValue || !causalToggle || !summary) return;
+
+    if (!window.Plotly) {
+      summary.textContent = "Plotly.js was not available, so the interactive figure could not be drawn.";
+      return;
+    }
+
+    const tokens = ["the", "student", "solved", "the", "linear", "problem"];
+
+    const heads = {
+      semantic: {
+        description: "Semantic grouping: math-related tokens attend strongly to one another.",
+        features: [
+          [0.1, 0.0],
+          [0.3, 0.2],
+          [0.4, 0.4],
+          [0.1, 0.0],
+          [1.0, 0.9],
+          [0.9, 1.0]
+        ]
+      },
+      local: {
+        description: "Local-neighborhood: nearby positions have similar features.",
+        features: [
+          [1.0, 0.0],
+          [0.8, 0.2],
+          [0.5, 0.5],
+          [0.2, 0.8],
+          [0.0, 1.0],
+          [-0.2, 1.1]
+        ]
+      },
+      syntax: {
+        description: "Syntax-role: determiners, nouns, verbs, and modifiers have different directions.",
+        features: [
+          [1.0, 0.0],
+          [0.0, 1.0],
+          [-0.9, 0.2],
+          [1.0, 0.0],
+          [0.4, 0.8],
+          [0.0, 1.0]
+        ]
+      }
+    };
+
+    querySelect.innerHTML = "";
+    tokens.forEach(function(token, idx) {
+      const option = document.createElement("option");
+      option.value = String(idx);
+      option.textContent = String(idx + 1) + ": " + token;
+      querySelect.appendChild(option);
+    });
+    querySelect.value = "4";
+
+    function computeAttention(features, scale, useCausal) {
+      const T = features.length;
+      const dK = features[0].length;
+      const scores = [];
+      const A = [];
+      for (let i = 0; i < T; i++) {
+        const row = [];
+        for (let j = 0; j < T; j++) {
+          if (useCausal && j > i) {
+            row.push(-1e9);
+          } else {
+            row.push(scale * dot(features[i], features[j]) / Math.sqrt(dK));
+          }
+        }
+        scores.push(row);
+        A.push(stableSoftmax(row));
+      }
+      return {scores: scores, attention: A};
+    }
+
+    function update() {
+      const headKey = headSelect.value;
+      const queryIndex = Number(querySelect.value);
+      const scale = Number(scaleSlider.value);
+      const useCausal = causalToggle.checked;
+      scaleValue.textContent = scale.toFixed(2);
+
+      const selected = heads[headKey];
+      const result = computeAttention(selected.features, scale, useCausal);
+      const A = result.attention;
+      const queryRow = A[queryIndex];
+
+      const heatmapTrace = {
+        z: A,
+        x: tokens.map((t, i) => String(i + 1) + ": " + t),
+        y: tokens.map((t, i) => String(i + 1) + ": " + t),
+        type: "heatmap",
+        zmin: 0,
+        zmax: 1,
+        colorscale: "Viridis",
+        hovertemplate: "query=%{y}<br>key=%{x}<br>weight=%{z:.3f}<extra></extra>"
+      };
+
+      const heatmapLayout = {
+        title: "Attention matrix A for the selected head",
+        xaxis: {title: "key/value token", automargin: true},
+        yaxis: {title: "query token", automargin: true},
+        margin: {l: 90, r: 30, t: 70, b: 90}
+      };
+
+      const barTrace = {
+        x: tokens.map((t, i) => String(i + 1) + ": " + t),
+        y: queryRow,
+        type: "bar",
+        hovertemplate: "key=%{x}<br>weight=%{y:.3f}<extra></extra>"
+      };
+
+      const barLayout = {
+        title: "Attention distribution for query token " + String(queryIndex + 1) + ": " + tokens[queryIndex],
+        yaxis: {title: "attention weight", range: [0, 1]},
+        xaxis: {automargin: true},
+        margin: {l: 70, r: 30, t: 70, b: 90}
+      };
+
+      Plotly.react(heatmapDiv, [heatmapTrace], heatmapLayout, {responsive: true});
+      Plotly.react(barDiv, [barTrace], barLayout, {responsive: true});
+
+      const entropies = A.map(rowEntropy);
+      const avgEntropy = entropies.reduce((a, b) => a + b, 0) / entropies.length;
+      const maxIndex = queryRow.reduce((best, value, idx) => value > queryRow[best] ? idx : best, 0);
+      summary.textContent = selected.description + "  Average row entropy = " + avgEntropy.toFixed(3) +
+        ".  For the selected query, the largest weight is on token " + String(maxIndex + 1) +
+        " ('" + tokens[maxIndex] + "') with weight " + queryRow[maxIndex].toFixed(3) + ".";
+    }
+
+    headSelect.addEventListener("change", update);
+    querySelect.addEventListener("change", update);
+    scaleSlider.addEventListener("input", update);
+    causalToggle.addEventListener("change", update);
+    update();
+  }
+
+  function boot() {
+    loadScriptSequentially(localPlotlySources(), initCh14SelfAttention, function() {
+      const summary = document.getElementById("ch14-attention-summary");
+      if (summary) {
+        summary.textContent = "Plotly.js was not available. Check that assets/plotly.min.js is included in the rendered site.";
+      }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+```
+
+Use this interactive as a mathematical object, not merely a picture.  Ask how the attention matrix changes when scores are sharpened, when future tokens are masked, and when the head geometry changes.
+
+## 14.18 AI-assisted learning: self-attention audit
+
+AI systems can help you check your reasoning, but they should not replace it.  Use them as mathematical critics.
+
+### Prompt 1: dimension audit
+
+Ask:
+
+> Let $X\in R^{T\times d_{\mathrm{model}}}$ and let $W_Q,W_K\in R^{d_{\mathrm{model}}\times d_k}$, $W_V\in R^{d_{\mathrm{model}}\times d_v}$.  Check every matrix dimension in one-head self-attention and explain why the output has shape $T\times d_v$.
+
+Then verify the answer line by line.
+
+### Prompt 2: proof critique
+
+Ask:
+
+> I claim that self-attention without positional encodings is permutation equivariant.  Give a proof using a permutation matrix $P$, and identify exactly where row-wise softmax is used.
+
+Check whether the proof distinguishes invariance from equivariance.
+
+### Prompt 3: causal-mask explanation
+
+Ask:
+
+> Explain why causal self-attention is needed for autoregressive language modeling.  Connect the mask to the factorization $P(w_1,\ldots,w_T)=\prod_t P(w_t\mid w_1,\ldots,w_{t-1})$.
+
+Then write your own explanation in one paragraph.
+
+## 14.19 Common mistakes
+
+1. **Confusing attention with explanation.**  Attention weights are useful diagnostics, but they are not complete causal explanations of a model's decision.
+2. **Forgetting row-wise softmax.**  The softmax is applied separately to each query row.
+3. **Ignoring positional information.**  Self-attention alone is permutation equivariant; language requires order.
+4. **Using the wrong mask orientation.**  In causal attention, query position $i$ may attend to key position $j$ only when $j\le i$.
+5. **Confusing token type and token position.**  The same word appearing twice can have two different contextual embeddings.
+6. **Overlooking quadratic cost.**  Full attention stores a $T\times T$ matrix for each head.
+
+## 14.20 Exercises
+
+1. **Dimension check.**  Let $T=12$, $d_{\mathrm{model}}=64$, $d_k=16$, and $d_v=16$.  Give the shapes of $Q,K,V,QK^T,A$, and $Z$ for one attention head.
+
+2. **Contextuality.**  Explain why changing token $x_j$ can change output vector $z_i$ even when $i\ne j$.
+
+3. **Permutation equivariance.**  Prove that one-head self-attention without masks and positional embeddings satisfies $F(PX)=PF(X)$ for every permutation matrix $P$.
+
+4. **Position necessity.**  Give two three-token sentences with the same words but different order and different meaning.  Explain why token embeddings alone cannot distinguish them under a permutation-equivariant model.
+
+5. **Causal mask.**  Write the $5\times 5$ causal mask pattern showing allowed and disallowed entries.
+
+6. **Entropy.**  For $a=(0.7,0.2,0.1)$ and $b=(1/3,1/3,1/3)$, compute $H(a)$ and $H(b)$.  Which distribution is sharper?
+
+7. **Multi-head dimensions.**  Suppose $d_{\mathrm{model}}=128$, $H=8$, and $d_v=16$.  What is the dimension of the concatenated head output?  What shape should $W_O$ have to return to $d_{\mathrm{model}}$?
+
+8. **Implementation.**  Modify the Python function `self_attention` to return both the unnormalized score matrix and the attention matrix.
+
+9. **Mask orientation test.**  Construct a toy sequence of length $4$ and verify that your causal mask makes the upper triangular entries of $A$ approximately zero.
+
+10. **Interpretation.**  Give one reason an attention heatmap may be useful and one reason it may be misleading.
+
+## 14.21 Mini-project: attention pattern laboratory
+
+Build a small attention laboratory in Python.
+
+1. Choose a sentence of length $5$ to $8$.
+2. Assign simple hand-designed token features.
+3. Construct at least three different heads by choosing different projection matrices.
+4. Plot attention heatmaps for each head.
+5. Compare unmasked and causal attention.
+6. Compute row entropies.
+7. Write a short report explaining what each head appears to measure.
+
+The goal is not to train a model.  The goal is to understand how different query-key geometries produce different attention patterns.
+
+## 14.22 Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-14-self-attention.ipynb
+```
+
+The lab should be written for independent study and should include:
+
+- a review of matrix shapes;
+- one-head self-attention from scratch;
+- padding and causal masks;
+- multi-head self-attention;
+- attention heatmap visualization;
+- attention entropy diagnostics;
+- a short comparison with RNNs and n-gram models.
+
+## 14.23 What to remember
+
+- Self-attention computes $Q,K,V$ from the same sequence matrix $X$.
+- Each output token representation is a weighted average of value vectors from the sequence.
+- Attention weights form a row-stochastic matrix.
+- Self-attention produces contextual embeddings.
+- Without positional information and masks, self-attention is permutation equivariant.
+- Causal masks enforce the conditional structure of autoregressive language modeling.
+- Multi-head attention learns several comparison geometries in parallel.
+- Full self-attention has quadratic cost in sequence length.
+
+## Notes and references
+
+Self-attention is the central operation in the Transformer architecture.  This chapter connects the attention formula from Chapter 13 to contextual token representations, symmetry, masking, and multi-head design.  Useful background sources include @vaswani_attention_2017, @jurafsky_martin_slp3, and @goodfellow_deep_learning_2016.

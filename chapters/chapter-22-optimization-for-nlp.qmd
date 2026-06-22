@@ -1,0 +1,1181 @@
+---
+title: "Optimization for NLP"
+subtitle: "Gradients, stochasticity, and large-scale training"
+---
+
+::: {.chapter-opening}
+Modern NLP models are trained by solving very large optimization problems.  The model may be a linear classifier, a recurrent network, a Transformer, or a retrieval-augmented system with trainable components, but the mathematical core is the same: choose parameters, define a loss, estimate a gradient from data, and update the parameters.  This chapter develops optimization for NLP from a clean mathematical point of view.
+:::
+
+## 22.1 Learning goals
+
+After reading this chapter, students should be able to:
+
+- formulate NLP training as empirical risk minimization;
+- derive gradients for softmax cross-entropy losses;
+- distinguish full-batch gradients from stochastic mini-batch gradients;
+- explain how SGD, momentum, RMSProp, Adam, and AdamW update parameters;
+- interpret learning rate, batch size, gradient noise, clipping, and regularization mathematically;
+- understand why optimization in neural NLP is nonconvex but still useful in practice;
+- implement small optimization algorithms from scratch in Python;
+- use AI tools to audit an optimization setup without treating them as black boxes.
+
+::: {.callout-note}
+## Guiding question
+When an NLP model improves during training, what mathematical object is changing?
+
+The answer is not simply "the model learns language."  More precisely, the parameter vector $\theta$ changes so that a loss function, usually an empirical estimate of an expected negative log-likelihood, becomes smaller on the training distribution.
+:::
+
+## 22.2 The optimization problem behind NLP
+
+Let $z$ denote an NLP input.  Depending on the task, $z$ may be a token, a document, a sentence pair, a prompt, or a sequence prefix.  Let $y$ denote the target.  A model with parameters $\theta \in R^p$ defines either a prediction function
+
+$$
+f_\theta(z)
+$$
+
+or a conditional probability distribution
+
+$$
+p_\theta(y \mid z).
+$$
+
+A loss function measures the cost of a prediction.  In supervised text classification, a common loss is
+
+$$
+\ell(\theta;z,y) = -\log p_\theta(y\mid z).
+$$
+
+Given training data
+
+$$
+D_n = \{(z_i,y_i)\}_{i=1}^n,
+$$
+
+the empirical risk is
+
+$$
+L_n(\theta)=\frac{1}{n}\sum_{i=1}^n \ell(\theta;z_i,y_i).
+$$
+
+Training means solving, approximately,
+
+$$
+\hat \theta \in \arg\min_{\theta \in R^p} L_n(\theta).
+$$
+
+The population risk is
+
+$$
+L(\theta)=E_{(Z,Y)\sim P}\left[\ell(\theta;Z,Y)\right],
+$$
+
+where $P$ is the data-generating distribution.  Since $P$ is unknown, the empirical risk $L_n$ is used as an estimate.
+
+::: {.math-card}
+**Optimization viewpoint.**  NLP training is the numerical problem of minimizing $L_n(\theta)$, but statistical learning is about whether small $L_n(\theta)$ also implies small $L(\theta)$.
+:::
+
+## 22.3 Token-level losses for language models
+
+For autoregressive language modeling, a training sequence is
+
+$$
+w_{1:T}=(w_1,\ldots,w_T).
+$$
+
+The model defines next-token probabilities
+
+$$
+p_\theta(w_t\mid w_{<t}).
+$$
+
+The negative log-likelihood for one sequence is
+
+$$
+\ell(\theta;w_{1:T})
+= -\sum_{t=1}^T \log p_\theta(w_t\mid w_{<t}).
+$$
+
+For a corpus with sequences $w^{(1)},\ldots,w^{(n)}$, the average token-level loss is
+
+$$
+L_n(\theta)
+= -\frac{1}{N}\sum_{i=1}^n\sum_{t=1}^{T_i}
+\log p_\theta\left(w_t^{(i)}\mid w_{<t}^{(i)}\right),
+$$
+
+where
+
+$$
+N = \sum_{i=1}^n T_i.
+$$
+
+The corresponding perplexity is
+
+$$
+\operatorname{PPL}(\theta)=\exp(L_n(\theta))
+$$
+
+when the loss uses natural logarithms.
+
+This gives a direct connection between optimization and language modeling:
+
+> Lower training loss means the model assigns higher probability to the observed tokens under teacher forcing.
+
+## 22.4 Softmax cross-entropy and its gradient
+
+Many NLP objectives end with a softmax.  Suppose a model produces logits
+
+$$
+z = (z_1,\ldots,z_K) \in R^K.
+$$
+
+The softmax probabilities are
+
+$$
+p_j = \frac{\exp(z_j)}{\sum_{k=1}^K \exp(z_k)}.
+$$
+
+For a one-hot target vector $e_y$, the cross-entropy loss is
+
+$$
+\ell(z,y)=-\log p_y.
+$$
+
+Equivalently,
+
+$$
+\ell(z,y)= -z_y + \log\left(\sum_{k=1}^K \exp(z_k)\right).
+$$
+
+Differentiating gives the fundamental gradient identity
+
+$$
+\frac{\partial \ell}{\partial z_j}=p_j-1_{j=y}.
+$$
+
+In vector form,
+
+$$
+\nabla_z \ell = p-e_y.
+$$
+
+This identity appears throughout NLP:
+
+- in text classifiers;
+- in masked language models;
+- in next-token prediction;
+- in instruction tuning;
+- in preference losses after reduction to logits.
+
+::: {.callout-tip}
+## Interpretation
+The gradient $p-e_y$ says: decrease the logit of classes assigned too much probability and increase the logit of the correct class.  The size of the correction depends on the model's current probability error.
+:::
+
+## 22.5 From logits to parameter gradients
+
+Let the logits depend on parameters $\theta$ through a differentiable map
+
+$$
+z=f_\theta(x).
+$$
+
+The chain rule gives
+
+$$
+\nabla_\theta \ell(\theta;x,y)
+= J_\theta f_\theta(x)^T (p-e_y),
+$$
+
+where $J_\theta f_\theta(x)$ is the Jacobian of the logits with respect to the parameters.
+
+For a linear softmax classifier,
+
+$$
+z = Wh+b,
+$$
+
+where $h \in R^d$, $W \in R^{K\times d}$, and $b \in R^K$.  Then
+
+$$
+\nabla_W \ell = (p-e_y)h^T,
+$$
+
+$$
+\nabla_b \ell = p-e_y,
+$$
+
+and
+
+$$
+\nabla_h \ell = W^T(p-e_y).
+$$
+
+This small calculation is the local building block of backpropagation.
+
+## 22.6 Gradient descent
+
+Gradient descent updates parameters by moving in the direction of steepest local decrease:
+
+$$
+\theta_{k+1}=\theta_k - \eta_k \nabla L_n(\theta_k),
+$$
+
+where $\eta_k>0$ is the learning rate.
+
+For a quadratic loss
+
+$$
+L(\theta)=\frac{1}{2}\theta^T A \theta - b^T \theta,
+$$
+
+with $A$ symmetric positive definite, the gradient is
+
+$$
+\nabla L(\theta)=A \theta-b.
+$$
+
+Gradient descent converges when the learning rate is small enough.  If $\lambda_{\max}(A)$ is the largest eigenvalue of $A$, then a constant learning rate satisfying
+
+$$
+0<\eta<\frac{2}{\lambda_{\max}(A)}
+$$
+
+ensures convergence for this quadratic problem.
+
+This idealized result matters because neural-network losses are locally approximated by quadratic functions through Taylor expansion:
+
+$$
+L(\theta+u)\approx L(\theta)+\nabla L(\theta)^T u + \frac{1}{2}u^T H(\theta)u.
+$$
+
+Large curvature directions require smaller steps.
+
+## 22.7 Stochastic gradients
+
+For large NLP corpora, the full gradient
+
+$$
+\nabla L_n(\theta)=\frac{1}{n}\sum_{i=1}^n \nabla \ell(\theta;z_i,y_i)
+$$
+
+is expensive.  Mini-batch stochastic gradient descent uses a random subset $B_k\subset \{1,\ldots,n\}$:
+
+$$
+g_k=\frac{1}{|B_k|}\sum_{i\in B_k}\nabla \ell(\theta_k;z_i,y_i).
+$$
+
+If the mini-batch is sampled uniformly, then
+
+$$
+E[g_k\mid \theta_k]=\nabla L_n(\theta_k).
+$$
+
+Thus $g_k$ is an unbiased estimator of the full gradient.  Its variance decreases as the batch size increases.  Under idealized independent sampling,
+
+$$
+\operatorname{Var}(g_k)\approx \frac{1}{B}\Sigma(\theta_k),
+$$
+
+where $B=|B_k|$ and $\Sigma(\theta_k)$ is the covariance matrix of per-example gradients.
+
+The SGD update is
+
+$$
+\theta_{k+1}=\theta_k-\eta_k g_k.
+$$
+
+::: {.math-card}
+**Statistical view of SGD.** SGD replaces an exact derivative by a noisy but cheaper estimator.  The learning rate controls how much of this noise is converted into parameter motion.
+:::
+
+## 22.8 Learning rate as a scale parameter
+
+The learning rate is not merely a software option.  It determines the scale of parameter movement:
+
+$$
+\|\theta_{k+1}-\theta_k\| = \eta_k \|g_k\|.
+$$
+
+If $\eta_k$ is too small, learning is slow.  If it is too large, the iterates may oscillate or diverge.  In neural NLP, useful learning-rate schedules often include:
+
+1. **warmup**, where the learning rate increases gradually at the beginning;
+2. **constant phase**, where the learning rate remains approximately stable;
+3. **decay**, where the learning rate decreases to refine the solution.
+
+A simple inverse-square-root schedule is
+
+$$
+\eta_k = c\min\{k^{-1/2}, k w^{-3/2}\},
+$$
+
+where $w$ is the warmup length.  A cosine decay schedule is
+
+$$
+\eta_k = \eta_{\min}
++\frac{1}{2}(\eta_{\max}-\eta_{\min})
+\left(1+\cos\left(\frac{\pi k}{K}\right)\right).
+$$
+
+The mathematical purpose of a schedule is to balance exploration and stabilization.
+
+## 22.9 Momentum
+
+Momentum keeps a running average of past gradients:
+
+$$
+v_{k+1}=\mu v_k + g_k,
+$$
+
+$$
+\theta_{k+1}=\theta_k-\eta v_{k+1},
+$$
+
+where $0\leq \mu <1$.  When gradients point in a consistent direction, momentum accelerates movement.  When gradients oscillate, momentum can average out some oscillation.
+
+For a long sequence of gradients, the velocity is
+
+$$
+v_{k+1}=g_k+\mu g_{k-1}+\mu^2 g_{k-2}+\cdots.
+$$
+
+Thus momentum is an exponentially weighted history of gradients.
+
+## 22.10 Adaptive methods: AdaGrad, RMSProp, and Adam
+
+NLP models often have sparse or highly uneven gradients.  Some parameters update frequently; others update rarely.  Adaptive methods rescale coordinates based on historical gradient magnitudes.
+
+### AdaGrad
+
+AdaGrad accumulates squared gradients coordinatewise:
+
+$$
+s_{k+1}=s_k+g_k\odot g_k,
+$$
+
+$$
+\theta_{k+1}=\theta_k-\eta \frac{g_k}{\sqrt{s_{k+1}}+\epsilon}.
+$$
+
+Coordinates with large accumulated gradients receive smaller future steps.
+
+### RMSProp
+
+RMSProp uses an exponential moving average instead of a cumulative sum:
+
+$$
+s_{k+1}=\rho s_k+(1-\rho)(g_k\odot g_k),
+$$
+
+$$
+\theta_{k+1}=\theta_k-\eta \frac{g_k}{\sqrt{s_{k+1}}+\epsilon}.
+$$
+
+### Adam
+
+Adam combines momentum and coordinatewise scaling:
+
+$$
+m_{k+1}=\beta_1 m_k+(1-\beta_1)g_k,
+$$
+
+$$
+v_{k+1}=\beta_2 v_k+(1-\beta_2)(g_k\odot g_k).
+$$
+
+Bias-corrected estimates are
+
+$$
+\hat m_{k+1}=\frac{m_{k+1}}{1-\beta_1^{k+1}},
+\qquad
+\hat v_{k+1}=\frac{v_{k+1}}{1-\beta_2^{k+1}}.
+$$
+
+The update is
+
+$$
+\theta_{k+1}=\theta_k-\eta\frac{\hat m_{k+1}}{\sqrt{\hat v_{k+1}}+\epsilon}.
+$$
+
+Adam is popular in neural NLP because it handles noisy, high-dimensional, and unevenly scaled gradients well.
+
+## 22.11 Weight decay and AdamW
+
+A common regularized objective is
+
+$$
+L_{\lambda}(\theta)=L_n(\theta)+\frac{\lambda}{2}\|\theta\|_2^2.
+$$
+
+For ordinary gradient descent, this gives
+
+$$
+\theta_{k+1}
+=\theta_k-\eta \left(\nabla L_n(\theta_k)+\lambda \theta_k\right)
+=(1-\eta\lambda)\theta_k-\eta\nabla L_n(\theta_k).
+$$
+
+The regularizer shrinks parameters toward zero.
+
+For adaptive optimizers, directly adding $\lambda \theta$ to the gradient interacts with coordinatewise scaling.  AdamW decouples weight decay from the adaptive gradient step:
+
+$$
+\theta_{k+1}
+=(1-\eta\lambda)\theta_k
+-\eta\frac{\hat m_{k+1}}{\sqrt{\hat v_{k+1}}+\epsilon}.
+$$
+
+This is often a cleaner implementation of shrinkage for Transformer models.
+
+## 22.12 Gradient clipping
+
+RNNs and Transformers can produce very large gradients.  Gradient clipping limits the step size by replacing $g$ with
+
+$$
+\tilde g = g\min\left\{1,\frac{c}{\|g\|}\right\}.
+$$
+
+If $\|g\|\leq c$, then $\tilde g=g$.  If $\|g\|>c$, then $\|\tilde g\|=c$.
+
+Clipping is not the same as fixing the model.  It is a numerical stabilization method.  It prevents one unusually large mini-batch gradient from causing a destructive update.
+
+## 22.13 Optimization and generalization
+
+Optimization minimizes training loss, but the goal is usually good performance on new data.  A model with very low empirical risk can still have high population risk if it overfits.
+
+Important sources of implicit or explicit regularization include:
+
+- weight decay;
+- dropout;
+- early stopping;
+- data augmentation;
+- label smoothing;
+- small-batch gradient noise;
+- learning-rate schedules;
+- architecture constraints;
+- parameter-efficient fine-tuning.
+
+From a statistical point of view, the optimizer is part of the learning algorithm.  Two optimizers can reach different solutions with similar training losses but different generalization behavior.
+
+## 22.14 Nonconvexity in neural NLP
+
+Linear regression with squared loss is convex.  Logistic regression is convex in its parameters.  Neural NLP models are typically nonconvex because they are compositions of many nonlinear maps:
+
+$$
+f_\theta = f_L\circ f_{L-1}\circ \cdots \circ f_1.
+$$
+
+The loss surface may contain many critical points where
+
+$$
+\nabla L_n(\theta)=0.
+$$
+
+These can be local minima, saddle points, or flat regions.  In high-dimensional neural networks, saddle points and nearly flat valleys are especially important.
+
+A second-order Taylor approximation near $\theta$ is
+
+$$
+L_n(\theta+u)
+\approx L_n(\theta)+\nabla L_n(\theta)^Tu+\frac{1}{2}u^T H(\theta)u.
+$$
+
+The Hessian eigenvalues describe local curvature.  Large positive eigenvalues indicate sharp directions.  Small eigenvalues indicate flat directions.  Negative eigenvalues indicate directions of local decrease.
+
+In modern NLP, the parameter dimension $p$ is often much larger than the number of human-interpretable modeling choices.  Therefore optimization analysis focuses less on finding the unique global minimizer and more on stability, scaling, gradient quality, and generalization.
+
+## 22.15 Numerical stability
+
+Optimization can fail because of numerical issues, not because the mathematical model is conceptually wrong.  Common stability tricks include:
+
+### Stable log-sum-exp
+
+Instead of computing
+
+$$
+\log\sum_j \exp(z_j),
+$$
+
+use
+
+$$
+m + \log\sum_j \exp(z_j-m),
+\qquad m=\max_j z_j.
+$$
+
+This avoids overflow when logits are large.
+
+### Loss masks
+
+For padded sequences, the loss should ignore padding tokens.  If $M_{i,t}\in\{0,1\}$ is a mask, then
+
+$$
+L(\theta)=
+-\frac{1}{\sum_{i,t} M_{i,t}}
+\sum_{i,t} M_{i,t}
+\log p_\theta(w_{i,t}\mid w_{i,<t}).
+$$
+
+### Mixed precision
+
+Large models often use lower precision arithmetic to save memory and increase speed.  This introduces a tradeoff between numerical efficiency and stability.  Loss scaling and careful normalization help prevent underflow and overflow.
+
+## 22.16 Interactive: optimization dynamics
+
+The following interactive compares gradient descent, momentum, and Adam on a two-dimensional quadratic loss
+
+$$
+L(x,y)=\frac{1}{2}(a x^2+b y^2).
+$$
+
+The parameter $b/a$ controls the condition number.  A large condition number creates a narrow valley, where plain gradient descent may zigzag.
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: Optimization dynamics on a quadratic loss</h3>
+  <p>
+    Move the sliders to change the learning rate and the condition number.  The plot shows the parameter path from the same starting point for gradient descent, momentum, and Adam.
+  </p>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; align-items:end;">
+    <label>Learning rate:
+      <input id="ch22-lr" type="range" min="0.01" max="1.20" step="0.01" value="0.18" style="width:100%;">
+      <span id="ch22-lr-label">0.18</span>
+    </label>
+    <label>Condition number b/a:
+      <input id="ch22-cond" type="range" min="1" max="40" step="1" value="12" style="width:100%;">
+      <span id="ch22-cond-label">12</span>
+    </label>
+    <label>Momentum beta:
+      <input id="ch22-beta" type="range" min="0.00" max="0.98" step="0.01" value="0.80" style="width:100%;">
+      <span id="ch22-beta-label">0.80</span>
+    </label>
+    <label>Iterations:
+      <input id="ch22-steps" type="range" min="5" max="80" step="1" value="35" style="width:100%;">
+      <span id="ch22-steps-label">35</span>
+    </label>
+  </div>
+
+  <div id="ch22-status" class="plotly-status">Loading local Plotly...</div>
+  <div id="ch22-path-plot" class="plotly-demo"></div>
+  <div id="ch22-loss-plot" class="plotly-demo"></div>
+  <pre id="ch22-summary" style="white-space:pre-wrap;"></pre>
+</div>
+
+<script>
+(function() {
+  function loadPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    const candidates = [
+      "../assets/plotly.min.js",
+      "assets/plotly.min.js",
+      "./assets/plotly.min.js"
+    ];
+    let i = 0;
+    function tryNext() {
+      if (window.Plotly) {
+        callback();
+        return;
+      }
+      if (i >= candidates.length) {
+        const status = document.getElementById("ch22-status");
+        if (status) {
+          status.textContent = "Plotly.js was not available, so the interactive figure could not be drawn. Check that assets/plotly.min.js exists in the rendered site.";
+        }
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = candidates[i++];
+      script.onload = function() { callback(); };
+      script.onerror = tryNext;
+      document.head.appendChild(script);
+    }
+    tryNext();
+  }
+
+  function loss(point, a, b) {
+    return 0.5 * (a * point[0] * point[0] + b * point[1] * point[1]);
+  }
+
+  function grad(point, a, b) {
+    return [a * point[0], b * point[1]];
+  }
+
+  function runGD(lr, steps, a, b) {
+    let p = [2.8, 2.2];
+    const path = [[p[0], p[1]]];
+    const losses = [loss(p, a, b)];
+    for (let k = 0; k < steps; k++) {
+      const g = grad(p, a, b);
+      p = [p[0] - lr * g[0], p[1] - lr * g[1]];
+      path.push([p[0], p[1]]);
+      losses.push(loss(p, a, b));
+      if (!Number.isFinite(losses[losses.length - 1]) || losses[losses.length - 1] > 1e8) break;
+    }
+    return {path: path, losses: losses};
+  }
+
+  function runMomentum(lr, beta, steps, a, b) {
+    let p = [2.8, 2.2];
+    let v = [0, 0];
+    const path = [[p[0], p[1]]];
+    const losses = [loss(p, a, b)];
+    for (let k = 0; k < steps; k++) {
+      const g = grad(p, a, b);
+      v = [beta * v[0] + g[0], beta * v[1] + g[1]];
+      p = [p[0] - lr * v[0], p[1] - lr * v[1]];
+      path.push([p[0], p[1]]);
+      losses.push(loss(p, a, b));
+      if (!Number.isFinite(losses[losses.length - 1]) || losses[losses.length - 1] > 1e8) break;
+    }
+    return {path: path, losses: losses};
+  }
+
+  function runAdam(lr, steps, a, b) {
+    let p = [2.8, 2.2];
+    let m = [0, 0];
+    let v = [0, 0];
+    const beta1 = 0.9;
+    const beta2 = 0.99;
+    const eps = 1e-8;
+    const path = [[p[0], p[1]]];
+    const losses = [loss(p, a, b)];
+    for (let k = 0; k < steps; k++) {
+      const g = grad(p, a, b);
+      m = [beta1 * m[0] + (1 - beta1) * g[0], beta1 * m[1] + (1 - beta1) * g[1]];
+      v = [beta2 * v[0] + (1 - beta2) * g[0] * g[0], beta2 * v[1] + (1 - beta2) * g[1] * g[1]];
+      const mh = [m[0] / (1 - Math.pow(beta1, k + 1)), m[1] / (1 - Math.pow(beta1, k + 1))];
+      const vh = [v[0] / (1 - Math.pow(beta2, k + 1)), v[1] / (1 - Math.pow(beta2, k + 1))];
+      p = [p[0] - lr * mh[0] / (Math.sqrt(vh[0]) + eps), p[1] - lr * mh[1] / (Math.sqrt(vh[1]) + eps)];
+      path.push([p[0], p[1]]);
+      losses.push(loss(p, a, b));
+      if (!Number.isFinite(losses[losses.length - 1]) || losses[losses.length - 1] > 1e8) break;
+    }
+    return {path: path, losses: losses};
+  }
+
+  function makeContour(a, b) {
+    const xs = [];
+    const ys = [];
+    const z = [];
+    for (let i = 0; i <= 40; i++) xs.push(-3 + 6 * i / 40);
+    for (let j = 0; j <= 40; j++) ys.push(-3 + 6 * j / 40);
+    for (let j = 0; j < ys.length; j++) {
+      const row = [];
+      for (let i = 0; i < xs.length; i++) row.push(0.5 * (a * xs[i] * xs[i] + b * ys[j] * ys[j]));
+      z.push(row);
+    }
+    return {x: xs, y: ys, z: z, type: "contour", showscale: false, contours: {coloring: "lines"}, name: "loss contours"};
+  }
+
+  function initCh22() {
+    const status = document.getElementById("ch22-status");
+    const lr = document.getElementById("ch22-lr");
+    const cond = document.getElementById("ch22-cond");
+    const beta = document.getElementById("ch22-beta");
+    const steps = document.getElementById("ch22-steps");
+    const summary = document.getElementById("ch22-summary");
+    if (!lr || !cond || !beta || !steps || !window.Plotly) return;
+    if (status) status.textContent = "";
+
+    function update() {
+      const eta = parseFloat(lr.value);
+      const kappa = parseFloat(cond.value);
+      const mu = parseFloat(beta.value);
+      const K = parseInt(steps.value, 10);
+      document.getElementById("ch22-lr-label").textContent = eta.toFixed(2);
+      document.getElementById("ch22-cond-label").textContent = kappa.toFixed(0);
+      document.getElementById("ch22-beta-label").textContent = mu.toFixed(2);
+      document.getElementById("ch22-steps-label").textContent = String(K);
+
+      const a = 1.0;
+      const b = kappa;
+      const gd = runGD(eta, K, a, b);
+      const mom = runMomentum(eta, mu, K, a, b);
+      const adam = runAdam(eta, K, a, b);
+
+      function pathTrace(obj, name) {
+        return {
+          x: obj.path.map(p => p[0]),
+          y: obj.path.map(p => p[1]),
+          mode: "lines+markers",
+          type: "scatter",
+          name: name
+        };
+      }
+
+      Plotly.react("ch22-path-plot", [
+        makeContour(a, b),
+        pathTrace(gd, "gradient descent"),
+        pathTrace(mom, "momentum"),
+        pathTrace(adam, "Adam")
+      ], {
+        title: "Parameter paths on the loss surface",
+        xaxis: {title: "x", range: [-3, 3]},
+        yaxis: {title: "y", range: [-3, 3]},
+        margin: {t: 50, r: 20, b: 50, l: 50}
+      }, {responsive: true});
+
+      function lossTrace(obj, name) {
+        return {x: obj.losses.map((_, i) => i), y: obj.losses, mode: "lines+markers", type: "scatter", name: name};
+      }
+
+      Plotly.react("ch22-loss-plot", [
+        lossTrace(gd, "gradient descent"),
+        lossTrace(mom, "momentum"),
+        lossTrace(adam, "Adam")
+      ], {
+        title: "Loss versus iteration",
+        xaxis: {title: "iteration"},
+        yaxis: {title: "loss", type: "log", autorange: true},
+        margin: {t: 50, r: 20, b: 50, l: 60}
+      }, {responsive: true});
+
+      const gdLast = gd.losses[gd.losses.length - 1];
+      const momLast = mom.losses[mom.losses.length - 1];
+      const adamLast = adam.losses[adam.losses.length - 1];
+      const stableLimit = 2 / kappa;
+      summary.textContent =
+        "For this quadratic, plain gradient descent is stable only roughly when eta < 2 / lambda_max = " + stableLimit.toFixed(3) + ".\n" +
+        "Final losses after " + K + " iterations:\n" +
+        "  GD:       " + gdLast.toExponential(3) + "\n" +
+        "  Momentum: " + momLast.toExponential(3) + "\n" +
+        "  Adam:     " + adamLast.toExponential(3);
+    }
+
+    [lr, cond, beta, steps].forEach(node => node.addEventListener("input", update));
+    update();
+  }
+
+  function ready(callback) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback);
+    } else {
+      callback();
+    }
+  }
+
+  ready(function() { loadPlotly(initCh22); });
+})();
+</script>
+```
+
+## 22.17 Python example: softmax regression gradient
+
+This example derives and checks the gradient for a small text classifier.  The model is
+
+$$
+z_i = W x_i + b,
+\qquad
+p_i=\operatorname{softmax}(z_i),
+$$
+
+with average cross-entropy loss.
+
+```{python}
+import numpy as np
+
+rng = np.random.default_rng(7243)
+
+X = np.array([
+    [2, 1, 0, 0],
+    [1, 2, 0, 0],
+    [0, 0, 2, 1],
+    [0, 0, 1, 2],
+    [1, 0, 1, 0],
+    [0, 1, 0, 1]
+], dtype=float)
+y = np.array([0, 0, 1, 1, 0, 1])
+K = 2
+n, d = X.shape
+
+W = rng.normal(scale=0.1, size=(K, d))
+b = np.zeros(K)
+
+def softmax_rows(Z):
+    Z_shift = Z - Z.max(axis=1, keepdims=True)
+    expZ = np.exp(Z_shift)
+    return expZ / expZ.sum(axis=1, keepdims=True)
+
+def loss_and_grad(W, b, X, y):
+    n = X.shape[0]
+    Z = X @ W.T + b
+    P = softmax_rows(Z)
+    loss = -np.mean(np.log(P[np.arange(n), y]))
+    G = P.copy()
+    G[np.arange(n), y] -= 1.0
+    G /= n
+    grad_W = G.T @ X
+    grad_b = G.sum(axis=0)
+    return loss, grad_W, grad_b
+
+loss, grad_W, grad_b = loss_and_grad(W, b, X, y)
+print("loss:", round(loss, 6))
+print("grad_W shape:", grad_W.shape)
+print("grad_b:", np.round(grad_b, 6))
+```
+
+The shapes are important:
+
+$$
+X\in R^{n\times d},
+\qquad
+W\in R^{K\times d},
+\qquad
+\nabla_W L\in R^{K\times d}.
+$$
+
+## 22.18 Python example: finite-difference gradient check
+
+A gradient check compares an analytic derivative with a numerical approximation:
+
+$$
+\frac{\partial L}{\partial \theta_j}
+\approx
+\frac{L(\theta+\epsilon e_j)-L(\theta-\epsilon e_j)}{2\epsilon}.
+$$
+
+```{python}
+eps = 1e-5
+j, k = 0, 2
+W_plus = W.copy()
+W_minus = W.copy()
+W_plus[j, k] += eps
+W_minus[j, k] -= eps
+loss_plus, _, _ = loss_and_grad(W_plus, b, X, y)
+loss_minus, _, _ = loss_and_grad(W_minus, b, X, y)
+finite_difference = (loss_plus - loss_minus) / (2 * eps)
+analytic = grad_W[j, k]
+
+print("finite difference:", round(finite_difference, 8))
+print("analytic gradient:", round(analytic, 8))
+print("absolute error:", abs(finite_difference - analytic))
+```
+
+Gradient checking is useful when writing custom training code.  It is too expensive for normal training, but it is excellent for debugging.
+
+## 22.19 Python example: GD, momentum, and Adam on a quadratic
+
+The next example mirrors the interactive figure.
+
+```{python}
+import numpy as np
+
+A = np.diag([1.0, 20.0])
+
+def quad_loss(theta):
+    return 0.5 * theta @ A @ theta
+
+def quad_grad(theta):
+    return A @ theta
+
+def optimize(method="gd", lr=0.08, steps=60, beta=0.9):
+    theta = np.array([2.8, 2.2], dtype=float)
+    path = [theta.copy()]
+    losses = [quad_loss(theta)]
+    m = np.zeros_like(theta)
+    v = np.zeros_like(theta)
+    beta1, beta2 = 0.9, 0.99
+    eps = 1e-8
+    for t in range(1, steps + 1):
+        g = quad_grad(theta)
+        if method == "gd":
+            theta = theta - lr * g
+        elif method == "momentum":
+            m = beta * m + g
+            theta = theta - lr * m
+        elif method == "adam":
+            m = beta1 * m + (1 - beta1) * g
+            v = beta2 * v + (1 - beta2) * (g * g)
+            m_hat = m / (1 - beta1 ** t)
+            v_hat = v / (1 - beta2 ** t)
+            theta = theta - lr * m_hat / (np.sqrt(v_hat) + eps)
+        path.append(theta.copy())
+        losses.append(quad_loss(theta))
+    return np.array(path), np.array(losses)
+
+for method in ["gd", "momentum", "adam"]:
+    path, losses = optimize(method=method)
+    print(f"{method:8s} final theta = {np.round(path[-1], 4)}, final loss = {losses[-1]:.6f}")
+```
+
+A quadratic example is simple, but it teaches three practical lessons:
+
+1. curvature affects stable step sizes;
+2. momentum can reduce zigzagging;
+3. adaptive scaling can help when coordinates have very different curvature.
+
+## 22.20 Python example: mini-batch gradient noise
+
+Mini-batch gradients are random estimates of the full gradient.  The variance decreases with batch size.
+
+```{python}
+rng = np.random.default_rng(2026)
+N = 1000
+true_grad = np.array([1.0, -0.5, 0.25])
+per_example_grads = true_grad + rng.normal(scale=[2.0, 1.0, 0.5], size=(N, 3))
+full_grad = per_example_grads.mean(axis=0)
+
+for B in [1, 4, 16, 64, 256]:
+    estimates = []
+    for _ in range(500):
+        idx = rng.choice(N, size=B, replace=False)
+        estimates.append(per_example_grads[idx].mean(axis=0))
+    estimates = np.array(estimates)
+    avg_error_norm = np.linalg.norm(estimates - full_grad, axis=1).mean()
+    print(f"batch size {B:3d}: mean gradient-estimation error norm = {avg_error_norm:.4f}")
+```
+
+Larger batches give more accurate gradient estimates, but they are more expensive and may reduce the useful exploratory noise of SGD.
+
+## 22.21 Python example: gradient clipping
+
+```{python}
+def clip_gradient(g, threshold):
+    norm = np.linalg.norm(g)
+    if norm <= threshold:
+        return g.copy()
+    return g * (threshold / norm)
+
+gradients = [
+    np.array([0.2, -0.1, 0.3]),
+    np.array([5.0, -4.0, 3.0]),
+    np.array([40.0, -20.0, 10.0])
+]
+threshold = 2.0
+
+for g in gradients:
+    clipped = clip_gradient(g, threshold)
+    print("original norm:", round(np.linalg.norm(g), 3),
+          " clipped norm:", round(np.linalg.norm(clipped), 3),
+          " clipped vector:", np.round(clipped, 3))
+```
+
+Clipping preserves direction but changes magnitude when the gradient is too large.
+
+## 22.22 Python example: training a tiny text classifier
+
+The following code trains a softmax classifier using averaged token-count features.  This is not a state-of-the-art NLP model.  Its purpose is to show the complete optimization loop in a transparent way.
+
+```{python}
+from collections import Counter
+import numpy as np
+
+train_texts = [
+    "excellent clear helpful explanation",
+    "useful clear lecture helpful",
+    "confusing unclear poor explanation",
+    "poor confusing lecture unclear",
+    "clear useful examples",
+    "unclear poor examples"
+]
+train_y = np.array([1, 1, 0, 0, 1, 0])
+
+vocab = sorted(set(word for text in train_texts for word in text.split()))
+word_to_id = {w: i for i, w in enumerate(vocab)}
+
+X = np.zeros((len(train_texts), len(vocab)))
+for i, text in enumerate(train_texts):
+    counts = Counter(text.split())
+    for word, count in counts.items():
+        X[i, word_to_id[word]] = count
+    X[i] /= max(1, X[i].sum())
+
+rng = np.random.default_rng(11)
+K, d = 2, X.shape[1]
+W = rng.normal(scale=0.01, size=(K, d))
+b = np.zeros(K)
+
+lr = 0.8
+loss_history = []
+for epoch in range(100):
+    loss, grad_W, grad_b = loss_and_grad(W, b, X, train_y)
+    W -= lr * grad_W
+    b -= lr * grad_b
+    loss_history.append(loss)
+
+P = softmax_rows(X @ W.T + b)
+pred = P.argmax(axis=1)
+print("vocabulary:", vocab)
+print("final loss:", round(loss_history[-1], 4))
+print("predictions:", pred.tolist())
+print("training accuracy:", float(np.mean(pred == train_y)))
+
+weights_for_positive = W[1] - W[0]
+for word, weight in sorted(zip(vocab, weights_for_positive), key=lambda x: -x[1]):
+    print(f"{word:12s} {weight: .3f}")
+```
+
+This example connects optimization with interpretability.  The learned weight difference $W_1-W_0$ gives a linear score direction for the positive class.
+
+## 22.23 AI-assisted learning prompts
+
+Use an AI assistant as a mathematical critic rather than a replacement for derivation.
+
+::: {.callout-tip}
+## Prompt 1: audit an objective
+I am training a text classifier with softmax cross-entropy.  Write the empirical risk $L_n(\theta)$ explicitly, identify the model probabilities, and explain which terms depend on $\theta$.  Then check whether my notation distinguishes logits, probabilities, and labels.
+:::
+
+::: {.callout-tip}
+## Prompt 2: verify a gradient
+Here is my derivation of the softmax cross-entropy gradient.  Check each line and identify the first incorrect equality, if any.  Do not skip dimension checks.
+:::
+
+::: {.callout-tip}
+## Prompt 3: diagnose optimization instability
+My training loss sometimes becomes `nan`.  Give a mathematical checklist involving log-sum-exp, learning rate, gradient norm, loss masking, division by small numbers, and probability clipping.  Separate likely numerical causes from modeling causes.
+:::
+
+::: {.callout-warning}
+## AI caution
+An AI assistant may correctly name Adam or SGD while giving an incomplete formula.  Always ask for the update equations, the role of each hyperparameter, and the dimensions of the quantities involved.
+:::
+
+## 22.24 Common mistakes
+
+1. **Confusing logits and probabilities.**  Softmax converts logits into probabilities.  Cross-entropy should usually be computed using a numerically stable log-softmax.
+2. **Averaging over padding tokens.**  Padding tokens should be masked out of token-level losses.
+3. **Using a learning rate without checking gradient scale.**  The product $\eta\|g\|$ controls step size.
+4. **Assuming smaller training loss means better model.**  Training loss and test performance can move differently.
+5. **Treating Adam as magic.**  Adam rescales coordinates using gradient moments; it still requires learning-rate tuning and regularization.
+6. **Ignoring random variation.**  Mini-batch order, initialization, and hardware can change training trajectories.
+
+## 22.25 Worked calculation
+
+Suppose a three-class model outputs probabilities
+
+$$
+p=(0.20,0.60,0.20)
+$$
+
+and the correct class is class $2$.  With one-hot target
+
+$$
+e_2=(0,1,0),
+$$
+
+the gradient with respect to logits is
+
+$$
+\nabla_z\ell=p-e_2=(0.20,-0.40,0.20).
+$$
+
+If the logit model is $z=Wh+b$ with
+
+$$
+h=(1,2)^T,
+$$
+
+then
+
+$$
+\nabla_W\ell=(p-e_2)h^T
+=
+\begin{pmatrix}
+0.20 \\
+-0.40 \\
+0.20
+\end{pmatrix}
+\begin{pmatrix}
+1 & 2
+\end{pmatrix}
+=
+\begin{pmatrix}
+0.20 & 0.40 \\
+-0.40 & -0.80 \\
+0.20 & 0.40
+\end{pmatrix}.
+$$
+
+Thus gradient descent subtracts a positive multiple of this matrix.  The row for the correct class increases in the direction of $h$, while the rows for incorrect classes decrease in that direction.
+
+## 22.26 Exercises
+
+1. **Softmax gradient.**  Starting from
+   $$
+   \ell(z,y)=-z_y+\log\sum_k \exp(z_k),
+   $$
+   derive $\partial \ell/\partial z_j=p_j-1_{j=y}$.
+
+2. **Linear classifier gradient.**  For $z=Wh+b$, derive $\nabla_W\ell$, $\nabla_b\ell$, and $\nabla_h\ell$.
+
+3. **Learning-rate stability.**  Consider $L(\theta)=\frac{1}{2}\lambda \theta^2$.  Show that gradient descent converges if $0<\eta<2/\lambda$.
+
+4. **Mini-batch variance.**  Suppose per-example gradients have covariance $\Sigma$.  Under independent sampling, show that the mini-batch gradient covariance is approximately $\Sigma/B$.
+
+5. **Gradient clipping.**  Prove that the clipped gradient
+   $$
+   \tilde g=g\min\{1,c/\|g\|\}
+   $$
+   has norm at most $c$.
+
+6. **Adam update.**  Write one full Adam update for the scalar gradient sequence $g_1=2$, $g_2=1$, using $\beta_1=0.9$, $\beta_2=0.99$, and $\epsilon=10^{-8}$.
+
+7. **Loss masking.**  Create a small padded batch of token labels and logits.  Compute the masked average cross-entropy by hand.
+
+8. **Optimization versus generalization.**  Describe an experiment comparing two optimizers that achieve similar training loss but different validation loss.
+
+## 22.27 Mini-project: optimizer comparison for text classification
+
+Build a small text classifier using count vectors, TF-IDF vectors, or learned embeddings.  Compare at least three optimizers:
+
+1. SGD;
+2. SGD with momentum;
+3. Adam or AdamW.
+
+For each optimizer, report:
+
+- training loss curve;
+- validation loss curve;
+- gradient norm curve;
+- final classification metrics;
+- sensitivity to learning rate;
+- an explanation of the observed behavior using the mathematics of this chapter.
+
+The final report should separate three questions:
+
+1. Which optimizer minimized training loss fastest?
+2. Which optimizer gave the best validation performance?
+3. Which optimizer was most stable across random seeds?
+
+## 22.28 Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-22-optimization-for-nlp.ipynb
+```
+
+The lab should be designed for independent study and should include:
+
+- a review of gradients and softmax cross-entropy;
+- implementation of SGD, momentum, RMSProp, Adam, and AdamW from scratch;
+- gradient checking;
+- gradient clipping;
+- training a small text classifier;
+- experiments with batch size and learning-rate schedules;
+- a short AI-assisted debugging activity.
+
+## 22.29 What to remember
+
+- Most NLP training objectives are empirical risks built from negative log-likelihood or cross-entropy.
+- The softmax cross-entropy gradient is $p-e_y$.
+- Backpropagation is repeated use of the chain rule.
+- SGD uses noisy but inexpensive gradient estimates.
+- Momentum averages gradient directions over time.
+- Adam rescales coordinates using first and second gradient moments.
+- AdamW separates weight decay from adaptive gradient scaling.
+- Gradient clipping controls the norm of extreme updates.
+- Optimization performance and statistical generalization are related but not identical.
+- In mathematical NLP, every training run should specify the model, data distribution, loss, optimizer, schedule, and evaluation metric.
+
+## 22.30 Notes and references
+
+Optimization for NLP draws on numerical optimization, stochastic approximation, statistical learning, and deep learning.  For broader background, see @boyd_vandenberghe_2004 for convex optimization, @nocedal_wright_2006 for numerical optimization, @goodfellow_bengio_courville_2016 for deep learning, and @vaswani_attention_2017 for Transformer training context.  Adam was introduced in @kingma_ba_2015, and decoupled weight decay in AdamW is associated with @loshchilov_hutter_2019.

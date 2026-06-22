@@ -1,0 +1,134 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "---\n",
+        "title: \"Python Reference\"\n",
+        "---\n",
+        "\n",
+        "This reference collects Python patterns used throughout the labs.  The goal is to keep code readable and mathematically connected.\n",
+        "\n",
+        "## Core libraries"
+      ],
+      "id": "36be3268"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "import numpy as np\n",
+        "import pandas as pd\n",
+        "import matplotlib.pyplot as plt"
+      ],
+      "id": "326a7380",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Count vectors"
+      ],
+      "id": "7a5299d3"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "vocab = [\"data\", \"language\", \"model\", \"statistics\"]\n",
+        "doc = [\"language\", \"model\", \"model\", \"data\"]\n",
+        "counts = np.array([doc.count(token) for token in vocab])\n",
+        "counts"
+      ],
+      "id": "458cbea9",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Cosine similarity"
+      ],
+      "id": "146929c0"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "def cosine_similarity(x, y):\n",
+        "    x = np.asarray(x, dtype=float)\n",
+        "    y = np.asarray(y, dtype=float)\n",
+        "    denom = np.linalg.norm(x) * np.linalg.norm(y)\n",
+        "    if denom == 0:\n",
+        "        return 0.0\n",
+        "    return float(np.dot(x, y) / denom)"
+      ],
+      "id": "442607c1",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Softmax"
+      ],
+      "id": "bc9a6c41"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "def softmax(z):\n",
+        "    z = np.asarray(z, dtype=float)\n",
+        "    z = z - np.max(z)\n",
+        "    exp_z = np.exp(z)\n",
+        "    return exp_z / exp_z.sum()"
+      ],
+      "id": "2efd0e89",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Scaled dot-product attention"
+      ],
+      "id": "231c9ae3"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "def attention(Q, K, V, mask=None):\n",
+        "    Q = np.asarray(Q, dtype=float)\n",
+        "    K = np.asarray(K, dtype=float)\n",
+        "    V = np.asarray(V, dtype=float)\n",
+        "    d_k = Q.shape[-1]\n",
+        "    scores = Q @ K.T / np.sqrt(d_k)\n",
+        "    if mask is not None:\n",
+        "        scores = scores + mask\n",
+        "    weights = np.apply_along_axis(softmax, 1, scores)\n",
+        "    return weights @ V, weights"
+      ],
+      "id": "18611911",
+      "execution_count": null,
+      "outputs": []
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "python3",
+      "language": "python",
+      "display_name": "Python 3 (ipykernel)",
+      "path": "/Users/he.wang/miniconda3/share/jupyter/kernels/python3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}

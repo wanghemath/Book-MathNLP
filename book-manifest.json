@@ -1,0 +1,51 @@
+{
+  "title": "Mathematical Foundations of Natural Language Processing",
+  "interactive_fix": {
+    "updated_styles": true,
+    "plotly_loaded_in_header": true,
+    "added_chapter_1_interactive": true,
+    "added_interactive_diagnostics_page": true,
+    "js_syntax_checks": [
+      {
+        "file": "chapters/chapter-01-what-is-nlp.qmd",
+        "script": 1,
+        "ok": true
+      },
+      {
+        "file": "chapters/chapter-02-text-tokens-vocabularies.qmd",
+        "script": 1,
+        "ok": true
+      },
+      {
+        "file": "chapters/chapter-03-documents-as-vectors.qmd",
+        "script": 1,
+        "ok": true
+      },
+      {
+        "file": "chapters/chapter-04-probability-and-language.qmd",
+        "script": 1,
+        "ok": true
+      },
+      {
+        "file": "chapters/chapter-05-ngram-language-models.qmd",
+        "script": 1,
+        "ok": true
+      },
+      {
+        "file": "chapters/chapter-06-naive-bayes-text-classification.qmd",
+        "script": 1,
+        "ok": true
+      },
+      {
+        "file": "chapters/chapter-07-vector-space-models.qmd",
+        "script": 1,
+        "ok": true
+      },
+      {
+        "file": "chapters/chapter-08-word-embeddings.qmd",
+        "script": 1,
+        "ok": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+---
+title: "References and Further Reading"
+bibliography: references.bib
+nocite: |
+  @*
+---
+
+This page collects the main references used throughout *Mathematical Foundations of Natural Language Processing*. The list is intentionally broad: it includes classical NLP, probability and information theory, linear algebra and retrieval, neural language models, attention and transformers, retrieval-augmented generation, evaluation, optimization, graph methods, topology, and responsible NLP.
+
+## Core NLP references
+
+For a broad introduction to natural language processing, the most useful starting points are the classical statistical treatment of Manning and Schuetze, the modern textbook by Jurafsky and Martin, the mathematically clear introduction by Eisenstein, and the neural NLP text by Goldberg [@manning_schuetze_1999; @jurafsky_martin_slp3; @eisenstein_2019; @goldberg_2017].
+
+## Probability and information theory
+
+The probability, likelihood, entropy, cross-entropy, KL divergence, and perplexity ideas used throughout the book are rooted in Shannon's communication theory and standard information-theory treatments [@shannon_1948; @cover_thomas_2006; @mackay_2003]. For probabilistic modeling and statistical learning background, see Bishop, Murphy, and Hastie--Tibshirani--Friedman [@bishop_prml_2006; @murphy_probabilistic_2022; @hastie_tibshirani_friedman_2009].
+
+## Vector spaces, retrieval, and document geometry
+
+The document-vector view of language connects vector-space indexing, latent semantic analysis, and probabilistic retrieval [@salton_wong_yang_1975; @deerwester_lsa_1990; @landauer_dumais_1997; @robertson_zaragoza_2009; @manning_ir_2008]. These sources support the chapters on document-term matrices, TF-IDF, cosine similarity, low-rank approximation, and retrieval.
+
+## Tokenization and word embeddings
+
+Subword tokenization is central to modern NLP systems [@sennrich_bpe_2016; @kudo_sentencepiece_2018]. Word representations connect neural prediction, matrix factorization, and distributional semantics [@bengio_neural_2003; @mikolov_word2vec_2013; @mikolov_distributed_2013; @pennington_glove_2014; @levy_neural_2014].
+
+## Sequence models, attention, and transformers
+
+The sequence-modeling arc begins with recurrent networks, LSTM/GRU memory mechanisms, and attention-based encoder-decoder models [@elman_1990; @hochreiter_lstm_1997; @cho_gru_2014; @bahdanau_attention_2015; @luong_attention_2015]. Transformers and large language models build on self-attention, positional structure, pretraining, scaling, and instruction tuning [@vaswani_attention_2017; @devlin_bert_2019; @radford_gpt2_2019; @brown_gpt3_2020; @kaplan_scaling_2020; @ouyang_instructgpt_2022].
+
+## Retrieval-augmented generation and semantic search
+
+The retrieval and RAG chapters use ideas from sentence embeddings, dense retrieval, late interaction, large-scale similarity search, and retrieval-augmented generation [@reimers_sentencebert_2019; @karpukhin_dpr_2020; @khattab_colbert_2020; @johnson_faiss_2019; @lewis_rag_2020].
+
+## Optimization and training
+
+Gradient-based training, stochastic optimization, recurrent-gradient pathologies, Adam, AdamW, and preference-based fine-tuning are supported by the following sources [@goodfellow_deep_learning_2016; @boyd_vandenberghe_2004; @pascanu_gradient_2013; @kingma_adam_2015; @loshchilov_adamw_2019; @christiano_preferences_2017; @rafailov_dpo_2023].
+
+## Evaluation and calibration
+
+The evaluation chapter uses classical overlap metrics, probabilistic scoring, calibration diagnostics, and modern model comparison ideas [@papineni_bleu_2002; @lin_rouge_2004; @brier_1950; @guo_calibration_2017]. These references are not a substitute for task-specific human evaluation, but they provide a mathematical starting point.
+
+## Graphs and topology
+
+Graph-based language models, PageRank, graph neural networks, and graph attention are connected to matrix operators on graphs [@page_pagerank_1999; @kipf_gcn_2017; @hamilton_graphsage_2017; @velickovic_gat_2018]. The topological viewpoint uses computational topology, persistent homology, and Mapper-style summaries [@edelsbrunner_harer_2010; @carlsson_topology_2009; @ghrist_barcodes_2008; @singh_mapper_2007].
+
+## Ethics, bias, and responsibility
+
+The final chapter connects technical NLP modeling with fairness, bias measurement, documentation, and responsible deployment [@barocas_fairness_2019; @dwork_fairness_2012; @hardt_equality_2016; @bolukbasi_debiasing_2016; @caliskan_semantics_2017; @blodgett_bias_2020; @bender_stochastic_2021; @gebru_datasheets_2021; @mitchell_modelcards_2019].
+
+## Bibliography
+
+::: {#refs}
+:::

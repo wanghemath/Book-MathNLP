@@ -1,0 +1,930 @@
+---
+title: "Recurrent Neural Networks"
+subtitle: "Dynamical systems, sequence likelihood, and backpropagation through time"
+---
+
+::: {.chapter-opening}
+A bag-of-words classifier treats a sentence as an unordered collection of tokens.  A recurrent neural network treats a sentence as an ordered sequence.  At each time step, the model reads one token, updates an internal state, and uses that state to make predictions.
+
+Mathematically, an RNN is a parameterized discrete-time dynamical system driven by a sequence of input vectors.  This viewpoint makes the model easier to understand: hidden states are states of a dynamical system, recurrent weights control memory and stability, and backpropagation through time is differentiation through repeated function composition.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. explain why order-sensitive language tasks require sequence models rather than pure bag-of-words models;
+2. write a vanilla RNN as a nonlinear recurrence;
+3. interpret hidden states as summaries of past tokens;
+4. formulate RNNs for sequence classification and language modeling;
+5. derive the negative log-likelihood for an RNN language model;
+6. explain backpropagation through time using products of Jacobian matrices;
+7. connect vanishing and exploding gradients to spectral radius and nonlinear saturation;
+8. implement a small RNN forward pass and training loop in Python;
+9. use an interactive visualization to study recurrent memory and stability.
+
+## 11.1 Why recurrence?
+
+Consider the two short sentences:
+
+$$
+\text{not good}
+\qquad \text{and} \qquad
+\text{good not}.
+$$
+
+A bag-of-words representation records the same two tokens in both cases.  Therefore a bag-of-words model cannot distinguish them.  More generally, count vectors ignore the order of tokens, so they cannot directly represent syntax, negation scope, local dependencies, or temporal structure.
+
+Let $V$ be a vocabulary.  A sentence of length $T$ is an ordered sequence
+
+$$
+x=(x_1,x_2,\ldots,x_T) \in V^T.
+$$
+
+A sequence model should process the tokens in order.  Instead of mapping the full sequence immediately to one fixed vector, it constructs a sequence of hidden states
+
+$$
+h_1,h_2,\ldots,h_T,
+$$
+
+where $h_t$ is intended to summarize the prefix
+
+$$
+(x_1,\ldots,x_t).
+$$
+
+The key modeling idea is recursive summarization:
+
+$$
+\text{new summary}
+=\text{update}(\text{old summary},\text{new token}).
+$$
+
+This is exactly the mathematical structure of a discrete-time dynamical system with external input.
+
+## 11.2 The vanilla RNN as a nonlinear recurrence
+
+Let each token $x_t \in V$ be mapped to an embedding vector
+
+$$
+e_t = E_{x_t} \in \mathbb R^m,
+$$
+
+where $E\in \mathbb R^{d\times m}$ is an embedding matrix and $d=|V|$.
+
+A vanilla RNN defines hidden states $h_t\in \mathbb R^r$ by
+
+$$
+h_t = \phi(W_h h_{t-1}+W_x e_t+b_h),
+\qquad t=1,\ldots,T.
+$$
+
+Here:
+
+- $h_0\in \mathbb R^r$ is an initial state, often the zero vector;
+- $W_h\in \mathbb R^{r\times r}$ is the recurrent weight matrix;
+- $W_x\in \mathbb R^{r\times m}$ maps token embeddings into hidden space;
+- $b_h\in \mathbb R^r$ is a bias vector;
+- $\phi$ is a coordinatewise nonlinearity such as $\tanh$ or ReLU.
+
+A common choice is
+
+$$
+\phi(u)=\tanh(u),
+$$
+
+applied coordinatewise.  Then every coordinate of $h_t$ lies between $-1$ and $1$.
+
+::: {.math-card}
+**Dimension check.**  If $h_{t-1}\in \mathbb R^r$, $e_t\in \mathbb R^m$, $W_h\in \mathbb R^{r\times r}$, and $W_x\in \mathbb R^{r\times m}$, then
+
+$$
+W_hh_{t-1}+W_xe_t+b_h\in \mathbb R^r.
+$$
+
+Therefore $h_t\in \mathbb R^r$.
+:::
+
+The same update rule is applied at every time step.  This **parameter sharing across time** is essential.  It allows the model to process sequences of different lengths and keeps the number of parameters independent of $T$.
+
+## 11.3 The state-space viewpoint
+
+The RNN recurrence can be written as
+
+$$
+h_t = F_\theta(h_{t-1},e_t),
+$$
+
+where
+
+$$
+F_\theta(h,e)=\phi(W_hh+W_xe+b_h).
+$$
+
+This is a controlled dynamical system.  The input sequence $e_1,e_2,\ldots,e_T$ drives the state trajectory
+
+$$
+h_0 \to h_1 \to h_2 \to \cdots \to h_T.
+$$
+
+For language, the hidden state has an information-processing interpretation:
+
+$$
+h_t \approx \text{a vector summary of the prefix } (x_1,\ldots,x_t).
+$$
+
+The hidden state is not guaranteed to contain all information about the prefix.  It is a compressed representation of a possibly long discrete sequence.  The quality of this compression depends on the hidden dimension $r$, the parameters, the nonlinearity, the training data, and the task.
+
+::: {.math-card}
+**RNN as learned sufficient statistic.**  In ideal probabilistic modeling, one might want a statistic $S_t=S(x_1,\ldots,x_t)$ such that the future depends on the past only through $S_t$.  An RNN attempts to learn a finite-dimensional vector $h_t$ that plays this role for a prediction task.
+:::
+
+## 11.4 Output maps: many-to-one and many-to-many models
+
+The hidden states can be used in different ways.
+
+### Sequence classification
+
+For sentiment classification, topic classification, or spam detection, the input is a sequence and the output is one label.  A common model uses only the final hidden state:
+
+$$
+z = W_o h_T+b_o,
+$$
+
+$$
+\widehat p(y\mid x)=\operatorname{softmax}(z).
+$$
+
+This is called a **many-to-one** model because many input tokens produce one output label.
+
+The loss for one training example $(x,y)$ is cross-entropy:
+
+$$
+\ell(\theta;x,y)
+= -\log \widehat p(y\mid x).
+$$
+
+### Sequence labeling
+
+For part-of-speech tagging or named-entity recognition, the model predicts a label at each time step:
+
+$$
+z_t = W_o h_t+b_o,
+$$
+
+$$
+\widehat p(y_t\mid x_1,\ldots,x_t)=\operatorname{softmax}(z_t).
+$$
+
+This is a **many-to-many** model.
+
+### Language modeling
+
+For next-token prediction, the model uses the prefix hidden state to predict the next token:
+
+$$
+\widehat p(x_{t+1}=j\mid x_1,\ldots,x_t)
+= \operatorname{softmax}(W_o h_t+b_o)_j.
+$$
+
+The RNN language model estimates the conditional distribution
+
+$$
+P(X_{t+1}\mid X_1,\ldots,X_t).
+$$
+
+This is the recurrent analogue of the $n$-gram models from Chapter 5.  An $n$-gram model keeps a finite symbolic context.  An RNN keeps a finite-dimensional learned vector context.
+
+## 11.5 RNN language-model likelihood
+
+Let a training sequence be
+
+$$
+x=(x_1,x_2,\ldots,x_T).
+$$
+
+A language model assigns probability using the chain rule:
+
+$$
+P_\theta(x_1,\ldots,x_T)
+=\prod_{t=1}^T P_\theta(x_t\mid x_1,\ldots,x_{t-1}).
+$$
+
+In an RNN language model, the conditional probability is computed from the previous hidden state:
+
+$$
+p_t=\operatorname{softmax}(W_oh_{t-1}+b_o),
+$$
+
+$$
+P_\theta(x_t=j\mid x_1,\ldots,x_{t-1})=(p_t)_j.
+$$
+
+The hidden state is then updated using the observed token $x_t$:
+
+$$
+h_t=\phi(W_hh_{t-1}+W_xE_{x_t}+b_h).
+$$
+
+The negative log-likelihood is
+
+$$
+L(\theta;x)
+=
+-\sum_{t=1}^T \log (p_t)_{x_t}.
+$$
+
+The average token-level cross-entropy is
+
+$$
+\operatorname{CE}(\theta;x)
+=\frac{1}{T}L(\theta;x),
+$$
+
+and the perplexity is
+
+$$
+\operatorname{PPL}(\theta;x)
+=\exp(\operatorname{CE}(\theta;x)).
+$$
+
+Thus training an RNN language model is maximum likelihood estimation, or equivalently empirical risk minimization with cross-entropy loss.
+
+## 11.6 Unrolling the recurrence
+
+For a fixed sequence length $T$, the recurrent computation can be unrolled into a deep feedforward network with shared weights.
+
+For example,
+
+$$
+h_1=F_\theta(h_0,e_1),
+$$
+
+$$
+h_2=F_\theta(h_1,e_2)=F_\theta(F_\theta(h_0,e_1),e_2),
+$$
+
+and so on.  Therefore
+
+$$
+h_T=F_\theta(F_\theta(\cdots F_\theta(h_0,e_1)\cdots,e_{T-1}),e_T).
+$$
+
+The same parameters occur at every layer of this unrolled network.  This is why training RNNs is similar to training deep networks, but with additional weight sharing.
+
+For sequence classification, the loss may depend only on $h_T$.  For language modeling, the loss depends on many hidden states:
+
+$$
+L=\sum_{t=1}^T \ell_t(h_{t-1}).
+$$
+
+In both cases, gradients must flow backward through the entire chain of recurrent updates.
+
+## 11.7 Backpropagation through time
+
+Backpropagation through time, or **BPTT**, is ordinary backpropagation applied to the unrolled recurrent computation graph.
+
+To see the main issue, consider how the final state depends on an earlier state.  By the chain rule,
+
+$$
+\frac{\partial h_T}{\partial h_t}
+=
+\frac{\partial h_T}{\partial h_{T-1}}
+\frac{\partial h_{T-1}}{\partial h_{T-2}}
+\cdots
+\frac{\partial h_{t+1}}{\partial h_t}.
+$$
+
+For the vanilla RNN,
+
+$$
+h_s=\phi(a_s),
+\qquad
+ a_s=W_hh_{s-1}+W_xe_s+b_h.
+$$
+
+The one-step Jacobian is
+
+$$
+J_s
+=
+\frac{\partial h_s}{\partial h_{s-1}}
+=
+D_s W_h,
+$$
+
+where
+
+$$
+D_s=\operatorname{diag}(\phi'(a_s)).
+$$
+
+Therefore
+
+$$
+\frac{\partial h_T}{\partial h_t}
+=
+J_TJ_{T-1}\cdots J_{t+1}.
+$$
+
+This product of many matrices is the central mathematical source of vanishing and exploding gradients.
+
+::: {.math-card}
+**Gradient stability.**  If the norms of the Jacobians are typically less than $1$, products shrink rapidly.  If they are typically greater than $1$, products may grow rapidly.  Long-range learning in vanilla RNNs is difficult because gradients involve long products of Jacobian matrices.
+:::
+
+## 11.8 Vanishing and exploding gradients
+
+Suppose, as a simplified model, that the nonlinear derivative is approximately constant and
+
+$$
+J_s \approx J.
+$$
+
+Then
+
+$$
+J_TJ_{T-1}\cdots J_{t+1}\approx J^{T-t}.
+$$
+
+If $J$ has eigenvalues with magnitudes smaller than $1$, then $J^k$ tends to shrink directions as $k$ increases.  If $J$ has eigenvalues with magnitudes larger than $1$, then $J^k$ may grow rapidly in some directions.
+
+For a linear recurrence
+
+$$
+h_t=W_hh_{t-1},
+$$
+
+the state is
+
+$$
+h_T=W_h^T h_0.
+$$
+
+If $W_h$ is diagonalizable as $W_h=Q\Lambda Q^{-1}$, then
+
+$$
+W_h^T=Q\Lambda^TQ^{-1}.
+$$
+
+The powers of the eigenvalues determine the long-run behavior.  This connects RNN stability to familiar ideas from linear algebra and dynamical systems.
+
+For $	anh$ RNNs, saturation introduces another source of gradient shrinkage.  Since
+
+$$
+\frac{d}{du}\tanh(u)=1-\tanh^2(u),
+$$
+
+large values of $|u|$ produce derivatives close to zero.  Even if $W_h$ is not small, saturated nonlinearities can make $D_s$ small.
+
+## 11.9 Truncated BPTT and gradient clipping
+
+For long sequences, full BPTT can be expensive and unstable.  Two practical techniques are common.
+
+### Truncated backpropagation through time
+
+Instead of backpropagating through the entire history, one backpropagates only through a window of length $K$:
+
+$$
+\frac{\partial h_t}{\partial h_{t-K}}.
+$$
+
+This reduces computation and memory cost, but limits how directly the model learns very long-range dependencies.
+
+### Gradient clipping
+
+When gradients explode, one can rescale the gradient vector $g$ before the optimizer update:
+
+$$
+g \leftarrow g\cdot \min\left\{1,\frac{c}{\|g\|}\right\}.
+$$
+
+Here $c>0$ is a clipping threshold.  Gradient clipping does not solve all long-memory problems, but it prevents extremely large updates from destabilizing training.
+
+## 11.10 RNNs versus $n$-gram models
+
+An $n$-gram model approximates
+
+$$
+P(x_t\mid x_1,\ldots,x_{t-1})
+\approx
+P(x_t\mid x_{t-n+1},\ldots,x_{t-1}).
+$$
+
+It stores a discrete context of length $n-1$.  An RNN approximates
+
+$$
+P(x_t\mid x_1,\ldots,x_{t-1})
+\approx
+P(x_t\mid h_{t-1}),
+$$
+
+where $h_{t-1}$ is a learned continuous summary of the prefix.
+
+This has advantages and disadvantages.
+
+| Model | Context representation | Strength | Limitation |
+|---|---|---|---|
+| $n$-gram | last $n-1$ tokens | transparent counts | sparse for large $n$ |
+| RNN | hidden state $h_t\in \mathbb R^r$ | shares statistical strength through vectors | difficult long-range optimization |
+
+The RNN is more flexible because similar contexts can produce similar hidden states.  However, this flexibility comes from nonlinear optimization, so the model is harder to analyze and train.
+
+## 11.11 Worked example: scalar linear RNN
+
+A scalar linear RNN is
+
+$$
+h_t=ah_{t-1}+bu_t,
+$$
+
+where $u_t$ is a scalar input.  Starting from $h_0=0$, we obtain
+
+$$
+h_1=bu_1,
+$$
+
+$$
+h_2=abu_1+bu_2,
+$$
+
+$$
+h_3=a^2bu_1+abu_2+bu_3.
+$$
+
+By induction,
+
+$$
+h_T=\sum_{s=1}^T a^{T-s}b u_s.
+$$
+
+Thus the input from time $s$ receives weight $a^{T-s}$.  If $|a|<1$, older inputs decay.  If $|a|>1$, older inputs may be amplified.  If $a\approx 1$, the model can maintain information for a longer time.
+
+This simple formula is one of the cleanest mathematical explanations of recurrent memory.
+
+## 11.12 Interactive: recurrent memory and stability
+
+The following interactive studies the scalar recurrence
+
+$$
+h_t = \tanh(a h_{t-1}+b u_t).
+$$
+
+The parameter $a$ plays the role of a recurrent weight.  The parameter $b$ controls input strength.  The input sequence has a pulse near the beginning, followed by smaller oscillating inputs.  Move the sliders to see how memory, saturation, and stability change.
+
+::: {.content-visible when-format="html"}
+<div class="interactive-card">
+  <h3>Interactive: Recurrent memory in a scalar RNN</h3>
+  <p class="text-muted">Explore how the recurrent coefficient controls memory and stability.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.8rem;align-items:end;">
+    <label>
+      recurrent weight a
+      <input id="ch11-rnn-a" type="range" min="-1.5" max="1.5" step="0.05" value="0.75" style="width:100%;">
+      <span id="ch11-rnn-a-val">0.75</span>
+    </label>
+    <label>
+      input weight b
+      <input id="ch11-rnn-b" type="range" min="0" max="2" step="0.05" value="1.00" style="width:100%;">
+      <span id="ch11-rnn-b-val">1.00</span>
+    </label>
+    <label>
+      nonlinearity
+      <select id="ch11-rnn-phi" style="width:100%;">
+        <option value="tanh" selected>tanh</option>
+        <option value="linear">linear</option>
+        <option value="relu">ReLU</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="ch11-rnn-status" class="plotly-status">Loading interactive figure...</div>
+  <div id="ch11-rnn-plot" class="plotly-demo"></div>
+</div>
+
+<script>
+(function() {
+  function setStatus(message) {
+    var status = document.getElementById('ch11-rnn-status');
+    if (status) status.textContent = message;
+  }
+
+  function loadPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    var existing = document.querySelector('script[data-local-plotly="true"]');
+    if (existing) {
+      existing.addEventListener('load', callback);
+      existing.addEventListener('error', function() {
+        setStatus('Plotly.js was not available, so the interactive figure could not be drawn.');
+      });
+      return;
+    }
+    var script = document.createElement('script');
+    script.src = '../assets/plotly.min.js';
+    script.async = true;
+    script.setAttribute('data-local-plotly', 'true');
+    script.onload = callback;
+    script.onerror = function() {
+      setStatus('Plotly.js was not available, so the interactive figure could not be drawn.');
+    };
+    document.head.appendChild(script);
+  }
+
+  function phi(kind, z) {
+    if (kind === 'linear') return z;
+    if (kind === 'relu') return Math.max(0, z);
+    return Math.tanh(z);
+  }
+
+  function simulate(a, b, kind) {
+    var T = 50;
+    var time = [];
+    var inputs = [];
+    var states = [];
+    var h = 0;
+    for (var t = 0; t < T; t++) {
+      var u = 0.18 * Math.sin(0.45 * t);
+      if (t === 5) u += 1.0;
+      if (t === 6) u += 0.6;
+      h = phi(kind, a * h + b * u);
+      time.push(t + 1);
+      inputs.push(u);
+      states.push(h);
+    }
+    return {time: time, inputs: inputs, states: states};
+  }
+
+  function init() {
+    var plot = document.getElementById('ch11-rnn-plot');
+    var aSlider = document.getElementById('ch11-rnn-a');
+    var bSlider = document.getElementById('ch11-rnn-b');
+    var kindSelect = document.getElementById('ch11-rnn-phi');
+    var aVal = document.getElementById('ch11-rnn-a-val');
+    var bVal = document.getElementById('ch11-rnn-b-val');
+
+    if (!plot || !aSlider || !bSlider || !kindSelect || !window.Plotly) {
+      setStatus('The interactive controls were not found.');
+      return;
+    }
+
+    function draw() {
+      var a = parseFloat(aSlider.value);
+      var b = parseFloat(bSlider.value);
+      var kind = kindSelect.value;
+      var sim = simulate(a, b, kind);
+      aVal.textContent = a.toFixed(2);
+      bVal.textContent = b.toFixed(2);
+
+      var traces = [
+        {
+          x: sim.time,
+          y: sim.inputs,
+          mode: 'lines+markers',
+          name: 'input u_t'
+        },
+        {
+          x: sim.time,
+          y: sim.states,
+          mode: 'lines+markers',
+          name: 'hidden state h_t'
+        }
+      ];
+
+      var layout = {
+        title: 'Scalar recurrent dynamics',
+        xaxis: {title: 'time t'},
+        yaxis: {title: 'value'},
+        margin: {l: 55, r: 20, t: 45, b: 50},
+        legend: {orientation: 'h'},
+        annotations: [{
+          xref: 'paper', yref: 'paper', x: 0, y: -0.25,
+          showarrow: false, align: 'left',
+          text: 'Large |a| can preserve or amplify memory; tanh saturation can also shrink gradients.'
+        }]
+      };
+
+      Plotly.react(plot, traces, layout, {responsive: true, displayModeBar: true});
+      setStatus('');
+    }
+
+    aSlider.addEventListener('input', draw);
+    bSlider.addEventListener('input', draw);
+    kindSelect.addEventListener('change', draw);
+    draw();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { loadPlotly(init); });
+  } else {
+    loadPlotly(init);
+  }
+})();
+</script>
+:::
+
+::: {.content-visible when-format="pdf"}
+The HTML version of this chapter contains an interactive Plotly visualization of the scalar recurrence $h_t=\tanh(ah_{t-1}+bu_t)$.
+:::
+
+## 11.13 Python example: RNN forward pass from scratch
+
+The following code implements a small vanilla RNN forward pass for sequence classification.  It is intentionally written with NumPy rather than a deep learning framework so the linear algebra is visible.
+
+```{python}
+#| label: ch11-rnn-forward
+#| message: false
+#| warning: false
+import numpy as np
+
+rng = np.random.default_rng(7243)
+
+# Tiny vocabulary and sequence
+vocab = {"not": 0, "very": 1, "good": 2, "bad": 3, "movie": 4}
+sequence = ["not", "very", "good", "movie"]
+x = np.array([vocab[w] for w in sequence])
+
+# Dimensions
+d = len(vocab)   # vocabulary size
+m = 4            # embedding dimension
+r = 5            # hidden dimension
+K = 2            # number of classes
+
+# Parameters
+E = rng.normal(scale=0.2, size=(d, m))
+W_h = rng.normal(scale=0.3, size=(r, r))
+W_x = rng.normal(scale=0.3, size=(r, m))
+b_h = np.zeros(r)
+W_o = rng.normal(scale=0.3, size=(K, r))
+b_o = np.zeros(K)
+
+def softmax(z):
+    z = z - np.max(z)
+    ez = np.exp(z)
+    return ez / ez.sum()
+
+def rnn_forward(x):
+    h = np.zeros(r)
+    states = []
+    for token_id in x:
+        e = E[token_id]
+        h = np.tanh(W_h @ h + W_x @ e + b_h)
+        states.append(h.copy())
+    logits = W_o @ h + b_o
+    probs = softmax(logits)
+    return probs, np.array(states)
+
+probs, states = rnn_forward(x)
+print("Sequence:", sequence)
+print("Hidden-state matrix shape:", states.shape)
+print("Class probabilities:", probs)
+```
+
+The hidden-state matrix has shape $T\times r$.  Each row is the hidden state after reading one more token.
+
+## 11.14 Python example: visualizing hidden-state trajectories
+
+A hidden-state sequence is a trajectory in $\mathbb R^r$.  We can project it to two dimensions with SVD to visualize how the RNN state changes over time.
+
+```{python}
+#| label: ch11-hidden-trajectory
+#| message: false
+#| warning: false
+import matplotlib.pyplot as plt
+
+# Center the hidden states and compute a 2D SVD projection
+H = states - states.mean(axis=0, keepdims=True)
+U, S, Vt = np.linalg.svd(H, full_matrices=False)
+coords = H @ Vt[:2].T
+
+plt.figure(figsize=(6, 4))
+plt.plot(coords[:, 0], coords[:, 1], marker="o")
+for i, token in enumerate(sequence):
+    plt.text(coords[i, 0], coords[i, 1], token)
+plt.xlabel("first SVD direction")
+plt.ylabel("second SVD direction")
+plt.title("Hidden-state trajectory of a toy RNN")
+plt.grid(True, alpha=0.3)
+plt.show()
+```
+
+The plot should not be overinterpreted.  This is only a two-dimensional projection of a higher-dimensional trajectory.  Still, it provides useful intuition: recurrent models convert a token sequence into a path through representation space.
+
+## 11.15 Python example: RNN language-model probabilities
+
+Now we implement the likelihood for a tiny RNN language model.  The model predicts the next token from the previous hidden state.
+
+```{python}
+#| label: ch11-rnn-language-model
+#| message: false
+#| warning: false
+rng = np.random.default_rng(7339)
+
+corpus = [
+    "math students learn probability",
+    "statistics students learn inference",
+    "language models learn probability",
+    "students study language models"
+]
+
+tokens = sorted(set(" ".join(corpus).split()))
+vocab = {w: i for i, w in enumerate(tokens)}
+id_to_word = {i: w for w, i in vocab.items()}
+encoded = [[vocab[w] for w in sent.split()] for sent in corpus]
+
+d = len(vocab)
+m = 6
+r = 8
+
+E_lm = rng.normal(scale=0.2, size=(d, m))
+W_h_lm = rng.normal(scale=0.25, size=(r, r))
+W_x_lm = rng.normal(scale=0.25, size=(r, m))
+b_h_lm = np.zeros(r)
+W_o_lm = rng.normal(scale=0.25, size=(d, r))
+b_o_lm = np.zeros(d)
+
+def lm_sequence_nll(seq):
+    h = np.zeros(r)
+    nll = 0.0
+    count = 0
+    for token_id in seq:
+        logits = W_o_lm @ h + b_o_lm
+        p = softmax(logits)
+        nll -= np.log(p[token_id] + 1e-12)
+        count += 1
+        e = E_lm[token_id]
+        h = np.tanh(W_h_lm @ h + W_x_lm @ e + b_h_lm)
+    return nll, count
+
+total_nll = 0.0
+total_tokens = 0
+for seq in encoded:
+    nll, count = lm_sequence_nll(seq)
+    total_nll += nll
+    total_tokens += count
+
+cross_entropy = total_nll / total_tokens
+perplexity = np.exp(cross_entropy)
+print("Vocabulary:", tokens)
+print("Average cross-entropy:", round(cross_entropy, 3))
+print("Perplexity:", round(perplexity, 3))
+```
+
+The parameters above are random, so the model is not expected to be good.  The purpose is to show the exact computation of likelihood, cross-entropy, and perplexity.
+
+## 11.16 Python example: one training step by finite differences
+
+Full BPTT is lengthy to implement from scratch.  To check our understanding, we can examine a one-parameter finite-difference derivative for the recurrent weight matrix.
+
+```{python}
+#| label: ch11-finite-difference-gradient
+#| message: false
+#| warning: false
+# Use one sequence and one entry of W_h_lm.
+seq = encoded[0]
+
+def loss_with_current_params():
+    nll, _ = lm_sequence_nll(seq)
+    return nll
+
+base_loss = loss_with_current_params()
+
+i, j = 0, 0
+eps = 1e-5
+old_value = W_h_lm[i, j]
+
+W_h_lm[i, j] = old_value + eps
+loss_plus = loss_with_current_params()
+
+W_h_lm[i, j] = old_value - eps
+loss_minus = loss_with_current_params()
+
+W_h_lm[i, j] = old_value
+finite_difference = (loss_plus - loss_minus) / (2 * eps)
+
+print("Base loss:", round(base_loss, 4))
+print("Finite-difference derivative for W_h[0,0]:", round(finite_difference, 4))
+```
+
+Finite differences are too slow for training real RNNs, but they are useful for verifying gradient code.  BPTT computes all such derivatives efficiently by reusing intermediate Jacobian-vector products.
+
+## 11.17 Python example: gradient norm through time
+
+The following simulation illustrates the product-of-Jacobians phenomenon in a linear recurrence.  We compute powers of a recurrent matrix and observe how their norms behave.
+
+```{python}
+#| label: ch11-gradient-norm-simulation
+#| message: false
+#| warning: false
+rng = np.random.default_rng(2026)
+
+r = 6
+A = rng.normal(size=(r, r))
+# Normalize A and create versions with different spectral scales.
+eig_max = max(abs(np.linalg.eigvals(A)))
+A_base = A / eig_max
+
+scales = [0.7, 0.95, 1.1]
+steps = np.arange(1, 31)
+
+norms = {}
+for scale in scales:
+    M = scale * A_base
+    values = []
+    P = np.eye(r)
+    for _ in steps:
+        P = M @ P
+        values.append(np.linalg.norm(P, ord=2))
+    norms[scale] = values
+
+for scale, values in norms.items():
+    print("scale", scale, "first norm", round(values[0], 3), "last norm", round(values[-1], 3))
+```
+
+When the effective recurrent scale is below $1$, powers tend to shrink.  When it is above $1$, powers may grow.  Nonlinearities and data-dependent Jacobians complicate this picture, but the linear example captures the core phenomenon.
+
+## 11.18 AI-assisted learning component
+
+Use an AI assistant as a mathematical critic rather than as a replacement for derivation.  Good prompts include:
+
+1. **Dimension audit.**  "Given the RNN equations $h_t=\tanh(W_hh_{t-1}+W_xe_t+b_h)$ and $z_t=W_oh_t+b_o$, check every matrix dimension and identify possible shape errors."
+2. **Gradient explanation.**  "Explain why products of Jacobian matrices can cause vanishing gradients in vanilla RNNs.  Use a two-dimensional linear example."
+3. **Model comparison.**  "Compare an $n$-gram model and an RNN language model using conditional probability notation."
+4. **Code review.**  "Review this NumPy RNN forward pass and identify whether the hidden state is updated before or after next-token prediction."
+5. **Interpretability caution.**  "Give three reasons why a two-dimensional projection of hidden states should not be interpreted as the true geometry of the RNN."
+
+The student should verify every answer by checking equations, dimensions, and small numerical examples.
+
+## 11.19 Common pitfalls
+
+1. **Confusing token embeddings with hidden states.**  The embedding $e_t$ represents the current token.  The hidden state $h_t$ represents the prefix up to time $t$.
+2. **Forgetting parameter sharing.**  The same recurrent weights are used at every time step.
+3. **Updating in the wrong order for language modeling.**  To predict $x_t$, the model should use information from $x_1,\ldots,x_{t-1}$, not from $x_t$ itself.
+4. **Ignoring gradient products.**  Long-range learning depends on products of Jacobians.
+5. **Assuming RNNs solve all sequence problems.**  Vanilla RNNs often struggle with long dependencies.  LSTM, GRU, and attention mechanisms were developed partly to address this problem.
+
+## 11.20 Summary
+
+A recurrent neural network is a sequence model built from a repeated update rule
+
+$$
+h_t=\phi(W_hh_{t-1}+W_xe_t+b_h).
+$$
+
+The hidden state is a learned continuous summary of the prefix.  For classification, the final state can feed a softmax classifier.  For language modeling, each hidden state predicts the next token distribution.
+
+The central mathematical challenge is that training requires differentiating through many repeated compositions.  Gradients contain products of Jacobian matrices, which can vanish or explode.  This explains why vanilla RNNs are historically important but limited for long-context language tasks.  The next chapter studies gated recurrent models, which modify the recurrence to control memory more explicitly.
+
+## Exercises
+
+1. **Dimension check.**  Let $E\in \mathbb R^{10000\times 128}$, $W_h\in \mathbb R^{256\times 256}$, and $W_x\in \mathbb R^{256\times 128}$.  What is the dimension of $h_t$?  What is the dimension of $W_xE_{x_t}$?
+
+2. **Bag-of-words failure.**  Construct two sentences with the same bag-of-words vector but different meanings.  Explain why a recurrent model can distinguish them in principle.
+
+3. **Scalar recurrence.**  For $h_t=ah_{t-1}+bu_t$ with $h_0=0$, prove that
+   $$
+   h_T=\sum_{s=1}^T a^{T-s}bu_s.
+   $$
+
+4. **Language-model likelihood.**  Write the negative log-likelihood for the sequence $(x_1,x_2,x_3,x_4)$ under an RNN language model.
+
+5. **Jacobian product.**  For $h_t=\tanh(W_hh_{t-1}+W_xe_t+b_h)$, derive the one-step Jacobian $\partial h_t/\partial h_{t-1}$.
+
+6. **Vanishing gradient.**  Suppose $J_s=0.8I$ for all $s$.  Compute $J_TJ_{T-1}\cdots J_{t+1}$ and explain what happens as $T-t$ grows.
+
+7. **Exploding gradient.**  Suppose $J_s=1.2I$ for all $s$.  Repeat the previous exercise.
+
+8. **RNN versus bigram model.**  Compare the assumptions behind a bigram language model and an RNN language model.
+
+9. **Hidden-state trajectory.**  Modify the Python code to compare two sentences with the same words in different orders.  Plot both hidden-state trajectories.
+
+10. **Training experiment.**  Implement a tiny RNN classifier in a deep learning framework and compare it with a bag-of-words classifier on a small sentiment dataset.
+
+## Mini-project: Order sensitivity in text classification
+
+Build a small dataset where word order matters.  For example, generate short phrases using templates such as:
+
+$$
+\text{not good},\quad \text{not bad},\quad \text{very good},\quad \text{very bad}.
+$$
+
+Compare three models:
+
+1. a bag-of-words logistic classifier;
+2. an averaged-embedding neural classifier;
+3. a vanilla RNN classifier.
+
+Report which models can distinguish negation and why.  Your report should include equations for each model, not only accuracy scores.
+
+## Lab connection
+
+The accompanying lab for this chapter should guide students through:
+
+1. implementing a vanilla RNN forward pass from scratch;
+2. computing language-model negative log-likelihood;
+3. visualizing hidden-state trajectories;
+4. training a small RNN classifier using a modern deep learning library;
+5. studying vanishing and exploding gradients numerically;
+6. comparing RNNs with bag-of-words and $n$-gram baselines.

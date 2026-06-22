@@ -1,0 +1,1167 @@
+---
+title: "Text, Tokens, and Vocabularies"
+subtitle: "From raw strings to finite mathematical objects"
+---
+
+::: {.chapter-opening}
+Natural language begins as text, but mathematical NLP begins only after text has been converted into well-defined objects.  This chapter develops the first conversion step: characters, words, subwords, tokens, vocabularies, and integer sequences.  The goal is to make tokenization mathematically explicit, because every later model in NLP depends on this first representation map.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. model raw text as strings over an alphabet;
+2. define tokenization as a map from strings to finite sequences of symbols or indices;
+3. construct vocabularies from a corpus and represent tokens by one-hot vectors;
+4. distinguish character, word, and subword tokenization;
+5. explain the out-of-vocabulary problem and why modern language models use subword units;
+6. build document-token count vectors and document-term matrices;
+7. describe vocabulary construction as a statistical estimation and compression problem;
+8. use Python to implement simple tokenizers and vocabulary maps;
+9. use AI tools critically to inspect tokenization decisions.
+
+## Why tokenization is mathematical
+
+A computer does not directly understand a sentence such as
+
+> The model predicts the next token.
+
+Before a statistical model, neural network, or transformer can operate on it, the sentence must be changed into a finite mathematical object.  For example, it might become
+
+$$
+(\text{the},\text{model},\text{predicts},\text{the},\text{next},\text{token}),
+$$
+
+or, after assigning integer IDs to tokens,
+
+$$
+(4, 18, 31, 4, 25, 7).
+$$
+
+This conversion is not a minor engineering detail.  It defines the sample space on which later probability models live.  It also defines the coordinates of the vectors and matrices used in learning algorithms.  A different tokenizer gives a different dataset.
+
+::: {.math-card}
+**Central idea.**  Tokenization is a representation map.  It changes an object from one mathematical space to another:
+
+$$
+\text{raw text} \longrightarrow \text{sequence of tokens} \longrightarrow \text{sequence of integers}.
+$$
+
+Once this map is fixed, we can define vectors, matrices, probability distributions, loss functions, and neural networks on top of the resulting representation.
+:::
+
+For MA Applied Mathematics and MS Statistics students, the right question is not only *which tokenizer should we use?* but also:
+
+- What is the domain and codomain of the tokenizer?
+- What information is preserved or discarded?
+- What random variables are being defined?
+- What statistical estimates depend on the vocabulary?
+- How does the choice of tokens change the geometry of the data?
+
+## Text as strings over an alphabet
+
+Let $A$ be a finite alphabet.  In elementary formal language theory, the set of all finite strings over $A$ is denoted by
+
+$$
+A^* = \{\epsilon\} \cup A \cup A^2 \cup A^3 \cup \cdots,
+$$
+
+where $\epsilon$ is the empty string.  A raw text document is an element
+
+$$
+x \in A^*.
+$$
+
+The alphabet $A$ may be a character alphabet, a Unicode alphabet, a byte alphabet, or another finite set of primitive symbols.
+
+### Example: character alphabet
+
+If
+
+$$
+A = \{a,b,c,\ldots,z,\text{space}\},
+$$
+
+then the sentence
+
+```text
+machine learning
+```
+
+is a string in $A^*$.  Its length is the number of characters, including the space.
+
+### Corpus
+
+A corpus is a finite collection of documents:
+
+$$
+D = \{x_1,x_2,\ldots,x_n\},
+$$
+
+where each $x_i \in A^*$.  In many statistical settings, we view documents as observations sampled from an unknown distribution $P$ on $A^*$:
+
+$$
+x_1,x_2,\ldots,x_n \sim P.
+$$
+
+This is already a modeling assumption.  Real documents are not always independent and identically distributed.  For example, news articles from the same week, posts from the same author, and pages from the same textbook have dependence.  Still, the i.i.d. viewpoint is a useful starting point for defining empirical distributions.
+
+## Normalization as a preprocessing map
+
+Before tokenization, one often applies a normalization function
+
+$$
+N:A^* \to A^*.
+$$
+
+Examples include lowercasing, removing punctuation, replacing multiple spaces by one space, and converting accented characters into a standard form.
+
+For instance,
+
+$$
+N(\text{``Models, models!''}) = \text{``models models''}.
+$$
+
+Normalization is a many-to-one map.  It usually discards information.  If uppercase and lowercase forms are collapsed, then we can no longer distinguish ``Apple'' as a company from ``apple'' as a fruit by capitalization alone.
+
+::: {.math-card}
+**Information loss.**  A preprocessing map $N$ is information-preserving only if it is injective.  Most normalizers used in NLP are not injective.  Therefore, preprocessing is a modeling decision, not merely a cleaning step.
+:::
+
+## Tokenization as a map
+
+A tokenizer maps a string to a finite sequence of tokens.  Let $V$ be a vocabulary, meaning a finite set of allowed tokens:
+
+$$
+V = \{v_1,v_2,\ldots,v_d\}.
+$$
+
+A tokenizer is a function
+
+$$
+\tau:A^* \to V^*.
+$$
+
+For a document $x$, the output is
+
+$$
+\tau(x)=(t_1,t_2,\ldots,t_m),
+$$
+
+where each $t_j \in V$.  The length $m$ depends on both $x$ and the tokenizer.
+
+After assigning each token an integer ID, we also have an index map
+
+$$
+\iota:V \to \{1,2,\ldots,d\}.
+$$
+
+The composition
+
+$$
+\iota \circ \tau:A^* \to \{1,2,\ldots,d\}^*
+$$
+
+is the form most directly used by neural networks.
+
+### Small example
+
+Let
+
+$$
+V = \{\text{data},\text{language},\text{learning},\text{model},\text{models},\text{token}\}.
+$$
+
+If
+
+$$
+x=\text{``language models learn from data''},
+$$
+
+then a simple word tokenizer might produce
+
+$$
+\tau(x)=(\text{language},\text{models},\text{learn},\text{from},\text{data}).
+$$
+
+But if $\text{learn}$ and $\text{from}$ are not in $V$, then the tokenizer must decide what to do.  It might replace them by a special unknown token:
+
+$$
+(\text{language},\text{models},\text{[UNK]},\text{[UNK]},\text{data}).
+$$
+
+This is the out-of-vocabulary problem.
+
+## Three levels of tokenization
+
+There are three common mathematical levels of tokenization.
+
+| Tokenization level | Basic unit | Strength | Weakness |
+|---|---:|---|---|
+| Character | characters | no unknown words | long sequences |
+| Word | words | interpretable | large vocabulary and unknown words |
+| Subword | pieces of words | balances vocabulary size and coverage | less directly interpretable |
+
+### Character tokenization
+
+A character tokenizer uses individual characters as tokens.  If
+
+```text
+data
+```
+
+is tokenized at the character level, then
+
+$$
+\tau(x)=(d,a,t,a).
+$$
+
+This approach has a small vocabulary but produces long sequences.  It also makes semantic units hard to identify.
+
+### Word tokenization
+
+A word tokenizer splits text into word-like units:
+
+$$
+\tau(\text{``data science''})=(\text{data},\text{science}).
+$$
+
+This is interpretable, but it creates a very large vocabulary.  Rare words, misspellings, names, and new technical terms cause difficulty.
+
+### Subword tokenization
+
+A subword tokenizer uses pieces that may be smaller than words but larger than characters.  For example,
+
+$$
+\text{``tokenization''} \mapsto (\text{token},\text{ization})
+$$
+
+or
+
+$$
+\text{``unbelievable''} \mapsto (\text{un},\text{believ},\text{able}).
+$$
+
+Modern language models typically use subword or byte-level tokenization because it controls vocabulary size while still representing rare and new words.
+
+## One-hot representation
+
+Once a vocabulary $V=\{v_1,\ldots,v_d\}$ is fixed, each token $v_j$ can be represented by the $j$th standard basis vector in $\mathbb{R}^d$:
+
+$$
+e_j = (0,\ldots,0,1,0,\ldots,0)^T.
+$$
+
+The one-hot map is
+
+$$
+\phi:V \to \mathbb{R}^d,
+\qquad
+\phi(v_j)=e_j.
+$$
+
+For example, if
+
+$$
+V=(\text{data},\text{language},\text{model},\text{token}),
+$$
+
+then
+
+$$
+\phi(\text{model})=(0,0,1,0)^T.
+$$
+
+One-hot vectors are simple but do not encode similarity.  In a one-hot representation,
+
+$$
+\langle e_i,e_j\rangle = 0 \qquad \text{for } i\ne j.
+$$
+
+Thus the representation initially treats all distinct tokens as orthogonal.  Word embeddings, studied later, replace this rigid geometry by learned vectors whose inner products carry semantic and statistical information.
+
+## Count vectors and the bag-of-words map
+
+A tokenizer preserves order:
+
+$$
+(t_1,t_2,\ldots,t_m).
+$$
+
+Many classical NLP methods then discard order and keep only counts.  Given a vocabulary $V=\{v_1,\ldots,v_d\}$, define the count vector
+
+$$
+c(x)=(c_1(x),\ldots,c_d(x))^T \in \mathbb{N}^d,
+$$
+
+where
+
+$$
+c_j(x)=\#\{k: t_k=v_j\}.
+$$
+
+The map
+
+$$
+x \mapsto c(x)
+$$
+
+is called the bag-of-words representation.  It is useful because it turns documents into vectors, but it loses word order.  For example,
+
+```text
+models use data
+```
+
+and
+
+```text
+data use models
+```
+
+have the same bag-of-words vector under a word tokenizer.
+
+::: {.math-card}
+**Representation tradeoff.**  Sequences preserve order but are harder to model.  Count vectors are easy to analyze using linear algebra and statistics, but they discard order.
+:::
+
+## Document-term matrix
+
+For a corpus $D=\{x_1,\ldots,x_n\}$ and vocabulary $V=\{v_1,\ldots,v_d\}$, the document-term matrix is
+
+$$
+X \in \mathbb{R}^{n\times d},
+$$
+
+where
+
+$$
+X_{ij}=c_j(x_i).
+$$
+
+Each row is a document vector, and each column corresponds to a token.  This matrix is usually sparse because most documents use only a small fraction of the vocabulary.
+
+The document-term matrix is one of the central objects in classical NLP, information retrieval, text classification, and topic modeling.  It is also the bridge from text to linear algebra.
+
+## A small corpus by hand
+
+Consider the corpus
+
+$$
+\begin{aligned}
+x_1 &= \text{``data models learn''},\\
+x_2 &= \text{``language models predict tokens''},\\
+x_3 &= \text{``statistics studies data''}.
+\end{aligned}
+$$
+
+Suppose the vocabulary is
+
+$$
+V=(\text{data},\text{language},\text{learn},\text{models},\text{predict},\text{statistics},\text{studies},\text{tokens}).
+$$
+
+Then the document-term matrix is
+
+$$
+X=
+\begin{bmatrix}
+1&0&1&1&0&0&0&0\\
+0&1&0&1&1&0&0&1\\
+1&0&0&0&0&1&1&0
+\end{bmatrix}.
+$$
+
+This matrix is not just a data table.  It is the object on which linear algebraic operations such as inner products, projections, low-rank approximations, and clustering will be performed.
+
+## Python example: tokenization and vocabulary construction
+
+The following example builds a simple word tokenizer using only Python standard libraries.  This is intentionally transparent.  Industrial tokenizers are more complicated, but the mathematical structure is the same.
+
+```{python}
+#| label: py-ch02-simple-tokenizer
+#| echo: true
+#| warning: false
+#| message: false
+
+import re
+from collections import Counter
+
+corpus = [
+    "Data models learn from data.",
+    "Language models predict the next token.",
+    "Statistics studies data, uncertainty, and models."
+]
+
+def normalize(text):
+    """Lowercase and keep alphabetic tokens only."""
+    text = text.lower()
+    text = re.sub(r"[^a-z\s]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+def word_tokenize(text):
+    return normalize(text).split()
+
+tokenized = [word_tokenize(doc) for doc in corpus]
+tokenized
+```
+
+```{python}
+#| label: py-ch02-vocabulary
+#| echo: true
+
+all_tokens = [token for doc in tokenized for token in doc]
+counts = Counter(all_tokens)
+
+vocab = sorted(counts)
+token_to_id = {token: j for j, token in enumerate(vocab)}
+id_to_token = {j: token for token, j in token_to_id.items()}
+
+print("Vocabulary size:", len(vocab))
+print(token_to_id)
+```
+
+```{python}
+#| label: py-ch02-integer-sequences
+#| echo: true
+
+integer_sequences = [
+    [token_to_id[token] for token in doc]
+    for doc in tokenized
+]
+
+integer_sequences
+```
+
+The variable `integer_sequences` is an explicit realization of the mathematical map
+
+$$
+\iota\circ\tau:A^*\to \{0,1,\ldots,d-1\}^*.
+$$
+
+## Python example: document-term matrix
+
+```{python}
+#| label: py-ch02-document-term-matrix
+#| echo: true
+
+import pandas as pd
+
+rows = []
+for doc in tokenized:
+    doc_counts = Counter(doc)
+    rows.append([doc_counts[token] for token in vocab])
+
+X = pd.DataFrame(rows, columns=vocab)
+X
+```
+
+The row sums are the document lengths after tokenization.
+
+```{python}
+#| label: py-ch02-row-sums
+#| echo: true
+
+X.sum(axis=1)
+```
+
+The column sums are the token frequencies over the corpus.
+
+```{python}
+#| label: py-ch02-column-sums
+#| echo: true
+
+X.sum(axis=0).sort_values(ascending=False)
+```
+
+## Frequency thresholding and vocabulary selection
+
+In real corpora, the vocabulary can be very large.  A common method is to keep only tokens whose frequency is at least a threshold $r$:
+
+$$
+V_r = \{v: f(v)\ge r\},
+$$
+
+where $f(v)$ is the corpus frequency of token $v$.
+
+This creates a smaller vocabulary but discards rare tokens.  Rare tokens may be noise, but they may also be important names, mathematical terms, or technical concepts.
+
+The threshold $r$ therefore controls a bias-variance-like tradeoff:
+
+- large vocabulary: more expressive, but sparse and harder to estimate;
+- small vocabulary: more stable, but less informative.
+
+::: {.math-card}
+**Vocabulary selection as estimation.**  If $p(v)$ is the unknown probability of token $v$ and $\hat p(v)=f(v)/M$ is its empirical frequency from $M$ observed tokens, then low-frequency tokens have high relative uncertainty.  Removing rare tokens is a form of regularization.
+:::
+
+## Interactive HTML: vocabulary threshold explorer
+
+The following interactive component uses Plotly.js to show how the vocabulary changes as the frequency threshold changes.  It is designed to render in the HTML version of the Quarto book.
+
+```{=html}
+<div class="interactive-card nlp-interactive" id="ch02-vocab-card">
+  <h3>Interactive: Vocabulary Threshold Explorer</h3>
+  <p>
+    Move the threshold slider. Tokens with frequency at least the threshold remain in the vocabulary.
+    This illustrates how a preprocessing choice changes the dimension of the feature space.
+  </p>
+
+  <label for="ch02-threshold-slider"><strong>Frequency threshold:</strong>
+    <span id="ch02-threshold-value">1</span>
+  </label>
+  <input id="ch02-threshold-slider" type="range" min="1" max="5" step="1" value="1" style="width: 100%;">
+
+  <div id="ch02-vocab-plot" class="plotly-demo" style="height:430px;"></div>
+  <div id="ch02-vocab-summary" style="font-weight:600; margin-top:0.5rem;"></div>
+  <div id="ch02-vocab-status" class="plotly-status" aria-live="polite">Loading interactive figure...</div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  function ready(fn) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", fn, {once: true});
+    } else {
+      fn();
+    }
+  }
+
+  function setStatus(message, isError) {
+    var status = document.getElementById("ch02-vocab-status");
+    if (!status) return;
+    status.textContent = message || "";
+    status.classList.toggle("plotly-error", Boolean(isError));
+    status.style.display = message ? "block" : "none";
+  }
+
+  function loadPlotly(callback) {
+    if (window.Plotly && typeof window.Plotly.react === "function") {
+      callback();
+      return;
+    }
+
+    var existing = document.querySelector("script[data-nlp-plotly-loader]");
+    if (!existing) {
+      existing = document.createElement("script");
+      existing.src = "https://cdn.plot.ly/plotly-2.35.2.min.js";
+      existing.async = true;
+      existing.setAttribute("data-nlp-plotly-loader", "true");
+      existing.onerror = function() {
+        setStatus("Plotly.js could not be loaded. Check your internet connection or the CDN setting in _quarto.yml.", true);
+      };
+      document.head.appendChild(existing);
+    }
+
+    var attempts = 0;
+    var timer = window.setInterval(function() {
+      attempts += 1;
+      if (window.Plotly && typeof window.Plotly.react === "function") {
+        window.clearInterval(timer);
+        callback();
+      } else if (attempts > 80) {
+        window.clearInterval(timer);
+        setStatus("Plotly.js was not available, so the interactive figure could not be drawn.", true);
+      }
+    }, 100);
+  }
+
+  ready(function() {
+    var plot = document.getElementById("ch02-vocab-plot");
+    var slider = document.getElementById("ch02-threshold-slider");
+    var value = document.getElementById("ch02-threshold-value");
+    var summary = document.getElementById("ch02-vocab-summary");
+
+    if (!plot || !slider || !value || !summary) {
+      setStatus("The interactive HTML container was not found on this page.", true);
+      return;
+    }
+
+    loadPlotly(function() {
+      var corpus = [
+        "data models learn from data",
+        "language models predict the next token",
+        "statistics studies data uncertainty and models",
+        "large language models use tokens and data",
+        "subword tokens help language models handle rare words",
+        "data science studies models uncertainty and prediction",
+        "tokens tokens tokens models data"
+      ];
+
+      function tokenize(text) {
+        return text.toLowerCase()
+          .replace(/[^a-z\s]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .split(" ")
+          .filter(Boolean);
+      }
+
+      var counts = {};
+      corpus.forEach(function(doc) {
+        tokenize(doc).forEach(function(tok) {
+          counts[tok] = (counts[tok] || 0) + 1;
+        });
+      });
+
+      var tokens = Object.keys(counts).sort(function(a, b) {
+        return counts[b] - counts[a] || a.localeCompare(b);
+      });
+      var maxFreq = Math.max.apply(null, tokens.map(function(t) { return counts[t]; }));
+      slider.max = String(maxFreq);
+
+      function updatePlot() {
+        var threshold = Number(slider.value);
+        value.textContent = String(threshold);
+
+        var kept = tokens.filter(function(t) { return counts[t] >= threshold; });
+        var removed = tokens.filter(function(t) { return counts[t] < threshold; });
+
+        var traceKept = {
+          x: kept,
+          y: kept.map(function(t) { return counts[t]; }),
+          type: "bar",
+          name: "kept tokens",
+          hovertemplate: "token=%{x}<br>frequency=%{y}<extra></extra>"
+        };
+
+        var traceRemoved = {
+          x: removed,
+          y: removed.map(function(t) { return counts[t]; }),
+          type: "bar",
+          name: "removed tokens",
+          hovertemplate: "token=%{x}<br>frequency=%{y}<extra></extra>",
+          opacity: 0.35
+        };
+
+        var layout = {
+          title: "Token frequencies under vocabulary thresholding",
+          xaxis: {title: "token", automargin: true},
+          yaxis: {title: "corpus frequency", rangemode: "tozero"},
+          margin: {l: 55, r: 20, t: 60, b: 100},
+          showlegend: true
+        };
+
+        window.Plotly.react(plot, [traceKept, traceRemoved], layout, {responsive: true});
+        summary.textContent = "Vocabulary size at threshold " + threshold + ": " + kept.length +
+          " tokens. Removed tokens: " + removed.length + ".";
+        setStatus("");
+      }
+
+      slider.addEventListener("input", updatePlot);
+      updatePlot();
+    });
+  });
+})();
+</script>
+```
+
+The mathematical point of the explorer is that the dimension $d$ of the vector space $\mathbb{R}^d$ is not intrinsic to the corpus.  It is chosen by the vocabulary construction rule.
+
+## Unknown tokens
+
+Suppose a word tokenizer is trained on a corpus whose vocabulary is $V$.  When a new document contains a token not in $V$, one classical solution is to use a special token `[UNK]`.
+
+Mathematically, extend the vocabulary to
+
+$$
+V' = V\cup \{\text{[UNK]}\}.
+$$
+
+Then define
+
+$$
+\pi(v)=
+\begin{cases}
+v, & v\in V,\\
+\text{[UNK]}, & v\notin V.
+\end{cases}
+$$
+
+This projection collapses all unseen tokens into a single symbol.  The price is severe information loss.  For example, all of the following may become `[UNK]`:
+
+```text
+ChatGPT
+Noetherian
+eigenvector
+Boston
+mispeledword
+```
+
+The unknown token solves the finite-vocabulary problem but destroys distinctions among rare and unseen terms.
+
+## Subword tokenization as a remedy
+
+Subword tokenization reduces the unknown-token problem by building words from smaller units.  If the vocabulary contains common pieces such as
+
+$$
+\text{eigen}, \quad \text{vector}, \quad \text{ization}, \quad \text{pre}, \quad \text{train},
+$$
+
+then rare words may be represented as sequences of meaningful or semi-meaningful pieces.
+
+For example,
+
+$$
+\text{eigenvectorization}
+\mapsto
+(\text{eigen},\text{vector},\text{ization}).
+$$
+
+The word may not be in the vocabulary, but its parts may be.
+
+## A clean view of byte-pair encoding
+
+Byte-pair encoding, often abbreviated BPE, is a common subword vocabulary construction method.  The exact implementations used in production systems vary, but the core mathematical idea is simple.
+
+Start with a corpus represented as sequences of basic symbols, often characters or bytes.  Repeatedly merge the most frequent adjacent pair into a new token.
+
+### Abstract BPE algorithm
+
+Let the current tokenized corpus be a finite multiset of sequences over a vocabulary $V_k$.  At step $k$:
+
+1. count all adjacent token pairs $(a,b)$ in the corpus;
+2. find a most frequent pair
+
+   $$
+   (a_k,b_k)\in \arg\max_{(a,b)} f_k(a,b);
+   $$
+
+3. create a new token
+
+   $$
+   z_k = a_k b_k;
+   $$
+
+4. replace occurrences of $(a_k,b_k)$ by $z_k$;
+5. update the vocabulary
+
+   $$
+   V_{k+1}=V_k\cup\{z_k\}.
+   $$
+
+After $K$ merges, the vocabulary has grown from basic symbols to useful subwords.
+
+::: {.math-card}
+**BPE as greedy compression.**  BPE greedily chooses frequent adjacent pairs.  It is not optimizing a simple global convex objective, but it can be interpreted as building a compact code for frequent local patterns.
+:::
+
+## Python example: a tiny BPE demonstration
+
+The following code implements a small educational version of BPE.  It is not intended to match production tokenizers.  Its purpose is to reveal the mathematical structure.
+
+```{python}
+#| label: py-ch02-mini-bpe
+#| echo: true
+
+from collections import Counter
+
+def word_as_chars(word):
+    # The end-of-word marker helps distinguish "low" from "lower".
+    return tuple(list(word) + ["</w>"])
+
+words = ["low", "lower", "newest", "widest", "low", "lower", "low"]
+corpus_tokens = [word_as_chars(w) for w in words]
+
+
+def pair_counts(sequences):
+    counts = Counter()
+    for seq in sequences:
+        for a, b in zip(seq[:-1], seq[1:]):
+            counts[(a, b)] += 1
+    return counts
+
+
+def merge_pair(sequence, pair):
+    a, b = pair
+    merged = []
+    i = 0
+    while i < len(sequence):
+        if i < len(sequence) - 1 and sequence[i] == a and sequence[i + 1] == b:
+            merged.append(a + b)
+            i += 2
+        else:
+            merged.append(sequence[i])
+            i += 1
+    return tuple(merged)
+
+
+def bpe_step(sequences):
+    counts = pair_counts(sequences)
+    best_pair, best_count = counts.most_common(1)[0]
+    new_sequences = [merge_pair(seq, best_pair) for seq in sequences]
+    return best_pair, best_count, new_sequences
+
+sequences = corpus_tokens
+for step in range(5):
+    best_pair, best_count, sequences = bpe_step(sequences)
+    print(f"Step {step + 1}: merge {best_pair} with frequency {best_count}")
+    print(sequences[:3])
+```
+
+Notice that BPE is data-dependent.  The same word may be segmented differently if the training corpus changes.
+
+## Tokenization and probability spaces
+
+Tokenization changes the probability space of language modeling.  If tokens are words, then a language model estimates probabilities such as
+
+$$
+P(W_t=\text{models}\mid W_1,\ldots,W_{t-1}).
+$$
+
+If tokens are subwords, then the random variables are subword tokens:
+
+$$
+P(T_t=\text{mod}\mid T_1,\ldots,T_{t-1}).
+$$
+
+These are not the same statistical problem.  The vocabulary determines the categorical sample space.
+
+For a vocabulary of size $d$, a next-token model outputs a probability vector
+
+$$
+p_t=(p_{t1},\ldots,p_{td})\in \Delta^{d-1},
+$$
+
+where
+
+$$
+\Delta^{d-1}=\left\{p\in\mathbb{R}^d: p_j\ge 0,\ \sum_{j=1}^d p_j=1\right\}.
+$$
+
+Thus changing the tokenizer changes $d$, the dimension of the output simplex.
+
+## Empirical token distribution
+
+Given a tokenized corpus with total number of tokens $M$, define the empirical token distribution
+
+$$
+\hat p_j = \frac{f_j}{M},
+$$
+
+where $f_j$ is the frequency of token $v_j$.
+
+The vector
+
+$$
+\hat p=(\hat p_1,\ldots,\hat p_d)
+$$
+
+belongs to the probability simplex $\Delta^{d-1}$.  It is a simple but important statistical summary of a corpus.
+
+The empirical entropy is
+
+$$
+\widehat H = -\sum_{j=1}^d \hat p_j \log \hat p_j,
+$$
+
+where terms with $\hat p_j=0$ are omitted.  A corpus whose token frequencies are evenly spread has larger entropy than one dominated by a few common tokens.
+
+```{python}
+#| label: py-ch02-empirical-distribution
+#| echo: true
+
+import math
+
+M = sum(counts.values())
+empirical_p = {token: freq / M for token, freq in counts.items()}
+entropy = -sum(p * math.log(p) for p in empirical_p.values())
+
+print("Total tokens:", M)
+print("Empirical entropy:", round(entropy, 4))
+print(sorted(empirical_p.items(), key=lambda x: -x[1])[:5])
+```
+
+## Zipf-like behavior
+
+In large natural language corpora, token frequencies tend to be highly skewed.  A small number of tokens occur very frequently, while many tokens occur rarely.  This qualitative pattern is often called Zipf-like behavior.
+
+If tokens are ranked by decreasing frequency, the frequency of the token with rank $r$ often roughly follows a power-law shape:
+
+$$
+f_r \approx C r^{-\alpha}
+$$
+
+for constants $C>0$ and $\alpha>0$ over a range of ranks.
+
+This matters because rare tokens are not an exception.  They are a structural feature of language data.
+
+## Vocabulary growth and Heaps-like behavior
+
+Another common empirical pattern is that the number of distinct observed tokens grows as more text is collected.  If $M$ is the number of observed tokens and $V(M)$ is the number of distinct token types, then one often sees approximate behavior of the form
+
+$$
+V(M) \approx K M^\beta,
+$$
+
+where $0<\beta<1$.
+
+The implication is important: collecting more data keeps revealing new tokens.  Therefore a fixed word vocabulary will always face rare and unseen words.
+
+## Sequence length versus vocabulary size
+
+Tokenization involves a fundamental tradeoff:
+
+$$
+\text{small vocabulary} \quad \Longleftrightarrow \quad \text{longer sequences},
+$$
+
+$$
+\text{large vocabulary} \quad \Longleftrightarrow \quad \text{shorter sequences}.
+$$
+
+Character tokenization has a very small vocabulary but long sequences.  Word tokenization has shorter sequences but a huge vocabulary.  Subword tokenization lives between these extremes.
+
+This matters computationally.  In a transformer, self-attention has a cost that grows roughly quadratically with sequence length $m$:
+
+$$
+\text{attention cost} \propto m^2.
+$$
+
+A tokenizer that produces longer sequences can substantially increase computational cost.
+
+## Padding and truncation
+
+Neural network batches often require sequences of equal length.  If a batch contains token sequences
+
+$$
+(t_{i1},\ldots,t_{im_i}), \qquad i=1,\ldots,B,
+$$
+
+then a maximum length $L$ is chosen.  Shorter sequences are padded using a special token `[PAD]`, and longer sequences are truncated.
+
+For example,
+
+$$
+(7,3,8) \mapsto (7,3,8,0,0)
+$$
+
+if `[PAD]` has index $0$ and $L=5$.
+
+Padding is another representation choice.  Models must be told which positions are real and which are padding.  This is done using an attention mask or sequence mask.
+
+## Special tokens
+
+Many NLP systems add special tokens to the vocabulary.  Common examples include:
+
+| Token | Meaning |
+|---|---|
+| `[PAD]` | padding token |
+| `[UNK]` | unknown token |
+| `[BOS]` | beginning of sequence |
+| `[EOS]` | end of sequence |
+| `[MASK]` | masked token for prediction tasks |
+| `[CLS]` | classification token in some encoder models |
+| `[SEP]` | separator token between segments |
+
+Mathematically, special tokens are ordinary vocabulary elements with assigned indices.  Their meaning comes from how the model and loss function use them.
+
+## Tokenization for AI systems
+
+Tokenization is especially important in modern AI systems because language models operate on token sequences, not directly on words.  A prompt, a retrieved document, or a generated answer is represented internally as tokens.
+
+This affects several practical AI questions.
+
+### Context length
+
+If a model has a maximum context length $L$, then the tokenized input must satisfy
+
+$$
+m \le L.
+$$
+
+Here $m$ is the number of tokens after tokenization, not the number of words.  A text that looks short to a human may be long in tokens if it contains code, formulas, tables, or uncommon terms.
+
+### Retrieval-augmented generation
+
+In retrieval-augmented generation, documents are often split into chunks before being embedded and retrieved.  A chunking rule is partly a tokenization problem.  It determines the units that become searchable objects.
+
+A simple chunking map has the form
+
+$$
+\gamma:A^*\to (A^*)^q,
+$$
+
+where a document is divided into $q$ text chunks.  Each chunk is then tokenized and embedded.
+
+Bad chunking may separate definitions from examples, theorem statements from assumptions, or student questions from answers.  Good chunking respects mathematical and semantic structure.
+
+### Prompt design
+
+A prompt is also a token sequence.  Repetition, formatting, examples, and equations all affect the tokenized representation.  Therefore prompt design has a mathematical side: it changes the conditioning information available to a next-token probability model.
+
+## AI-assisted learning component
+
+Use an AI assistant as a mathematical checker, not as a black box.  For this chapter, useful AI-assisted tasks include:
+
+::: {.callout-tip title="AI activity 1: tokenizer audit"}
+Give an AI assistant the following instruction:
+
+> Tokenize the sentence below in three ways: character-level, word-level, and a plausible subword-level segmentation.  Then explain what information is preserved and what information is lost by each representation.  Sentence: `Mathematical tokenization changes the sample space.`
+
+Then check whether the assistant clearly identifies the domain, codomain, and representation loss for each tokenizer.
+:::
+
+::: {.callout-tip title="AI activity 2: mathematical vocabulary design"}
+Ask an AI assistant:
+
+> I am building a tokenizer for graduate mathematics text.  Give examples of words or expressions that should not be carelessly split.  Organize the answer by mathematical area: linear algebra, probability, statistics, optimization, and NLP.
+
+Use the answer to think about domain-specific vocabulary design.
+:::
+
+::: {.callout-warning title="AI caution"}
+Do not paste private student data, confidential emails, unpublished manuscripts, or sensitive institutional documents into a public AI tool.  For tokenizer experiments, use synthetic examples or public text.
+:::
+
+## Mathematical summary
+
+The main objects of this chapter are summarized below.
+
+| Object | Mathematical form | Interpretation |
+|---|---|---|
+| Alphabet | $A$ | primitive symbols |
+| String space | $A^*$ | all finite raw strings |
+| Corpus | $D=\{x_1,\ldots,x_n\}$ | observed documents |
+| Normalizer | $N:A^*\to A^*$ | preprocessing map |
+| Vocabulary | $V=\{v_1,\ldots,v_d\}$ | finite token set |
+| Tokenizer | $\tau:A^*\to V^*$ | string-to-token sequence map |
+| Index map | $\iota:V\to\{1,\ldots,d\}$ | token-to-ID map |
+| One-hot map | $\phi:V\to\mathbb{R}^d$ | token-to-basis-vector map |
+| Count vector | $c(x)\in\mathbb{N}^d$ | bag-of-words representation |
+| Document-term matrix | $X\in\mathbb{R}^{n\times d}$ | corpus as matrix |
+| Empirical distribution | $\hat p\in\Delta^{d-1}$ | token frequency distribution |
+
+## Common misconceptions
+
+### Misconception 1: tokenization is just cleaning
+
+Tokenization is not just cleaning.  It defines the symbols used by the model.  It changes the statistical problem.
+
+### Misconception 2: words are the natural tokens
+
+Words are intuitive for humans, but they are not always the best modeling units.  Subwords often provide better coverage and a more stable vocabulary.
+
+### Misconception 3: larger vocabulary is always better
+
+A larger vocabulary can represent more distinctions, but it also creates a higher-dimensional and sparser estimation problem.
+
+### Misconception 4: one-hot vectors encode meaning
+
+One-hot vectors encode identity, not meaning.  Meaning enters later through co-occurrence, embeddings, attention, and learned model parameters.
+
+## Worked exercise: comparing tokenizers
+
+Consider the sentence
+
+```text
+Transformer-based models tokenize mathematical notation differently.
+```
+
+### Character-level representation
+
+A character tokenizer might produce every character, including punctuation and spaces.  This has strong coverage but long length.
+
+### Word-level representation
+
+A word tokenizer might produce
+
+$$
+(\text{transformer},\text{based},\text{models},\text{tokenize},\text{mathematical},\text{notation},\text{differently}).
+$$
+
+This is interpretable but loses the hyphen structure unless the tokenizer preserves it.
+
+### Subword-level representation
+
+A subword tokenizer might produce pieces such as
+
+$$
+(\text{transform},\text{er},\text{-},\text{based},\text{models},\text{token},\text{ize},\ldots).
+$$
+
+This preserves more detail than a crude word tokenizer and avoids unknown words more effectively.
+
+## Exercises
+
+1. Let $A=\{a,b\}$.  List all elements of $A^*$ of length at most $3$.  How many are there?
+
+2. Let $V=\{\text{data},\text{model},\text{token}\}$.  Define a tokenizer for the sentence `data data model token`.  Write the corresponding count vector.
+
+3. Construct the document-term matrix for the corpus
+
+   ```text
+   data models data
+   language models language
+   data language token
+   ```
+
+   using the vocabulary ordered alphabetically.
+
+4. Show that the bag-of-words map is not injective by giving two different sentences with the same count vector.
+
+5. Suppose a vocabulary has size $d=50,000$.  What is the dimension of a one-hot token vector?  How many nonzero entries does it have?
+
+6. Let $f(v)$ be the frequency of token $v$.  For the rule $V_r=\{v:f(v)\ge r\}$, explain what happens to vocabulary size as $r$ increases.
+
+7. Consider a corpus with total token count $M=1000$.  A token appears twice.  What is its empirical probability?  Why might its estimate be unstable?
+
+8. Explain why replacing all unseen words by `[UNK]` is a many-to-one map.
+
+9. Implement a simple word tokenizer in Python that lowercases text and removes punctuation.  Test it on a sentence containing mathematical notation such as `P(X > 2) = 0.13`.
+
+10. Design a domain-specific tokenization rule for mathematical text.  What should happen to symbols such as `$x_i$`, `$\nabla f$`, or `$A^T A$`?
+
+## Mini-project: tokenizer design for mathematical documents
+
+Choose a short paragraph from a mathematical textbook or lecture note.  Compare three tokenization strategies:
+
+1. character-level tokenization;
+2. word-level tokenization;
+3. a manually designed math-aware tokenization.
+
+For each strategy, report:
+
+- number of tokens;
+- vocabulary size;
+- examples of ambiguous tokens;
+- information preserved;
+- information lost;
+- whether the representation is suitable for search, classification, or language modeling.
+
+## Lab connection
+
+The associated independent-study lab should be saved as:
+
+```text
+labs/chapter-02-text-tokens-vocabularies.ipynb
+```
+
+Recommended lab sections:
+
+1. strings, normalization, and regular expressions;
+2. word tokenization from scratch;
+3. vocabulary construction and integer encoding;
+4. document-term matrices;
+5. empirical token distributions;
+6. a tiny BPE implementation;
+7. comparison of character, word, and subword tokenization;
+8. AI-assisted tokenizer audit.
+
+## Key takeaways
+
+- Text must be converted into finite mathematical objects before modeling.
+- A tokenizer is a map $\tau:A^*\to V^*$.
+- A vocabulary determines the dimension of one-hot vectors and count vectors.
+- Count vectors and document-term matrices are the first bridge from NLP to linear algebra.
+- Word tokenization is interpretable but has serious unknown-word problems.
+- Subword tokenization balances vocabulary size, sequence length, and coverage.
+- Tokenization changes the probability space of language modeling.
+- In AI systems, tokenization affects context length, retrieval, prompting, and computational cost.
+
+## Notes and references
+
+Classical treatments of text representations, tokenization, and document-term matrices appear in information retrieval and statistical NLP sources such as @manning_ir_2008, @manning_schuetze_1999, and @jurafsky_martin_slp3.  Subword tokenization and byte-pair encoding connect classical compression ideas with modern neural language modeling.

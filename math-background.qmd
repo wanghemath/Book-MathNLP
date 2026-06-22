@@ -1,0 +1,790 @@
+---
+title: "Mathematical Background"
+subtitle: "Core tools for studying natural language processing"
+---
+
+::: {.hero-box}
+Natural language processing uses many kinds of mathematics at once. A tokenizer creates finite sets. A document becomes a vector. A language model becomes a conditional probability distribution. A transformer becomes a composition of matrix maps, nonlinearities, normalizations, and optimization steps. This page collects the main background ideas used throughout the book.
+:::
+
+This background chapter is not meant to replace a full course in linear algebra, probability, statistics, optimization, graph theory, or topology. Instead, it gives a compact map of the mathematical objects that appear repeatedly in NLP. Students can read this page before starting the book, and then return to the relevant sections while working through the chapters and labs.
+
+## How to use this page
+
+Use this page as a reference while reading the book.
+
+| When you see this in NLP | Review this mathematical topic |
+|---|---|
+| token ids, vocabularies, text normalization | finite sets and maps |
+| count vectors, TF-IDF, embeddings | vectors, norms, inner products, matrices |
+| cosine similarity, nearest neighbors | geometry and metrics |
+| document-term matrices, latent semantic analysis | matrix factorization and SVD |
+| n-gram models, Naive Bayes, language models | probability and likelihood |
+| cross-entropy, KL divergence, perplexity | information theory |
+| neural networks and transformers | optimization and matrix calculus |
+| attention | softmax, weighted averages, bilinear scores |
+| retrieval and RAG | similarity search, ranking, evaluation metrics |
+| dependency graphs, knowledge graphs | graph theory and linear algebra on graphs |
+| representation diagnostics | geometry, topology, statistics, and fairness audits |
+
+A useful study habit is to ask four questions whenever a new NLP method appears.
+
+1. What is the input set?
+2. What mathematical representation is assigned to each input?
+3. What function, probability distribution, or optimization problem is being used?
+4. What metric or loss tells us whether the method worked?
+
+## 1. Finite sets, maps, and indexing
+
+Most NLP systems begin by converting text into discrete symbols.
+
+A **vocabulary** is a finite set
+
+$$
+V = \{w_1,w_2,\ldots,w_m\}.
+$$
+
+An **indexing map** assigns each token to an integer:
+
+$$
+\iota: V \to \{0,1,\ldots,m-1\}.
+$$
+
+After indexing, a sentence such as
+
+```text
+language models learn patterns
+```
+
+may become a sequence of token ids such as
+
+```text
+[12, 7, 35, 19]
+```
+
+This is mathematically important because neural networks do not operate directly on English words. They operate on arrays of numbers.
+
+### Key ideas
+
+| Concept | Meaning in NLP |
+|---|---|
+| finite set | vocabulary, label set, document collection |
+| sequence | ordered list of tokens |
+| map | tokenizer, embedding lookup, classifier |
+| equivalence relation | normalization that treats variants as the same token |
+| composition | pipeline: text $\to$ tokens $\to$ vectors $\to$ prediction |
+
+### Common notation
+
+| Symbol | Meaning |
+|---|---|
+| $V$ | vocabulary |
+| $m=|V|$ | vocabulary size |
+| $x=(x_1,\ldots,x_T)$ | token sequence of length $T$ |
+| $y$ | label or target output |
+| $D$ | document collection or dataset |
+
+## 2. Vectors and matrices
+
+Once words and documents are indexed, they are commonly represented as vectors.
+
+A vector in $\mathbb{R}^d$ is an ordered list of real numbers:
+
+$$
+\mathbf{x} = (x_1,x_2,\ldots,x_d).
+$$
+
+A document-term vector might record how often each word appears in a document. If the vocabulary is
+
+$$
+V=\{\text{data},\text{language},\text{model},\text{probability}\},
+$$
+
+then the document
+
+```text
+language model language
+```
+
+has count vector
+
+$$
+\mathbf{x}=(0,2,1,0).
+$$
+
+A collection of $n$ documents can be represented by a document-term matrix
+
+$$
+X \in \mathbb{R}^{n \times m},
+$$
+
+where row $i$ represents document $i$ and column $j$ represents token $w_j$.
+
+### Inner products and norms
+
+The dot product of two vectors is
+
+$$
+\mathbf{x}\cdot \mathbf{y}=\sum_{j=1}^d x_jy_j.
+$$
+
+The Euclidean norm is
+
+$$
+\|\mathbf{x}\|_2=\sqrt{\sum_{j=1}^d x_j^2}.
+$$
+
+The cosine similarity is
+
+$$
+\cos(\mathbf{x},\mathbf{y})=
+\frac{\mathbf{x}\cdot \mathbf{y}}{\|\mathbf{x}\|_2\|\mathbf{y}\|_2}.
+$$
+
+Cosine similarity is widely used in NLP retrieval because it compares vector direction rather than raw magnitude. This is useful when two documents have similar topic proportions but different lengths.
+
+### Important matrix operations
+
+| Operation | Formula | NLP interpretation |
+|---|---|---|
+| matrix-vector product | $A\mathbf{x}$ | linear transformation of a representation |
+| matrix-matrix product | $AB$ | composition of many linear maps |
+| transpose | $A^T$ | switch rows and columns |
+| Gram matrix | $XX^T$ | pairwise document similarities |
+| covariance-like matrix | $X^TX$ | feature-feature relationships |
+| diagonal scaling | $XD$ | TF-IDF reweighting |
+
+## 3. Linear transformations and embeddings
+
+An **embedding** maps a discrete object into a vector space. For example, a word embedding is a function
+
+$$
+e: V \to \mathbb{R}^d.
+$$
+
+If the vocabulary has $m$ words, an embedding table is a matrix
+
+$$
+E \in \mathbb{R}^{m\times d}.
+$$
+
+The row $E_{j,:}$ is the vector representation of token $w_j$.
+
+The embedding lookup for token id $j$ can be written as
+
+$$
+\mathbf{e}_j = E_{j,:}.
+$$
+
+Equivalently, if $\mathbf{u}_j$ is the one-hot vector for token $j$, then
+
+$$
+\mathbf{e}_j = \mathbf{u}_j^T E.
+$$
+
+This identity explains why embedding lookup is a computationally efficient version of multiplying by a large matrix.
+
+### What embeddings try to preserve
+
+Embeddings are useful when geometric relationships encode linguistic relationships.
+
+| Geometric relation | Linguistic interpretation |
+|---|---|
+| small distance | similar meaning or usage |
+| large dot product | high compatibility or relevance |
+| common direction | shared semantic or syntactic change |
+| cluster | group of related words or documents |
+| subspace | latent topic, style, or feature |
+
+Embeddings are not perfect. They may encode frequency artifacts, social bias, domain shift, and spurious correlations. This is why the book repeatedly connects representation learning with diagnostics and evaluation.
+
+## 4. Projection, orthogonality, and least squares
+
+A projection finds the closest point in a subspace. If $U$ is a subspace of $\mathbb{R}^d$, the projection of $\mathbf{x}$ onto $U$ is the vector $\mathbf{p}\in U$ that minimizes
+
+$$
+\|\mathbf{x}-\mathbf{p}\|_2.
+$$
+
+Projection appears in NLP when we reduce dimension, remove a direction from embeddings, or fit linear models.
+
+If $A\in \mathbb{R}^{n\times d}$ and $\mathbf{b}\in \mathbb{R}^n$, the least-squares problem is
+
+$$
+\min_{\mathbf{w}\in \mathbb{R}^d}\|A\mathbf{w}-\mathbf{b}\|_2^2.
+$$
+
+The normal equation is
+
+$$
+A^TA\mathbf{w}=A^T\mathbf{b}.
+$$
+
+In modern machine learning, we usually solve such problems with numerical optimization rather than explicitly forming the inverse.
+
+## 5. Singular value decomposition
+
+The singular value decomposition, or SVD, is one of the most important matrix tools in this book. For a matrix $X\in \mathbb{R}^{n\times m}$, the SVD has the form
+
+$$
+X = U\Sigma V^T.
+$$
+
+Here:
+
+- columns of $U$ describe directions among documents;
+- columns of $V$ describe directions among terms or features;
+- diagonal entries of $\Sigma$ are singular values, ordered from largest to smallest.
+
+A rank-$k$ approximation is
+
+$$
+X_k = U_k\Sigma_k V_k^T.
+$$
+
+This is the best rank-$k$ approximation to $X$ in Frobenius norm:
+
+$$
+X_k = \arg\min_{\operatorname{rank}(Y)\leq k}\|X-Y\|_F.
+$$
+
+In NLP, SVD appears in latent semantic analysis, dimensionality reduction, visualization, denoising, and embedding diagnostics.
+
+## 6. Probability distributions
+
+A probability distribution on a finite set $V$ assigns a number $p(w)$ to each $w\in V$ such that
+
+$$
+p(w)\geq 0,\qquad \sum_{w\in V}p(w)=1.
+$$
+
+In NLP, finite distributions appear everywhere:
+
+- token frequency distributions;
+- next-token distributions;
+- class posterior probabilities;
+- attention weights;
+- retrieval scores after normalization.
+
+### Conditional probability
+
+The conditional probability of $y$ given $x$ is
+
+$$
+P(y\mid x)=\frac{P(x,y)}{P(x)}.
+$$
+
+A classifier estimates $P(y\mid x)$. A language model estimates
+
+$$
+P(x_t\mid x_1,\ldots,x_{t-1}).
+$$
+
+The chain rule gives
+
+$$
+P(x_1,\ldots,x_T)=\prod_{t=1}^T P(x_t\mid x_1,
+\ldots,x_{t-1}).
+$$
+
+This identity is the mathematical basis of autoregressive language modeling.
+
+## 7. Likelihood, log-likelihood, and maximum likelihood
+
+Suppose a model with parameter $\theta$ assigns probability $p_\theta(x_i)$ to each training example $x_i$. The likelihood is
+
+$$
+L(\theta)=\prod_{i=1}^n p_\theta(x_i).
+$$
+
+The log-likelihood is
+
+$$
+\ell(\theta)=\sum_{i=1}^n \log p_\theta(x_i).
+$$
+
+Maximum likelihood estimation chooses
+
+$$
+\hat\theta=\arg\max_\theta \ell(\theta).
+$$
+
+Equivalently, many machine learning algorithms minimize the negative log-likelihood:
+
+$$
+\hat\theta=\arg\min_\theta -\sum_{i=1}^n \log p_\theta(x_i).
+$$
+
+In language modeling, this becomes the token-level cross-entropy loss.
+
+## 8. Entropy, cross-entropy, KL divergence, and perplexity
+
+Information theory provides the language for uncertainty and prediction quality.
+
+The entropy of a distribution $p$ on $V$ is
+
+$$
+H(p)=-\sum_{w\in V}p(w)\log p(w).
+$$
+
+Entropy measures uncertainty. A concentrated distribution has low entropy. A nearly uniform distribution has high entropy.
+
+The cross-entropy from $p$ to $q$ is
+
+$$
+H(p,q)=-\sum_{w\in V}p(w)\log q(w).
+$$
+
+The KL divergence from $p$ to $q$ is
+
+$$
+D_{\mathrm{KL}}(p\|q)=\sum_{w\in V}p(w)\log\frac{p(w)}{q(w)}.
+$$
+
+The identity
+
+$$
+H(p,q)=H(p)+D_{\mathrm{KL}}(p\|q)
+$$
+
+shows that cross-entropy is minimized when $q=p$.
+
+If average token cross-entropy is measured using natural logarithms, perplexity is
+
+$$
+\operatorname{PPL}=\exp(H).
+$$
+
+Perplexity can be interpreted as an effective number of choices per token.
+
+## 9. Bayes rule and classification
+
+Bayes rule states
+
+$$
+P(y\mid x)=\frac{P(x\mid y)P(y)}{P(x)}.
+$$
+
+For classification, the denominator $P(x)$ is the same for all classes, so the Bayes decision rule is
+
+$$
+\hat y = \arg\max_y P(x\mid y)P(y).
+$$
+
+Naive Bayes assumes that features are conditionally independent given the class. For a count vector
+
+$$
+\mathbf{x}=(x_1,\ldots,x_m),
+$$
+
+the multinomial Naive Bayes score has the form
+
+$$
+\log P(y)+\sum_{j=1}^m x_j\log P(w_j\mid y).
+$$
+
+This formula is simple, interpretable, and surprisingly strong for many text classification problems.
+
+## 10. Softmax and attention weights
+
+The softmax function converts real-valued scores into probabilities. Given scores
+
+$$
+\mathbf{z}=(z_1,\ldots,z_m),
+$$
+
+the softmax distribution is
+
+$$
+\operatorname{softmax}(\mathbf{z})_j=
+\frac{e^{z_j}}{\sum_{k=1}^m e^{z_k}}.
+$$
+
+For numerical stability, compute softmax as
+
+$$
+\operatorname{softmax}(\mathbf{z})_j=
+\frac{e^{z_j-c}}{\sum_{k=1}^m e^{z_k-c}},
+\qquad c=\max_k z_k.
+$$
+
+In attention, the score between query $\mathbf{q}$ and key $\mathbf{k}$ is often
+
+$$
+\frac{\mathbf{q}\cdot \mathbf{k}}{\sqrt{d}}.
+$$
+
+The attention output is a weighted average of value vectors:
+
+$$
+\operatorname{Attention}(Q,K,V)=
+\operatorname{softmax}\left(\frac{QK^T}{\sqrt{d}}\right)V.
+$$
+
+This formula is one of the central mathematical expressions in modern NLP.
+
+## 11. Differentiation, gradients, and backpropagation
+
+Training a neural model means minimizing a loss function. If
+
+$$
+L(\theta)
+$$
+
+is a loss depending on parameters $\theta$, the gradient
+
+$$
+\nabla_\theta L
+$$
+
+points in the direction of steepest increase. Gradient descent updates parameters by
+
+$$
+\theta_{t+1}=\theta_t-\eta\nabla_\theta L(\theta_t),
+$$
+
+where $\eta>0$ is the learning rate.
+
+Backpropagation is repeated use of the chain rule. If
+
+$$
+z=f(y),\qquad y=g(x),
+$$
+
+then
+
+$$
+\frac{dz}{dx}=\frac{dz}{dy}\frac{dy}{dx}.
+$$
+
+In a neural network, every layer contributes one part of this chain.
+
+### Common losses
+
+| Task | Common loss | Mathematical form |
+|---|---|---|
+| binary classification | logistic loss | $-y\log p-(1-y)\log(1-p)$ |
+| multiclass classification | cross-entropy | $-\log p_y$ |
+| language modeling | token cross-entropy | $-\sum_t \log p(x_t\mid x_{<t})$ |
+| regression | squared error | $\|y-\hat y\|_2^2$ |
+| preference learning | pairwise logistic loss | $-\log\sigma(s^+-s^-)$ |
+
+## 12. Optimization algorithms
+
+Full-batch gradient descent uses all training data for each update. Stochastic gradient descent uses small random batches. For mini-batch $B_t$, the update is
+
+$$
+\theta_{t+1}=\theta_t-\eta\frac{1}{|B_t|}\sum_{i\in B_t}\nabla_\theta L_i(\theta_t).
+$$
+
+Momentum smooths updates:
+
+$$
+v_{t+1}=\beta v_t + \nabla L(\theta_t),
+$$
+
+$$
+\theta_{t+1}=\theta_t-\eta v_{t+1}.
+$$
+
+Adam and AdamW adapt learning rates using running estimates of first and second moments of gradients. These methods are standard in training transformer models.
+
+### Practical optimization issues
+
+| Issue | Meaning | Common response |
+|---|---|---|
+| learning rate too large | loss diverges | reduce learning rate |
+| learning rate too small | training is slow | increase learning rate or use schedule |
+| exploding gradients | updates become unstable | gradient clipping |
+| overfitting | train loss improves but validation worsens | regularization, early stopping, more data |
+| padding tokens affect loss | model learns from fake positions | loss masks |
+| class imbalance | rare classes are ignored | reweighting or threshold adjustment |
+
+## 13. Sequences and recurrence
+
+A text is not only a bag of words. It is an ordered sequence
+
+$$
+x_1,x_2,\ldots,x_T.
+$$
+
+A recurrent neural network updates a hidden state by
+
+$$
+\mathbf{h}_t=\phi(W_x\mathbf{x}_t+W_h\mathbf{h}_{t-1}+\mathbf{b}),
+$$
+
+where $\phi$ is a nonlinear activation function.
+
+The hidden state is a summary of previous tokens. The challenge is that long chains of matrix multiplications can produce vanishing or exploding gradients. LSTMs and GRUs address this issue with gates that control memory flow.
+
+## 14. Transformers and residual computation
+
+A transformer block combines several operations:
+
+1. self-attention;
+2. residual connection;
+3. layer normalization;
+4. feedforward network;
+5. another residual connection;
+6. another layer normalization.
+
+A simplified encoder block can be written as
+
+$$
+Y = \operatorname{LayerNorm}(X + \operatorname{SelfAttention}(X)),
+$$
+
+$$
+Z = \operatorname{LayerNorm}(Y + \operatorname{FFN}(Y)).
+$$
+
+The residual terms help preserve information and improve gradient flow. Layer normalization stabilizes the scale of activations.
+
+## 15. Positional encoding
+
+Self-attention alone is permutation equivariant: if token order is permuted, outputs are permuted in the same way. To model word order, transformers add position information.
+
+A token representation often has the form
+
+$$
+\mathbf{z}_t = \mathbf{e}_{x_t}+\mathbf{p}_t,
+$$
+
+where $\mathbf{e}_{x_t}$ is the token embedding and $\mathbf{p}_t$ is a position vector.
+
+Sinusoidal positional encodings use functions such as
+
+$$
+\sin\left(\frac{t}{10000^{2j/d}}\right),
+\qquad
+\cos\left(\frac{t}{10000^{2j/d}}\right).
+$$
+
+Relative position methods modify attention scores according to token distance. Rotary positional embedding, or RoPE, rotates query and key vectors by position-dependent angles.
+
+## 16. Graphs and language
+
+A graph consists of vertices and edges:
+
+$$
+G=(V,E).
+$$
+
+Graphs appear in NLP in many ways:
+
+- dependency parse graphs;
+- word co-occurrence graphs;
+- document similarity graphs;
+- knowledge graphs;
+- retrieval citation graphs;
+- conversation graphs.
+
+The adjacency matrix $A$ is defined by
+
+$$
+A_{ij}=1
+$$
+
+if there is an edge from node $i$ to node $j$, and $0$ otherwise. Weighted graphs allow nonnegative edge weights.
+
+The degree matrix $D$ has diagonal entries
+
+$$
+D_{ii}=\sum_j A_{ij}.
+$$
+
+The graph Laplacian is
+
+$$
+L=D-A.
+$$
+
+Graph neural networks update node features by mixing information from neighbors. A simple graph convolution has the form
+
+$$
+H^{(\ell+1)}=\sigma(\widetilde A H^{(\ell)}W^{(\ell)}),
+$$
+
+where $\widetilde A$ is a normalized adjacency matrix.
+
+## 17. Metrics, ranking, and retrieval evaluation
+
+Retrieval systems rank documents according to a score. If $q$ is a query and $d$ is a document, a retrieval score might be
+
+$$
+s(q,d)=\cos(\mathbf{q},\mathbf{d}).
+$$
+
+The output is an ordered list of documents. Evaluation must respect ranking.
+
+| Metric | What it measures |
+|---|---|
+| precision@k | fraction of top-$k$ documents that are relevant |
+| recall@k | fraction of all relevant documents found in top $k$ |
+| MRR | reciprocal rank of the first relevant document |
+| MAP | average precision across relevant documents |
+| nDCG | relevance-weighted ranking quality with discount for lower ranks |
+
+For retrieval-augmented generation, evaluation must check both retrieval and generation. A good answer may fail because the retriever missed the right evidence, or because the generator ignored the evidence.
+
+## 18. Statistics and uncertainty
+
+Evaluation metrics are estimates computed on finite datasets. They have uncertainty.
+
+If a model has accuracy $\hat p$ on $n$ independent examples, an approximate standard error is
+
+$$
+\sqrt{\frac{\hat p(1-\hat p)}{n}}.
+$$
+
+For complex metrics, bootstrap resampling is often more useful. A bootstrap procedure repeatedly samples the evaluation set with replacement, recomputes the metric, and uses the resulting empirical distribution to estimate uncertainty.
+
+### Confusion matrix
+
+For binary classification, the confusion matrix records:
+
+| | predicted positive | predicted negative |
+|---|---:|---:|
+| actual positive | TP | FN |
+| actual negative | FP | TN |
+
+The most common metrics are
+
+$$
+\operatorname{precision}=\frac{TP}{TP+FP},
+$$
+
+$$
+\operatorname{recall}=\frac{TP}{TP+FN},
+$$
+
+$$
+F_1=\frac{2\cdot \operatorname{precision}\cdot \operatorname{recall}}
+{\operatorname{precision}+\operatorname{recall}}.
+$$
+
+## 19. Geometry and topology of representations
+
+A set of embeddings can be treated as a finite metric space. Given points
+
+$$
+\mathbf{x}_1,\ldots,\mathbf{x}_n\in \mathbb{R}^d,
+$$
+
+we can compute pairwise distances
+
+$$
+d_{ij}=\|\mathbf{x}_i-\mathbf{x}_j\|_2.
+$$
+
+A neighborhood graph connects points whose distance is below a scale $\epsilon$. As $\epsilon$ changes, the graph may gain or lose connected components.
+
+Topology studies properties such as connected components and loops. Persistent homology studies how such properties change across scale.
+
+In NLP, these ideas can help diagnose representation spaces. For example:
+
+- Are embeddings organized into clusters?
+- Are there hubs that appear near too many points?
+- Does the representation collapse into a narrow cone?
+- Are trajectories through generated text smooth or unstable?
+- Do different groups or domains occupy different regions?
+
+## 20. Responsible mathematical modeling
+
+Responsible NLP is not separate from mathematics. It uses mathematical tools to ask whether systems behave reliably and fairly.
+
+Examples include:
+
+| Concern | Mathematical diagnostic |
+|---|---|
+| unequal error rates | subgroup precision, recall, false positive rate |
+| overconfidence | calibration curves, ECE, Brier score |
+| distribution shift | train-test divergence, importance weighting |
+| embedding bias | association scores, projection diagnostics |
+| hallucination in RAG | evidence coverage and answer support |
+| privacy leakage | randomized response, membership inference risk |
+| unreliable automation | abstention, uncertainty thresholds, human review |
+
+A model is not responsible simply because it has high average accuracy. The errors must be understood by context, subgroup, uncertainty, and consequences.
+
+## Chapter-by-chapter background map
+
+| Chapters | Main mathematical tools |
+|---|---|
+| 1--3 | finite sets, token sequences, vectors, document-term matrices, cosine similarity |
+| 4--6 | probability distributions, Bayes rule, likelihood, entropy, smoothing |
+| 7--9 | vector spaces, TF-IDF scaling, Gram matrices, SVD, embedding geometry |
+| 10--12 | softmax, cross-entropy, gradients, recurrence, gated memory |
+| 13--16 | attention matrices, masking, positional encoding, residual maps, normalization |
+| 17--20 | chain rule for probabilities, perplexity, retrieval metrics, calibration, bootstrap uncertainty |
+| 21--25 | information theory, optimization, graph Laplacians, topology, fairness and responsibility |
+
+## Minimal Python notation
+
+The labs mostly use NumPy notation. The table below connects mathematical symbols to Python objects.
+
+| Mathematical object | Python representation |
+|---|---|
+| scalar $a$ | `float` |
+| vector $\mathbf{x}\in\mathbb{R}^d$ | one-dimensional NumPy array with shape `(d,)` |
+| matrix $X\in\mathbb{R}^{n\times d}$ | two-dimensional NumPy array with shape `(n, d)` |
+| token sequence $(x_1,\ldots,x_T)$ | Python list of strings or ids |
+| vocabulary map | Python dictionary |
+| probability vector | nonnegative array summing to one |
+| dataset | list, pandas DataFrame, or pair of arrays |
+| model parameters | arrays to be optimized |
+
+Common NumPy operations:
+
+```python
+x @ y          # dot product for vectors
+X @ W          # matrix multiplication
+X.T            # transpose
+np.linalg.norm(x)
+np.exp(z)
+np.log(p)
+np.argmax(scores)
+np.linalg.svd(X)
+```
+
+## A compact formula sheet
+
+| Topic | Formula |
+|---|---|
+| cosine similarity | $\cos(\mathbf{x},\mathbf{y})=\frac{\mathbf{x}\cdot\mathbf{y}}{\|\mathbf{x}\|\|\mathbf{y}\|}$ |
+| softmax | $p_j=\frac{e^{z_j}}{\sum_k e^{z_k}}$ |
+| cross-entropy | $H(p,q)=-\sum_j p_j\log q_j$ |
+| KL divergence | $D_{\mathrm{KL}}(p\|q)=\sum_jp_j\log\frac{p_j}{q_j}$ |
+| perplexity | $\operatorname{PPL}=\exp(H)$ |
+| Bayes rule | $P(y\mid x)=\frac{P(x\mid y)P(y)}{P(x)}$ |
+| gradient descent | $\theta_{t+1}=\theta_t-\eta\nabla L(\theta_t)$ |
+| attention | $\operatorname{softmax}(QK^T/\sqrt{d})V$ |
+| graph Laplacian | $L=D-A$ |
+| rank-$k$ SVD approximation | $X_k=U_k\Sigma_kV_k^T$ |
+
+## Self-check questions
+
+1. Why does an embedding table have one row per vocabulary item?
+2. Why is cosine similarity often preferred over raw dot product for document retrieval?
+3. What is the difference between entropy and cross-entropy?
+4. Why do we usually optimize log-likelihood instead of likelihood?
+5. What does softmax do to a vector of real-valued scores?
+6. Why does a transformer need positional information?
+7. What is the difference between model training loss and evaluation metric?
+8. Why can a high average score hide subgroup failures?
+9. How can a graph represent language data?
+10. What does it mean to study embeddings as a finite metric space?
+
+## Suggested review path
+
+Students who need a quick review before the book can follow this sequence.
+
+1. Review finite sets, maps, vectors, matrices, and cosine similarity.
+2. Work through probability distributions, conditional probability, and Bayes rule.
+3. Study entropy, cross-entropy, KL divergence, and perplexity.
+4. Review gradients, softmax, and cross-entropy loss.
+5. Learn the attention formula and identify the shapes of $Q$, $K$, and $V$.
+6. Return to graph and topology sections later, when reaching Chapters 23 and 24.
+
+The goal is not to memorize every formula at once. The goal is to recognize the mathematical structure behind each NLP method and to connect the theory with the Python labs.

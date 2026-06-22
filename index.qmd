@@ -1,0 +1,196 @@
+---
+title: "Mathematical Foundations of Natural Language Processing"
+subtitle: "From Tokens and Probability to Transformers, Retrieval, and Responsible AI"
+author: "He Wang"
+---
+
+::: {.hero-box}
+Natural language processing is the study of how language can be represented, modeled, learned, retrieved, generated, and evaluated by computational systems. This book develops NLP from a mathematical point of view, with enough Python computation to make the ideas concrete and testable.
+:::
+
+This book is designed for students in applied mathematics, statistics, data science, computer science, and related quantitative programs who want to understand modern NLP beyond package usage. The central theme is that language data can be studied through familiar mathematical structures: finite sets, vectors, matrices, probability distributions, optimization problems, graphs, geometry, and topology.
+
+## What makes this book mathematical?
+
+Rather than beginning with software libraries, the book begins with objects and operations.
+
+| NLP idea | Mathematical viewpoint | Computational object |
+|---|---|---|
+| Tokens | Elements of a finite alphabet | strings, integer ids |
+| Documents | Empirical measures or vectors | token lists, count vectors |
+| Vocabulary | Finite set with indexing | dictionaries, arrays |
+| Language model | Conditional probability distribution | tables or neural networks |
+| Embedding | Map into a vector space | dense matrix rows |
+| Similarity | Inner product, norm, or metric | cosine score, distance matrix |
+| Attention | Similarity-weighted averaging operator | query-key-value matrices |
+| Transformer | Nonlinear operator on sequences | stacked attention and feedforward blocks |
+| Retrieval | Nearest-neighbor search in representation space | ranked document lists |
+| Evaluation | Statistical estimation under uncertainty | metrics, confidence intervals |
+| Responsible NLP | Error analysis across populations and contexts | audits, calibration, bias diagnostics |
+
+The goal is not only to run an NLP model. The goal is to understand what the model is doing, what assumptions it makes, when it works, and how to diagnose its failures.
+
+## Intended audience
+
+The book assumes basic familiarity with:
+
+- linear algebra: vectors, matrices, inner products, projections, eigenvalues, and singular value decomposition;
+- probability: conditional probability, likelihood, entropy, expectation, and random variables;
+- statistics: classification, estimation, empirical risk, validation, and uncertainty;
+- Python: NumPy, pandas, matplotlib, and basic machine learning workflows.
+
+No prior NLP background is required. The computer labs are written for independent study and include the necessary background before programming begins.
+
+## How to use this book
+
+Each chapter is organized around four layers.
+
+1. **Conceptual layer:** What is the NLP problem and why does it matter?
+2. **Mathematical layer:** What objects, maps, distributions, or optimization problems define the method?
+3. **Computational layer:** How can the idea be implemented in Python on a small transparent example?
+4. **Critical layer:** What can go wrong, and how should we evaluate or audit the method?
+
+A recommended weekly workflow is:
+
+1. read the chapter overview and mathematical explanation;
+2. work through the examples by hand for a small toy corpus;
+3. open the corresponding lab in Google Colab;
+4. complete the guided exercises;
+5. write a short reflection on what the model assumes and where it may fail.
+
+## Book structure
+
+### Part I. Language as Data
+
+Part I introduces the basic data structures of NLP: texts, tokens, vocabularies, documents, and document vectors.
+
+| Chapter | Topic | Lab |
+|---:|---|---|
+| 1 | [What Is Natural Language Processing?](chapters/chapter-01-what-is-nlp.qmd) | [Open Lab 1 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-01-what-is-nlp.ipynb) |
+| 2 | [Text, Tokens, and Vocabularies](chapters/chapter-02-text-tokens-vocabularies.qmd) | [Open Lab 2 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-02-text-tokens-vocabularies.ipynb) |
+| 3 | [Documents as Vectors](chapters/chapter-03-documents-as-vectors.qmd) | [Open Lab 3 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-03-documents-as-vectors.ipynb) |
+
+### Part II. Probability Models for Language
+
+Part II develops probabilistic language modeling, smoothing, likelihood, classification, and uncertainty.
+
+| Chapter | Topic | Lab |
+|---:|---|---|
+| 4 | [Probability and Language](chapters/chapter-04-probability-and-language.qmd) | [Open Lab 4 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-04-probability-and-language.ipynb) |
+| 5 | [N-gram Language Models](chapters/chapter-05-ngram-language-models.qmd) | [Open Lab 5 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-05-ngram-language-models.ipynb) |
+| 6 | [Naive Bayes Text Classification](chapters/chapter-06-naive-bayes-text-classification.qmd) | [Open Lab 6 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-06-naive-bayes-text-classification.ipynb) |
+
+### Part III. Linear Algebra of Language
+
+Part III treats language as geometry: vector spaces, similarity, matrix factorization, embeddings, and representation diagnostics.
+
+| Chapter | Topic | Lab |
+|---:|---|---|
+| 7 | [Vector Space Models](chapters/chapter-07-vector-space-models.qmd) | [Open Lab 7 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-07-vector-space-models.ipynb) |
+| 8 | [Word Embeddings](chapters/chapter-08-word-embeddings.qmd) | [Open Lab 8 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-08-word-embeddings.ipynb) |
+| 9 | [Geometry of Embeddings](chapters/chapter-09-geometry-of-embeddings.qmd) | [Open Lab 9 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-09-geometry-of-embeddings.ipynb) |
+
+### Part IV. Neural Networks for Sequences
+
+Part IV introduces neural computation for text, including embeddings, recurrent networks, and gated memory.
+
+| Chapter | Topic | Lab |
+|---:|---|---|
+| 10 | [Neural Networks for Text](chapters/chapter-10-neural-networks-for-text.qmd) | [Open Lab 10 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-10-neural-networks-for-text.ipynb) |
+| 11 | [Recurrent Neural Networks](chapters/chapter-11-recurrent-neural-networks.qmd) | [Open Lab 11 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-11-recurrent-neural-networks.ipynb) |
+| 12 | [LSTM and GRU Models](chapters/chapter-12-lstm-gru-models.qmd) | [Open Lab 12 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-12-lstm-gru-models.ipynb) |
+
+### Part V. Attention and Transformers
+
+Part V develops the mathematical core of modern NLP: attention, self-attention, positional encoding, and transformers.
+
+| Chapter | Topic | Lab |
+|---:|---|---|
+| 13 | [Attention Mechanisms](chapters/chapter-13-attention-mechanisms.qmd) | [Open Lab 13 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-13-attention-mechanisms.ipynb) |
+| 14 | [Self-Attention](chapters/chapter-14-self-attention.qmd) | [Open Lab 14 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-14-self-attention.ipynb) |
+| 15 | [Transformers](chapters/chapter-15-transformers.qmd) | [Open Lab 15 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-15-transformers.ipynb) |
+| 16 | [Positional Encoding and Sequence Geometry](chapters/chapter-16-positional-encoding.qmd) | [Open Lab 16 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-16-positional-encoding.ipynb) |
+
+### Part VI. Large Language Models and Retrieval
+
+Part VI studies autoregressive models, training objectives, retrieval-augmented generation, and evaluation.
+
+| Chapter | Topic | Lab |
+|---:|---|---|
+| 17 | [Autoregressive Language Models](chapters/chapter-17-autoregressive-language-models.qmd) | [Open Lab 17 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-17-autoregressive-language-models.ipynb) |
+| 18 | [Training Large Language Models](chapters/chapter-18-training-large-language-models.qmd) | [Open Lab 18 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-18-training-large-language-models.ipynb) |
+| 19 | [Embeddings, Retrieval, and RAG](chapters/chapter-19-embeddings-retrieval-rag.qmd) | [Open Lab 19 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-19-embeddings-retrieval-rag.ipynb) |
+| 20 | [Evaluation](chapters/chapter-20-evaluation.qmd) | [Open Lab 20 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-20-evaluation-of-language-models.ipynb) |
+
+### Part VII. Advanced Mathematical Perspectives
+
+Part VII connects NLP to information theory, optimization, graphs, topology, geometry, and responsible AI.
+
+| Chapter | Topic | Lab |
+|---:|---|---|
+| 21 | [Information Theory](chapters/chapter-21-information-theory.qmd) | [Open Lab 21 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-21-information-theory.ipynb) |
+| 22 | [Optimization for NLP](chapters/chapter-22-optimization-for-nlp.qmd) | [Open Lab 22 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-22-optimization-for-nlp.ipynb) |
+| 23 | [Graphs and Language](chapters/chapter-23-graphs-and-language.qmd) | [Open Lab 23 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-23-graphs-and-language.ipynb) |
+| 24 | [Topology, Geometry, and Language](chapters/chapter-24-topology-geometry-language.qmd) | [Open Lab 24 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-24-topology-geometry-language.ipynb) |
+| 25 | [Ethics, Bias, and Responsibility](chapters/chapter-25-ethics-bias-responsibility.qmd) | [Open Lab 25 in Colab](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-25-ethics-bias-responsibility.ipynb) |
+
+## Mathematical spine of the course
+
+A useful way to read the book is to follow the mathematical objects as they become more expressive.
+
+```text
+text
+  -> tokens
+  -> count vectors
+  -> probability distributions
+  -> sparse and dense vector spaces
+  -> neural sequence maps
+  -> attention operators
+  -> transformer blocks
+  -> autoregressive probability models
+  -> retrieval systems
+  -> evaluated and audited NLP systems
+```
+
+The same mathematical ideas appear repeatedly:
+
+- **Linearity:** document-term matrices, embeddings, projections, attention scores, and low-rank adaptation.
+- **Probability:** likelihood, language modeling, entropy, calibration, decoding, and preference learning.
+- **Optimization:** cross-entropy minimization, stochastic gradients, AdamW, clipping, and regularization.
+- **Geometry:** similarity, clustering, anisotropy, hubness, positional encoding, and representation diagnostics.
+- **Graphs:** co-occurrence networks, dependency structures, knowledge graphs, message passing, and retrieval links.
+- **Evaluation:** metrics, uncertainty, subgroup analysis, factuality, robustness, and responsible deployment.
+
+## Computer labs
+
+The labs are stored in the `labs/` folder and are designed for Google Colab. Each lab includes:
+
+- background knowledge before programming;
+- small transparent datasets;
+- runnable Python examples;
+- guided exercises;
+- AI-assisted reflection prompts;
+- a mini-project for independent study.
+
+Start from the [Labs Summary](labs-summary.qmd) page, or open any lab directly from the chapter table above.
+
+## Suggested projects
+
+Students can use the later chapters as starting points for final projects, for example:
+
+- compare TF-IDF, dense embeddings, and hybrid retrieval on a small course-document corpus;
+- audit a text classifier for subgroup performance and calibration;
+- build a transparent retrieval-augmented question-answering prototype;
+- study geometry and topology of sentence embeddings from different domains;
+- implement and evaluate decoding methods for a small autoregressive model;
+- compare graph-based and vector-based representations of language data.
+
+See the [Final Projects](final-projects.qmd) page for more ideas.
+
+## Repository
+
+The GitHub repository for this book is:
+
+<https://github.com/wanghemath/Book-MathNLP>
+
+When the repository is published with GitHub Pages, the book can be rendered with Quarto and the labs can be opened directly in Google Colab.

@@ -1,0 +1,310 @@
+---
+title: "Introduction"
+subtitle: "Why Natural Language Processing Is a Mathematical Subject"
+---
+
+::: {.hero-box}
+Natural language processing is often introduced through applications: search engines, translation systems, chatbots, summarizers, speech interfaces, and large language models. This book takes a different but complementary route. It asks: **what mathematical objects are being manipulated when a machine processes language?**
+:::
+
+The answer is richer than a single method or model. Language can be represented as strings, finite sets, sequences, sparse vectors, probability distributions, matrices, graphs, geometric point clouds, and learned nonlinear maps. Modern NLP is powerful because these representations can be connected: tokens become vectors, vectors become probability models, probability models become neural networks, neural networks become attention-based sequence operators, and these operators become components of retrieval and generation systems.
+
+This book develops NLP through that mathematical chain.
+
+## Goals of the book
+
+The main goal is to help students understand NLP as a mathematical discipline, not only as a collection of software tools. By the end of the book, students should be able to:
+
+1. represent text using tokens, vocabularies, vectors, matrices, and probability distributions;
+2. derive and implement basic probabilistic language models;
+3. understand text classification through Bayes rules, likelihoods, and decision boundaries;
+4. explain document-term matrices, TF-IDF, cosine similarity, SVD, and embedding geometry;
+5. implement the core computations behind attention and transformer blocks;
+6. interpret autoregressive language modeling through conditional probability and cross-entropy;
+7. build small retrieval and retrieval-augmented generation systems;
+8. evaluate NLP systems using metrics, uncertainty, calibration, and subgroup analysis;
+9. connect NLP to information theory, optimization, graphs, geometry, topology, and ethics.
+
+The book is intentionally mathematical, but it is also computational. Each major idea is paired with a transparent Python implementation, usually on a small corpus that students can inspect directly.
+
+## Why a mathematical approach?
+
+Many NLP systems are large, but their core ideas can be studied on small examples. A sentence such as
+
+> language models learn patterns from text
+
+can already illustrate much of the mathematical structure of NLP.
+
+It can be treated as:
+
+| Viewpoint | Mathematical object | Example question |
+|---|---|---|
+| string processing | sequence of characters | How should text be normalized? |
+| tokenization | finite sequence from a vocabulary | What counts as a word or subword? |
+| vectorization | vector in $\mathbb R^d$ | Which coordinates represent the document? |
+| probability | empirical or learned distribution | How surprising is the next token? |
+| geometry | point in a metric or inner product space | Which texts are similar? |
+| neural modeling | parameterized nonlinear map | How are features learned from data? |
+| attention | weighted averaging operator | Which tokens should influence each other? |
+| evaluation | statistical estimator | How reliable is the measured performance? |
+| responsibility | decision under social constraints | Who is harmed by errors or bias? |
+
+A mathematical perspective helps students see common structure across many models. For example, cosine similarity in TF-IDF retrieval, nearest-neighbor search in embedding space, attention scores in transformers, and reranking in retrieval-augmented generation all involve comparing representations. Cross-entropy appears in language modeling, classification, calibration, and preference learning. Matrix factorization appears in latent semantic analysis, embedding learning, low-rank adaptation, and representation diagnostics.
+
+## The central pipeline
+
+A simplified NLP pipeline is:
+
+```text
+raw text
+  -> tokens
+  -> vocabulary indices
+  -> vectors or embeddings
+  -> model scores
+  -> probability distributions
+  -> predictions, retrieved documents, or generated text
+  -> evaluation and auditing
+```
+
+Each arrow hides mathematical choices. Tokenization determines the sample space. Vectorization determines what information is preserved. The model class determines which dependencies can be learned. The loss function determines what the system is optimized to do. The evaluation protocol determines what failures are visible.
+
+One guiding theme of the book is therefore:
+
+::: {.callout-note}
+Every NLP system is a sequence of mathematical modeling decisions. Good NLP requires understanding those decisions, not merely running the final model.
+:::
+
+## Prerequisites
+
+The book is written for advanced undergraduate students, master's students, or beginning PhD students in applied mathematics, statistics, data science, computer science, computational linguistics, or related fields.
+
+Useful background includes:
+
+- **linear algebra:** vectors, matrices, inner products, norms, projections, eigenvalues, and singular value decomposition;
+- **probability:** conditional probability, likelihood, expectation, entropy, Bayes rule, and random variables;
+- **statistics and machine learning:** classification, validation, loss functions, empirical risk, and basic evaluation metrics;
+- **calculus and optimization:** gradients, gradient descent, stochastic gradients, and regularization;
+- **Python:** basic programming with lists, dictionaries, NumPy arrays, pandas data frames, and matplotlib plots.
+
+Students do not need prior NLP experience. The computer labs are designed for independent study and introduce the needed background before programming begins.
+
+## Notation
+
+The following notation is used throughout the book.
+
+| Symbol | Meaning |
+|---|---|
+| $V$ | vocabulary set |
+| $|V|$ | vocabulary size |
+| $x_1, x_2, \ldots, x_T$ | token sequence of length $T$ |
+| $d$ | embedding dimension or feature dimension |
+| $X \in \mathbb R^{n \times d}$ | data matrix with $n$ examples and $d$ features |
+| $p(x)$ | probability of token, document, or event $x$ |
+| $p(x_t \mid x_{<t})$ | autoregressive next-token probability |
+| $\theta$ | model parameters |
+| $\ell(\theta)$ | loss function or objective |
+| $q, k, v$ | query, key, and value vectors in attention |
+| $Q, K, V$ | query, key, and value matrices |
+| $A$ | attention weight matrix or adjacency matrix, depending on context |
+
+For a probability distribution $p$ over a finite set $V$, entropy is written as
+
+$$
+H(p) = -\sum_{x \in V} p(x) \log p(x).
+$$
+
+For two distributions $p$ and $q$, cross-entropy is
+
+$$
+H(p,q) = -\sum_{x \in V} p(x) \log q(x),
+$$
+
+and KL divergence is
+
+$$
+D_{\mathrm{KL}}(p \Vert q) = \sum_{x \in V} p(x) \log \frac{p(x)}{q(x)}.
+$$
+
+For vectors $u,v \in \mathbb R^d$, cosine similarity is
+
+$$
+\operatorname{cos}(u,v) = \frac{u \cdot v}{\|u\|\,\|v\|}.
+$$
+
+The attention operation is usually written as
+
+$$
+\operatorname{Attention}(Q,K,V) = \operatorname{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V.
+$$
+
+These formulas will appear repeatedly in different contexts.
+
+## Computational philosophy
+
+The labs avoid treating NLP models as black boxes. Instead, students are asked to build small versions of the main algorithms. The goal is not to compete with industrial-scale models. The goal is to understand the computations well enough to inspect, modify, and evaluate them.
+
+For example, students will implement:
+
+- tokenization and vocabulary construction;
+- document-term matrices and TF-IDF;
+- n-gram language models and smoothing;
+- Naive Bayes classification;
+- cosine retrieval and SVD-based latent spaces;
+- word embeddings from co-occurrence statistics;
+- attention and self-attention from matrix operations;
+- transformer-style blocks;
+- autoregressive decoding methods;
+- retrieval metrics and transparent RAG pipelines;
+- fairness, calibration, and bias diagnostics.
+
+Whenever possible, the book uses small datasets created inside the notebook. This makes the mathematical structure visible. Students can print the vocabulary, inspect the matrix entries, compute probabilities by hand, and compare manual calculations with Python output.
+
+## How to use the computer labs
+
+The labs are located in the `labs/` folder and are designed to open directly in Google Colab. Each lab follows the same independent-study structure:
+
+1. **Background before programming.** The lab explains the core mathematical idea before code appears.
+2. **Small transparent data.** Students work with short corpora or toy examples before moving to larger settings.
+3. **Guided implementation.** Important formulas are translated into Python step by step.
+4. **Diagnostics.** Students inspect intermediate objects such as vocabularies, matrices, probabilities, hidden states, attention weights, or retrieval rankings.
+5. **Exercises.** Each lab contains tasks that require modification, experimentation, and interpretation.
+6. **Mini-project.** Each lab ends with an open-ended extension suitable for independent study.
+7. **AI-assisted reflection.** Students are encouraged to use AI tools to explain, critique, and test their reasoning, but not to replace their own mathematical work.
+
+A productive workflow is:
+
+```text
+read the chapter
+  -> open the corresponding Colab lab
+  -> run every cell
+  -> change the toy data
+  -> answer the exercises
+  -> write a short reflection
+  -> connect the result back to the formulas
+```
+
+## Responsible use of AI tools
+
+Because NLP is closely connected to modern generative AI, this book treats AI tools as objects of study and as possible learning assistants. Students may use AI systems to ask for explanations, generate test examples, or compare interpretations. However, they should verify all claims through computation, derivation, or source checking.
+
+A useful rule is:
+
+::: {.callout-important}
+Use AI to ask better questions, not to avoid mathematical reasoning.
+:::
+
+For each AI-assisted prompt in the labs, students should record:
+
+- the question they asked;
+- the answer they received;
+- what they verified independently;
+- what was unclear, incomplete, or incorrect;
+- how the result connects to the mathematical model.
+
+This habit is especially important in later chapters on evaluation, retrieval-augmented generation, fairness, and responsibility.
+
+## Chapter roadmap
+
+The book has seven parts.
+
+### Part I. Language as Data
+
+Chapters 1--3 introduce text as data. Students learn what NLP studies, how text becomes tokens and vocabularies, and how documents become vectors. These chapters establish the finite-set and vector-space foundations of the book.
+
+### Part II. Probability Models for Language
+
+Chapters 4--6 develop probability models. Students study empirical distributions, likelihood, entropy, n-gram language models, smoothing, and Naive Bayes classification. These chapters show how language modeling begins with conditional probability.
+
+### Part III. Linear Algebra of Language
+
+Chapters 7--9 develop vector space methods, embeddings, and geometry. Students study document-term matrices, TF-IDF, SVD, word embeddings, cosine similarity, anisotropy, hubness, clustering, and semantic directions.
+
+### Part IV. Neural Networks for Sequences
+
+Chapters 10--12 introduce neural networks for text. Students study embedding lookup, pooling, recurrent neural networks, backpropagation through time, LSTM cells, GRU cells, and gated memory.
+
+### Part V. Attention and Transformers
+
+Chapters 13--16 develop attention, self-attention, transformer blocks, and positional encoding. These chapters form the mathematical core of modern NLP architectures.
+
+### Part VI. Large Language Models and Retrieval
+
+Chapters 17--20 study autoregressive language models, training objectives, retrieval, RAG, and evaluation. Students learn how next-token prediction, decoding, fine-tuning, retrieval, calibration, and uncertainty interact in modern systems.
+
+### Part VII. Advanced Mathematical Perspectives
+
+Chapters 21--25 connect NLP to information theory, optimization, graphs, topology, geometry, ethics, bias, and responsibility. These chapters invite students to view NLP as part of a larger mathematical and social ecosystem.
+
+## Learning outcomes by mathematical theme
+
+The following table summarizes the mathematical themes of the book.
+
+| Theme | Chapters | What students learn |
+|---|---:|---|
+| finite structures | 1--3 | tokens, vocabularies, documents, indexing |
+| probability | 4--6, 17--21 | likelihood, entropy, language modeling, calibration |
+| linear algebra | 3, 7--9, 13--16 | matrices, similarity, SVD, embeddings, attention |
+| optimization | 10--12, 18, 22 | losses, gradients, SGD, AdamW, clipping, regularization |
+| geometry | 8--9, 16, 24 | distances, neighborhoods, directions, intrinsic structure |
+| graphs | 19, 23 | co-occurrence graphs, knowledge graphs, random walks, message passing |
+| evaluation | 20, 25 | metrics, uncertainty, subgroup analysis, audits |
+| responsibility | 20, 25 | fairness, bias, factuality, privacy, human impact |
+
+## Suggested study questions
+
+Students should return to these questions throughout the course:
+
+1. What is the sample space?
+2. What information is preserved by the representation?
+3. What information is lost?
+4. What probability distribution is being estimated or optimized?
+5. What geometry does the representation create?
+6. What loss function defines success during training?
+7. What metric defines success during evaluation?
+8. What kinds of examples are likely to fail?
+9. Who is affected by the errors?
+10. What evidence supports the final conclusion?
+
+These questions help connect early chapters on tokens and vectors with later chapters on transformers, retrieval, and responsible AI.
+
+## A first example: language as counting and prediction
+
+Consider a tiny corpus:
+
+```text
+language models learn from text
+language models predict text
+retrieval systems use text
+```
+
+From this corpus, we can construct a vocabulary
+
+$$
+V = \{\text{from}, \text{language}, \text{learn}, \text{models}, \text{predict}, \text{retrieval}, \text{systems}, \text{text}, \text{use}\}.
+$$
+
+Each document can be represented as a vector in $\mathbb R^{|V|}$. A language model can estimate probabilities such as
+
+$$
+p(\text{text} \mid \text{predict}).
+$$
+
+A retrieval system can compare a query vector with document vectors. A neural model can learn dense embeddings for the same tokens. An attention model can compute which earlier words influence a later prediction.
+
+Thus a simple corpus already contains the central mathematical objects of the book: sets, vectors, matrices, probabilities, optimization problems, and evaluation criteria.
+
+## What this book is not
+
+This book is not a catalog of every NLP library or a survey of every current model. Modern NLP changes quickly, and software APIs change even faster. Instead, this book focuses on durable mathematical principles. Students who understand these principles will be better prepared to learn new architectures, evaluate new systems, and use future tools responsibly.
+
+## Final perspective
+
+Natural language is human, contextual, and social. Mathematical models of language are useful because they simplify language into structures that can be computed with. But every simplification has consequences. A responsible mathematical approach therefore asks both technical and critical questions:
+
+- What is the model?
+- What does the model optimize?
+- What does the model ignore?
+- How do we know whether it works?
+- What happens when it fails?
+
+The purpose of this book is to give students the mathematical and computational tools to answer these questions carefully.

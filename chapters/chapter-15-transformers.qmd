@@ -1,0 +1,1057 @@
+---
+title: "The Transformer Architecture"
+subtitle: "Residual nonlinear operators on token sequences"
+---
+
+::: {.chapter-opening}
+The Transformer combines the self-attention mechanism from Chapter 14 with residual connections, normalization, and position-wise neural networks.  From a mathematical point of view, a Transformer layer is a learned nonlinear map
+
+$$
+F:R^{T\times d}\to R^{T\times d}
+$$
+
+that transforms a matrix of token representations into a new matrix of contextual token representations.  The key architectural idea is not a single formula, but a carefully organized composition of simple maps:
+
+$$
+\text{linear maps}\;\longrightarrow\;\text{softmax attention}\;\longrightarrow\;\text{residual addition}\;\longrightarrow\;\text{normalization}\;\longrightarrow\;\text{position-wise nonlinear maps}.
+$$
+
+This chapter studies the Transformer as an operator on sequence matrices.  We emphasize dimensions, probability models, optimization objectives, and why the architecture is easier to train than a plain deep stack of nonlinear maps.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. describe a Transformer layer as a map from $R^{T\times d}$ to $R^{T\times d}$;
+2. distinguish encoder blocks, decoder blocks, and encoder-decoder blocks;
+3. write the formulas for multi-head attention, residual connections, layer normalization, and feedforward sublayers;
+4. explain why residual connections help gradient flow;
+5. explain layer normalization as a row-wise standardization map;
+6. compute the parameter count of a basic Transformer block;
+7. connect decoder-only Transformers with autoregressive language modeling;
+8. implement a small Transformer block from scratch in NumPy;
+9. use a Plotly.js interactive to visualize how attention, residual mixing, and nonlinear feedforward maps change token representations;
+10. describe the main mathematical difference between RNNs and Transformers.
+
+## 15.1 The sequence-matrix viewpoint
+
+Let a token sequence have length $T$.  After token embedding and positional encoding, the input to a Transformer layer is a matrix
+
+$$
+X\in R^{T\times d},
+$$
+
+where row $x_i^T\in R^d$ represents token position $i$.  The Transformer layer produces another matrix
+
+$$
+Y=F(X)\in R^{T\times d}.
+$$
+
+The row $y_i^T$ is a contextual representation of token position $i$.  The same layer is applied to every example in a batch, but for mathematical clarity we first ignore the batch dimension.
+
+A simple Transformer encoder layer has the form
+
+$$
+\begin{aligned}
+H &= \operatorname{LayerNorm}\bigl(X + \operatorname{MHA}(X)\bigr),\\
+Y &= \operatorname{LayerNorm}\bigl(H + \operatorname{FFN}(H)\bigr).
+\end{aligned}
+$$
+
+This is called a **post-norm** block because layer normalization is applied after the residual addition.  Many modern implementations use a **pre-norm** block:
+
+$$
+\begin{aligned}
+H &= X + \operatorname{MHA}(\operatorname{LayerNorm}(X)),\\
+Y &= H + \operatorname{FFN}(\operatorname{LayerNorm}(H)).
+\end{aligned}
+$$
+
+The two designs use the same basic pieces, but place normalization in different locations.  Pre-norm blocks are often easier to train in very deep networks because the residual path is more direct.
+
+::: {.math-card}
+**Main mathematical abstraction.**  A Transformer is a deep composition
+
+$$
+F_L\circ F_{L-1}\circ\cdots\circ F_1
+$$
+
+of sequence-to-sequence maps, where each $F_\ell$ mixes token positions by attention and transforms feature coordinates by feedforward nonlinear maps.
+:::
+
+## 15.2 Multi-head attention inside a Transformer block
+
+A Transformer does not usually use a single attention head.  It uses $h$ heads in parallel.  Let
+
+$$
+X\in R^{T\times d}.
+$$
+
+For head $r=1,\ldots,h$, define
+
+$$
+Q_r=XW_Q^{(r)},\qquad
+K_r=XW_K^{(r)},\qquad
+V_r=XW_V^{(r)},
+$$
+
+where
+
+$$
+W_Q^{(r)},W_K^{(r)}\in R^{d\times d_k},
+\qquad
+W_V^{(r)}\in R^{d\times d_v}.
+$$
+
+The $r$th head output is
+
+$$
+Z_r=\operatorname{softmax}_{\text{row}}\left(\frac{Q_rK_r^T+M}{\sqrt{d_k}}\right)V_r
+\in R^{T\times d_v}.
+$$
+
+The matrix $M\in R^{T\times T}$ is optional.  For encoder self-attention, $M$ may be a padding mask.  For decoder self-attention, $M$ also includes a causal mask.
+
+The head outputs are concatenated:
+
+$$
+Z=\operatorname{concat}(Z_1,\ldots,Z_h)\in R^{T\times hd_v}.
+$$
+
+Then a final output projection gives
+
+$$
+\operatorname{MHA}(X)=ZW_O,
+\qquad
+W_O\in R^{hd_v\times d}.
+$$
+
+A common choice is
+
+$$
+d_k=d_v=d/h,
+$$
+
+so $hd_v=d$ and the output has the same feature dimension as $X$.
+
+### Why multiple heads?
+
+A single attention head has one learned geometry for comparing tokens.  Multiple heads allow several comparison geometries in parallel.  One head might emphasize local syntactic relations, another might emphasize long-range dependencies, and another might attend to special tokens or punctuation.  This interpretation should be used carefully: attention heads are learned numerical objects, not guaranteed linguistic modules.
+
+Mathematically, multi-head attention increases expressiveness by applying several different bilinear score functions
+
+$$
+(x_i,x_j)\mapsto x_i^TW_Q^{(r)}(W_K^{(r)})^Tx_j
+$$
+
+and several different value transformations
+
+$$
+x_j\mapsto x_j^TW_V^{(r)}.
+$$
+
+Thus each head defines a different kernel-like similarity and a different message representation.
+
+## 15.3 Residual connections
+
+A residual connection adds the input of a sublayer to its output.  If $G:R^{T\times d}\to R^{T\times d}$ is a sublayer, the residual map is
+
+$$
+R(X)=X+G(X).
+$$
+
+The derivative of this map has the form
+
+$$
+DR(X)=I+DG(X),
+$$
+
+where $I$ denotes the identity map on $R^{T\times d}$.  This is the main mathematical reason residual connections help optimization: even if $DG(X)$ has small singular values, the identity term provides a direct path for gradients.
+
+To see the idea in a scalar example, suppose
+
+$$
+y=x+g(x).
+$$
+
+Then
+
+$$
+\frac{dy}{dx}=1+g'(x).
+$$
+
+In a deep non-residual composition, derivatives multiply many factors.  In a residual network, each layer has an identity contribution, so information and gradients can pass through the network more easily.
+
+::: {.math-card}
+**Residual learning.**  A residual block does not need to learn the entire transformation.  It only needs to learn a correction to the identity map.
+:::
+
+## 15.4 Layer normalization
+
+Layer normalization standardizes each token vector across its feature coordinates.  For a row vector
+
+$$
+x=(x_1,\ldots,x_d)\in R^d,
+$$
+
+define
+
+$$
+\mu(x)=\frac{1}{d}\sum_{j=1}^d x_j,
+\qquad
+\sigma^2(x)=\frac{1}{d}\sum_{j=1}^d (x_j-\mu(x))^2.
+$$
+
+Layer normalization maps $x$ to
+
+$$
+\operatorname{LN}(x)_j
+=
+\gamma_j\frac{x_j-\mu(x)}{\sqrt{\sigma^2(x)+\varepsilon}}+\beta_j,
+\qquad j=1,\ldots,d,
+$$
+
+where $\gamma,\beta\in R^d$ are trainable parameters and $\varepsilon>0$ is a small constant for numerical stability.
+
+For a sequence matrix $X\in R^{T\times d}$, layer normalization is applied row by row:
+
+$$
+\operatorname{LN}(X)_{i,:}=\operatorname{LN}(X_{i,:}).
+$$
+
+Layer normalization is different from batch normalization.  It does not compute statistics across examples in a batch.  Instead, it computes statistics across the coordinates of one token representation.
+
+### Geometric interpretation
+
+Ignoring $\gamma$ and $\beta$, layer normalization subtracts the component in the direction of the all-ones vector and rescales to approximately fixed length.  If
+
+$$
+\mathbf{1}=(1,\ldots,1)^T\in R^d,
+$$
+
+then centering replaces $x$ by
+
+$$
+x-\mu(x)\mathbf{1}.
+$$
+
+This vector lies in the hyperplane
+
+$$
+\{z\in R^d: z^T\mathbf{1}=0\}.
+$$
+
+Thus layer normalization controls scale and location of token features, making the optimization problem more stable.
+
+## 15.5 Position-wise feedforward networks
+
+After attention mixes information across token positions, a Transformer block applies the same feedforward network to each token position independently.  For one row $h_i\in R^d$, define
+
+$$
+\operatorname{FFN}(h_i)=\sigma(h_iW_1+b_1)W_2+b_2,
+$$
+
+where
+
+$$
+W_1\in R^{d\times d_{\mathrm{ff}}},
+\qquad
+W_2\in R^{d_{\mathrm{ff}}\times d}.
+$$
+
+The activation $\sigma$ is applied coordinatewise.  Common choices include ReLU and GELU.  In matrix form,
+
+$$
+\operatorname{FFN}(H)=\sigma(HW_1+\mathbf{1}b_1^T)W_2+\mathbf{1}b_2^T.
+$$
+
+This sublayer does not mix token positions.  It transforms the feature representation at each position.  Attention mixes positions; the feedforward network mixes coordinates.
+
+::: {.math-card}
+**Two kinds of mixing.**  In a Transformer block, attention mixes rows of $X$, while the feedforward network mixes columns of $X$.
+:::
+
+## 15.6 Encoder blocks
+
+A Transformer encoder is designed to read an entire input sequence and produce contextual representations for all positions.  An encoder block uses bidirectional self-attention: every non-padding token may attend to every other non-padding token.
+
+For an encoder block, a typical post-norm formula is
+
+$$
+\begin{aligned}
+H &= \operatorname{LN}(X+\operatorname{MHA}_{\text{enc}}(X)),\\
+Y &= \operatorname{LN}(H+\operatorname{FFN}(H)).
+\end{aligned}
+$$
+
+The attention mask usually prevents real tokens from attending to padding positions.  It does not prevent a token from attending to future positions because the encoder is not generating left-to-right.
+
+Encoder-only architectures are natural for:
+
+- document classification;
+- token classification;
+- sentence similarity;
+- extractive question answering;
+- sequence representation.
+
+Mathematically, an encoder is a map
+
+$$
+F_{\text{enc}}:R^{T\times d}\to R^{T\times d}
+$$
+
+that is allowed to use information from the full input sequence at every output position.
+
+## 15.7 Decoder blocks
+
+A Transformer decoder is designed for generation.  In a decoder-only language model, token position $t$ should not use information from positions $t+1,t+2,\ldots,T$ when predicting the next token.  This is enforced by a causal mask.
+
+For decoder self-attention, the mask satisfies
+
+$$
+M_{ij}=\begin{cases}
+0, & j\le i,\\
+-\infty, & j>i.
+\end{cases}
+$$
+
+Then after applying row-wise softmax, all future-position weights are zero:
+
+$$
+a_{ij}=0\qquad\text{for }j>i.
+$$
+
+A decoder-only block has the same two main sublayers as an encoder block, but with causal self-attention:
+
+$$
+\begin{aligned}
+H &= \operatorname{LN}(X+\operatorname{MHA}_{\text{causal}}(X)),\\
+Y &= \operatorname{LN}(H+\operatorname{FFN}(H)).
+\end{aligned}
+$$
+
+Decoder-only architectures are natural for autoregressive language modeling:
+
+$$
+P(w_1,\ldots,w_T)=\prod_{t=1}^T P(w_t\mid w_1,\ldots,w_{t-1}).
+$$
+
+The model predicts a probability distribution for the next token at each position.
+
+## 15.8 Encoder-decoder Transformers
+
+The original Transformer architecture for machine translation used both an encoder and a decoder.  The encoder reads the source sequence.  The decoder generates the target sequence.  The decoder uses two kinds of attention:
+
+1. **causal self-attention** over previously generated target tokens;
+2. **cross-attention** from target positions to source positions.
+
+Let
+
+$$
+X_{\text{src}}\in R^{T_s\times d},
+\qquad
+X_{\text{tgt}}\in R^{T_t\times d}.
+$$
+
+The encoder produces
+
+$$
+E=F_{\text{enc}}(X_{\text{src}})\in R^{T_s\times d}.
+$$
+
+In cross-attention, queries come from the decoder state, while keys and values come from the encoder output:
+
+$$
+Q=HW_Q,
+\qquad
+K=EW_K,
+\qquad
+V=EW_V.
+$$
+
+The cross-attention output is
+
+$$
+\operatorname{CrossAttn}(H,E)
+=
+\operatorname{softmax}_{\text{row}}\left(\frac{QK^T}{\sqrt{d_k}}\right)V.
+$$
+
+This lets each target position decide which source positions are relevant.
+
+## 15.9 Output layer and language modeling
+
+For a decoder-only language model, the final Transformer representation at position $t$ is a vector
+
+$$
+h_t\in R^d.
+$$
+
+A linear output layer maps $h_t$ to vocabulary logits:
+
+$$
+z_t=h_tW_U+b_U\in R^{|V|},
+$$
+
+where
+
+$$
+W_U\in R^{d\times |V|},
+\qquad
+b_U\in R^{|V|}.
+$$
+
+The conditional distribution over the next token is
+
+$$
+P_\theta(w_{t+1}=v\mid w_1,\ldots,w_t)
+=\frac{\exp(z_{t,v})}{\sum_{u\in V}\exp(z_{t,u})}.
+$$
+
+For a training sequence $w_1,\ldots,w_T$, the negative log-likelihood is
+
+$$
+\mathcal{L}(\theta)
+= -\sum_{t=1}^{T-1}\log P_\theta(w_{t+1}\mid w_1,\ldots,w_t).
+$$
+
+Dividing by $T-1$ gives the average cross-entropy loss.  Exponentiating average cross-entropy gives perplexity.
+
+## 15.10 Parameter count of a basic block
+
+Assume a Transformer block has model dimension $d$, number of heads $h$, and feedforward dimension $d_{\mathrm{ff}}$.  Suppose each head uses
+
+$$
+d_k=d_v=d/h.
+$$
+
+The query, key, and value projections across all heads together have approximately
+
+$$
+3d^2
+$$
+
+weights.  The output projection has
+
+$$
+d^2
+$$
+
+weights.  Therefore multi-head attention has about
+
+$$
+4d^2
+$$
+
+weights, ignoring biases.
+
+The feedforward sublayer has
+
+$$
+dd_{\mathrm{ff}}+d_{\mathrm{ff}}d=2dd_{\mathrm{ff}}
+$$
+
+weights, ignoring biases.  Layer normalization contributes $2d$ parameters per normalization layer: scale $\gamma$ and shift $\beta$.
+
+Thus a rough block parameter count is
+
+$$
+4d^2+2dd_{\mathrm{ff}}+4d,
+$$
+
+for a block with two layer normalization modules and no bias counting in the linear layers.
+
+A common choice is
+
+$$
+d_{\mathrm{ff}}=4d.
+$$
+
+Then the feedforward sublayer has about $8d^2$ weights, which is often more than the attention sublayer.
+
+## 15.11 Computational complexity
+
+Self-attention forms the score matrix
+
+$$
+S=QK^T\in R^{T\times T}.
+$$
+
+Computing $S$ costs on the order of
+
+$$
+O(T^2d)
+$$
+
+operations.  Multiplying the attention matrix by the values also costs about
+
+$$
+O(T^2d).
+$$
+
+The feedforward sublayer costs
+
+$$
+O(Tdd_{\mathrm{ff}}).
+$$
+
+Thus the cost of attention grows quadratically with sequence length $T$.  This is the main computational bottleneck for long-context Transformers.
+
+RNNs process sequences sequentially with cost roughly linear in $T$, but they are hard to parallelize over time.  Transformers use $T^2$ pairwise comparisons, but these comparisons can be computed in parallel on modern hardware.
+
+::: {.math-card}
+**Tradeoff.**  RNNs have sequential recurrence.  Transformers replace recurrence with parallel pairwise interaction.
+:::
+
+## 15.12 Interactive: Transformer block geometry explorer
+
+The following interactive uses a two-dimensional toy sequence.  It is not a real Transformer model, but it visualizes three structural ideas:
+
+- attention mixes token positions;
+- residual connections pull the transformed representation back toward the input;
+- the feedforward sublayer bends the representation coordinatewise.
+
+Try increasing the attention mixing parameter and residual strength.  Notice that a Transformer layer is not simply a classifier or a lookup table; it is a learned geometric transformation of a whole sequence matrix.
+
+::: {.interactive-card}
+<div id="ch15-transformer-status" class="plotly-status">Loading local Plotly for Chapter 15...</div>
+<div class="controls" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:0.75rem; margin-bottom:0.75rem;">
+  <label>Attention mixing $\alpha$<br><input id="ch15-alpha" type="range" min="0" max="1" step="0.05" value="0.55"></label>
+  <label>Residual strength $\rho$<br><input id="ch15-rho" type="range" min="0" max="1" step="0.05" value="0.75"></label>
+  <label>FFN nonlinearity $\eta$<br><input id="ch15-eta" type="range" min="0" max="1" step="0.05" value="0.45"></label>
+</div>
+<div id="ch15-transformer-demo" class="plotly-demo"></div>
+<div id="ch15-transformer-readout" style="font-size:0.95rem; margin-top:0.5rem;"></div>
+</div>
+:::
+
+<script>
+(function(){
+  function status(msg, isError){
+    var el = document.getElementById('ch15-transformer-status');
+    if(el){
+      el.textContent = msg;
+      el.style.color = isError ? '#b00020' : '#555';
+    }
+  }
+  function loadLocalPlotly(callback){
+    if(window.Plotly){ callback(); return; }
+    var existing = document.querySelector('script[data-local-plotly="true"]');
+    if(existing){
+      existing.addEventListener('load', callback);
+      existing.addEventListener('error', function(){ status('Local Plotly could not be loaded from assets/plotly.min.js.', true); });
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = '../assets/plotly.min.js';
+    s.setAttribute('data-local-plotly', 'true');
+    s.onload = callback;
+    s.onerror = function(){ status('Local Plotly could not be loaded from ../assets/plotly.min.js. Check that assets/plotly.min.js is included in the rendered book.', true); };
+    document.head.appendChild(s);
+  }
+  function softmax(row){
+    var m = Math.max.apply(null, row);
+    var ex = row.map(function(v){ return Math.exp(v - m); });
+    var s = ex.reduce(function(a,b){ return a+b; }, 0);
+    return ex.map(function(v){ return v/s; });
+  }
+  function matmul(A,B){
+    var out = [];
+    for(var i=0;i<A.length;i++){
+      var row = [];
+      for(var j=0;j<B[0].length;j++){
+        var acc = 0;
+        for(var k=0;k<B.length;k++) acc += A[i][k]*B[k][j];
+        row.push(acc);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+  function update(){
+    if(!window.Plotly){ status('Plotly.js was not available, so the interactive figure could not be drawn.', true); return; }
+    var div = document.getElementById('ch15-transformer-demo');
+    if(!div) return;
+    var alpha = parseFloat(document.getElementById('ch15-alpha').value);
+    var rho = parseFloat(document.getElementById('ch15-rho').value);
+    var eta = parseFloat(document.getElementById('ch15-eta').value);
+
+    var tokens = ['The','model','learns','language'];
+    var X = [[-1.4,0.2],[-0.3,1.1],[0.8,0.9],[1.4,-0.2]];
+
+    var scores = [];
+    for(var i=0;i<X.length;i++){
+      var row = [];
+      for(var j=0;j<X.length;j++){
+        var dot = X[i][0]*X[j][0] + X[i][1]*X[j][1];
+        var local = (i === j) ? 0.8 : 0.0;
+        row.push(alpha*dot + (1-alpha)*local);
+      }
+      scores.push(row);
+    }
+    var A = scores.map(softmax);
+    var AX = matmul(A,X);
+    var H = [];
+    var Y = [];
+    for(var i=0;i<X.length;i++){
+      var hx = rho*X[i][0] + (1-rho)*AX[i][0];
+      var hy = rho*X[i][1] + (1-rho)*AX[i][1];
+      H.push([hx,hy]);
+      var fx = Math.tanh(1.25*hx + 0.4*hy);
+      var fy = Math.tanh(-0.25*hx + 1.4*hy);
+      Y.push([hx + eta*fx, hy + eta*fy]);
+    }
+
+    function trace(points, name, symbol){
+      return {
+        x: points.map(function(p){return p[0];}),
+        y: points.map(function(p){return p[1];}),
+        mode: 'markers+text',
+        type: 'scatter',
+        text: tokens,
+        textposition: 'top center',
+        marker: {size: 11, symbol: symbol},
+        name: name
+      };
+    }
+
+    var arrowTraces = [];
+    for(var i=0;i<X.length;i++){
+      arrowTraces.push({
+        x: [X[i][0], Y[i][0]],
+        y: [X[i][1], Y[i][1]],
+        mode: 'lines',
+        type: 'scatter',
+        line: {width: 1},
+        showlegend: false,
+        hoverinfo: 'skip'
+      });
+    }
+
+    var data = [
+      trace(X, 'input X', 'circle'),
+      trace(AX, 'attention-mixed AX', 'diamond'),
+      trace(Y, 'after residual + FFN', 'square')
+    ].concat(arrowTraces);
+
+    var layout = {
+      title: 'Toy Transformer block as a sequence-matrix transformation',
+      xaxis: {title: 'feature 1', zeroline: true},
+      yaxis: {title: 'feature 2', zeroline: true, scaleanchor: 'x'},
+      margin: {l: 50, r: 20, t: 55, b: 45},
+      legend: {orientation: 'h'},
+      hovermode: 'closest'
+    };
+    Plotly.react(div, data, layout, {responsive:true, displayModeBar:false});
+
+    var maxEntropy = 0;
+    for(var r=0;r<A.length;r++){
+      var ent = 0;
+      for(var c=0;c<A[r].length;c++) ent -= A[r][c]*Math.log(A[r][c] + 1e-12);
+      if(ent > maxEntropy) maxEntropy = ent;
+    }
+    var readout = document.getElementById('ch15-transformer-readout');
+    if(readout){
+      readout.innerHTML = 'Parameters: attention mixing alpha = <b>' + alpha.toFixed(2) + '</b>, residual strength rho = <b>' + rho.toFixed(2) + '</b>, FFN nonlinearity eta = <b>' + eta.toFixed(2) + '</b>. Largest row attention entropy: <b>' + maxEntropy.toFixed(3) + '</b>.';
+    }
+    status('Interactive loaded using local Plotly.', false);
+  }
+  function init(){
+    loadLocalPlotly(function(){
+      ['ch15-alpha','ch15-rho','ch15-eta'].forEach(function(id){
+        var el = document.getElementById(id);
+        if(el) el.addEventListener('input', update);
+      });
+      update();
+    });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+
+## 15.13 Python example: layer normalization
+
+The following implementation applies layer normalization row by row to a token matrix.
+
+```{python}
+#| label: py-ch15-layernorm
+#| echo: true
+import numpy as np
+
+np.set_printoptions(precision=4, suppress=True)
+
+def layer_norm(X, gamma=None, beta=None, eps=1e-5):
+    """Layer normalization for X with shape (T, d)."""
+    X = np.asarray(X, dtype=float)
+    mu = X.mean(axis=1, keepdims=True)
+    var = ((X - mu) ** 2).mean(axis=1, keepdims=True)
+    Z = (X - mu) / np.sqrt(var + eps)
+    if gamma is None:
+        gamma = np.ones(X.shape[1])
+    if beta is None:
+        beta = np.zeros(X.shape[1])
+    return Z * gamma + beta
+
+X = np.array([
+    [2.0, 4.0, 6.0, 8.0],
+    [1.0, 1.0, 3.0, 7.0],
+    [-2.0, 0.0, 2.0, 4.0]
+])
+
+Y = layer_norm(X)
+print(Y)
+print("row means after LN:", Y.mean(axis=1))
+print("row variances after LN:", Y.var(axis=1))
+```
+
+Layer normalization changes the feature coordinates of each token vector, but it does not mix token positions.
+
+## 15.14 Python example: multi-head attention from scratch
+
+The next example implements a small multi-head self-attention layer.  The purpose is dimension bookkeeping, not performance.
+
+```{python}
+#| label: py-ch15-mha-from-scratch
+#| echo: true
+import numpy as np
+
+rng = np.random.default_rng(7243)
+
+T = 5
+model_dim = 8
+num_heads = 2
+head_dim = model_dim // num_heads
+
+X = rng.normal(size=(T, model_dim))
+
+WQ = rng.normal(scale=0.2, size=(num_heads, model_dim, head_dim))
+WK = rng.normal(scale=0.2, size=(num_heads, model_dim, head_dim))
+WV = rng.normal(scale=0.2, size=(num_heads, model_dim, head_dim))
+WO = rng.normal(scale=0.2, size=(num_heads * head_dim, model_dim))
+
+def softmax_rows(S):
+    S_shift = S - S.max(axis=1, keepdims=True)
+    E = np.exp(S_shift)
+    return E / E.sum(axis=1, keepdims=True)
+
+def multi_head_attention(X, WQ, WK, WV, WO, mask=None):
+    head_outputs = []
+    attention_matrices = []
+    for r in range(WQ.shape[0]):
+        Q = X @ WQ[r]
+        K = X @ WK[r]
+        V = X @ WV[r]
+        scores = (Q @ K.T) / np.sqrt(Q.shape[1])
+        if mask is not None:
+            scores = scores + mask
+        A = softmax_rows(scores)
+        Z = A @ V
+        head_outputs.append(Z)
+        attention_matrices.append(A)
+    Z_all = np.concatenate(head_outputs, axis=1)
+    return Z_all @ WO, attention_matrices
+
+Y, As = multi_head_attention(X, WQ, WK, WV, WO)
+
+print("X shape:", X.shape)
+print("head attention shape:", As[0].shape)
+print("output shape:", Y.shape)
+print("row sums of first attention matrix:", As[0].sum(axis=1))
+```
+
+The row sums are approximately one because each attention matrix is row-stochastic.
+
+## 15.15 Python example: a full Transformer encoder block
+
+Now we add residual connections, layer normalization, and a position-wise feedforward network.
+
+```{python}
+#| label: py-ch15-transformer-block
+#| echo: true
+import numpy as np
+
+rng = np.random.default_rng(2026)
+
+T = 6
+d = 8
+h = 2
+dh = d // h
+dff = 4 * d
+
+X = rng.normal(size=(T, d))
+
+params = {
+    "WQ": rng.normal(scale=0.2, size=(h, d, dh)),
+    "WK": rng.normal(scale=0.2, size=(h, d, dh)),
+    "WV": rng.normal(scale=0.2, size=(h, d, dh)),
+    "WO": rng.normal(scale=0.2, size=(h * dh, d)),
+    "W1": rng.normal(scale=0.2, size=(d, dff)),
+    "b1": np.zeros(dff),
+    "W2": rng.normal(scale=0.2, size=(dff, d)),
+    "b2": np.zeros(d),
+}
+
+def relu(U):
+    return np.maximum(U, 0.0)
+
+def ffn(H, params):
+    return relu(H @ params["W1"] + params["b1"]) @ params["W2"] + params["b2"]
+
+def transformer_encoder_block(X, params):
+    attn_out, attention_mats = multi_head_attention(
+        X,
+        params["WQ"],
+        params["WK"],
+        params["WV"],
+        params["WO"]
+    )
+    H = layer_norm(X + attn_out)
+    Y = layer_norm(H + ffn(H, params))
+    return Y, attention_mats
+
+Y, attention_mats = transformer_encoder_block(X, params)
+
+print("input shape:", X.shape)
+print("output shape:", Y.shape)
+print("first token before:", X[0])
+print("first token after:", Y[0])
+```
+
+The block maps $R^{T\times d}$ to $R^{T\times d}$.  The sequence length and model dimension are preserved.
+
+## 15.16 Python example: causal decoder mask
+
+A decoder-only Transformer uses a causal mask so that position $i$ cannot attend to position $j>i$.
+
+```{python}
+#| label: py-ch15-causal-mask
+#| echo: true
+import numpy as np
+
+T = 6
+causal_mask = np.triu(np.ones((T, T)), k=1)
+causal_mask = np.where(causal_mask == 1, -1e9, 0.0)
+
+print(causal_mask)
+
+Y_causal, causal_As = multi_head_attention(
+    X[:T],
+    params["WQ"],
+    params["WK"],
+    params["WV"],
+    params["WO"],
+    mask=causal_mask
+)
+
+print("First head causal attention matrix:")
+print(causal_As[0])
+print("largest future attention weight:", np.triu(causal_As[0], k=1).max())
+```
+
+The largest future attention weight should be numerically close to zero.
+
+## 15.17 Python example: output probabilities for language modeling
+
+The final hidden state at each position is converted into vocabulary logits and then probabilities.
+
+```{python}
+#| label: py-ch15-output-probabilities
+#| echo: true
+import numpy as np
+
+rng = np.random.default_rng(15)
+
+vocab = ["<bos>", "the", "model", "learns", "language", "."]
+V = len(vocab)
+T = Y_causal.shape[0]
+d = Y_causal.shape[1]
+
+WU = rng.normal(scale=0.2, size=(d, V))
+bU = np.zeros(V)
+
+logits = Y_causal @ WU + bU
+probs = softmax_rows(logits)
+
+for t in range(T):
+    top = int(np.argmax(probs[t]))
+    print(f"position {t}: top next-token candidate = {vocab[top]:>8s}, probability = {probs[t, top]:.3f}")
+```
+
+During training, the true next token is known, so the model is trained by minimizing cross-entropy across positions.
+
+## 15.18 Parameter-count function
+
+The following function computes the rough parameter count from Section 15.10.
+
+```{python}
+#| label: py-ch15-parameter-count
+#| echo: true
+
+def transformer_block_parameter_count(d, dff, include_bias=False):
+    attention = 4 * d * d
+    feedforward = 2 * d * dff
+    layernorm = 4 * d
+    total = attention + feedforward + layernorm
+    if include_bias:
+        total += 4 * d      # Q, K, V, O biases approximately
+        total += dff + d    # FFN biases
+    return {
+        "attention_weights": attention,
+        "feedforward_weights": feedforward,
+        "layernorm_parameters": layernorm,
+        "total": total,
+    }
+
+for d in [128, 256, 512]:
+    counts = transformer_block_parameter_count(d=d, dff=4*d)
+    print(f"d={d}, dff={4*d}, total parameters per block ≈ {counts['total']:,}")
+```
+
+This calculation explains why feedforward layers are often a major part of the parameter budget.
+
+## 15.19 Encoder-only, decoder-only, and encoder-decoder models
+
+The three main Transformer families differ in their attention pattern and task objective.
+
+| Architecture | Attention pattern | Main output | Typical tasks |
+|---|---|---|---|
+| Encoder-only | bidirectional self-attention | contextual input representation | classification, retrieval, tagging |
+| Decoder-only | causal self-attention | next-token distribution | generation, completion, chat |
+| Encoder-decoder | source encoder plus target decoder cross-attention | conditional target distribution | translation, summarization |
+
+Mathematically, encoder-only models estimate representations useful for conditional predictions such as
+
+$$
+P(y\mid x_1,\ldots,x_T).
+$$
+
+Decoder-only models estimate left-to-right conditional distributions such as
+
+$$
+P(w_{t+1}\mid w_1,\ldots,w_t).
+$$
+
+Encoder-decoder models estimate conditional sequence distributions such as
+
+$$
+P(y_1,\ldots,y_m\mid x_1,\ldots,x_T)
+=\prod_{t=1}^m P(y_t\mid y_1,\ldots,y_{t-1},x_1,\ldots,x_T).
+$$
+
+## 15.20 Mathematical comparison with RNNs
+
+An RNN computes hidden states recursively:
+
+$$
+h_t=f(h_{t-1},x_t).
+$$
+
+Thus information from token $j$ reaches token $i$ through a chain of intermediate states.  A Transformer computes direct token-token scores:
+
+$$
+s_{ij}=q_i^Tk_j/\sqrt{d_k}.
+$$
+
+Thus token $i$ can attend directly to token $j$ in one layer.  This shorter interaction path is one reason Transformers can model long-range dependencies effectively.
+
+However, the direct interaction comes with quadratic cost in $T$.  The mathematical tradeoff is:
+
+$$
+\text{recurrence path length }O(T)\quad\text{versus}\quad\text{attention score matrix size }O(T^2).
+$$
+
+## 15.21 AI-assisted learning activities
+
+Use an AI assistant as a mathematical critic, not just as a code generator.
+
+### Prompt 1: dimension audit
+
+Give the assistant the formulas for multi-head attention and ask:
+
+> Check every matrix dimension in this Transformer block.  Identify the shape of each intermediate matrix and explain where shape errors are most likely.
+
+Then verify the response by doing the calculation yourself.
+
+### Prompt 2: residual-gradient explanation
+
+Ask:
+
+> Explain why $R(X)=X+G(X)$ helps gradient flow.  Give both a scalar explanation and a matrix derivative explanation.
+
+A good response should mention the identity term in the derivative.
+
+### Prompt 3: architecture classification
+
+Give the assistant several tasks such as sentiment classification, next-token prediction, translation, semantic search, and summarization.  Ask it to classify which Transformer family is most natural and justify the answer mathematically.
+
+### Prompt 4: implementation debugging
+
+Paste your NumPy Transformer block and ask:
+
+> Find possible shape, masking, and numerical-stability bugs.  Do not rewrite the whole program.  Explain each issue mathematically.
+
+## 15.22 Common mistakes
+
+1. **Confusing attention with the entire Transformer.**  Attention is one sublayer.  A Transformer block also uses residual connections, normalization, feedforward networks, and output projections.
+2. **Forgetting the causal mask in decoder-only language models.**  Without causal masking, training leaks future tokens.
+3. **Applying softmax over the wrong axis.**  Attention softmax should usually be row-wise over key positions for each query position.
+4. **Thinking layer normalization mixes tokens.**  Layer normalization standardizes feature coordinates within each token row.
+5. **Assuming attention weights are explanations.**  Attention weights are useful diagnostics, but they are not automatically causal explanations of model behavior.
+6. **Ignoring sequence length cost.**  The $T\times T$ score matrix can dominate memory and computation for long sequences.
+
+## 15.23 Exercises
+
+1. **Dimension check.**  Let $T=12$, $d=64$, $h=4$, and $d_k=d_v=16$.  Write the shapes of $Q_r$, $K_r$, $V_r$, $Q_rK_r^T$, $A_r$, $Z_r$, $\operatorname{concat}(Z_1,\ldots,Z_h)$, and the final multi-head output.
+
+2. **Residual derivative.**  Suppose $g:R\to R$ and $R(x)=x+g(x)$.  Show that $R'(x)=1+g'(x)$.  Explain why this is helpful in a deep composition.
+
+3. **Layer normalization.**  Compute layer normalization by hand for $x=(1,3,5)$ with $\gamma=(1,1,1)$, $\beta=(0,0,0)$, and $\varepsilon=0$.
+
+4. **Parameter count.**  For $d=768$, $h=12$, and $d_{\mathrm{ff}}=3072$, compute the approximate number of parameters in one Transformer block, ignoring biases.
+
+5. **Causal mask.**  Write the causal mask matrix for $T=5$.  Explain why row $3$ can attend to columns $1,2,3$ but not columns $4,5$ if indexing starts at $1$.
+
+6. **Encoder versus decoder.**  Give one mathematical reason why bidirectional attention is inappropriate for next-token prediction training if no mask is used.
+
+7. **Complexity.**  Compare the attention cost for sequence lengths $T=512$, $T=2048$, and $T=8192$, assuming $d$ is fixed.  How many times larger is $T^2$ when $T$ quadruples?
+
+8. **Implementation.**  Modify the Python multi-head attention example so that $h=4$ and $d=8$.  What must be true about $d$ and $h$?
+
+9. **Interpretation.**  In the interactive, set residual strength near $1$.  What happens to the transformed points?  Explain this using the formula $X+G(X)$.
+
+10. **Model families.**  Classify each task as encoder-only, decoder-only, or encoder-decoder: spam detection, machine translation, autocomplete, named-entity recognition, and abstractive summarization.
+
+## 15.24 Mini-project: Build a tiny Transformer encoder block
+
+Build a small Transformer encoder block from scratch in NumPy.
+
+Your project should include:
+
+1. token embeddings for a toy vocabulary;
+2. positional encodings or learned position vectors;
+3. multi-head self-attention;
+4. residual connections;
+5. layer normalization;
+6. a position-wise feedforward network;
+7. a short report checking all dimensions.
+
+Then compare two inputs that contain the same words in different orders.  Explain how positional information changes the output.
+
+## 15.25 Lab connection
+
+The Chapter 15 lab should ask students to implement a minimal Transformer block step by step.  Students should first verify shapes using small matrices, then add masking, and finally connect the block to a simple next-token prediction objective.
+
+Suggested lab sections:
+
+1. matrix shapes and token embeddings;
+2. row-wise softmax and attention;
+3. multi-head attention;
+4. residual connections and layer normalization;
+5. feedforward network;
+6. causal masking;
+7. output logits and cross-entropy;
+8. reflection questions comparing RNNs and Transformers.
+
+The goal is not to train a large model.  The goal is to understand the mathematical architecture well enough to debug real implementations.

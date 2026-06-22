@@ -1,0 +1,59 @@
+---
+title: "Python Reference"
+---
+
+This reference collects Python patterns used throughout the labs.  The goal is to keep code readable and mathematically connected.
+
+## Core libraries
+
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+```
+
+## Count vectors
+
+```{python}
+vocab = ["data", "language", "model", "statistics"]
+doc = ["language", "model", "model", "data"]
+counts = np.array([doc.count(token) for token in vocab])
+counts
+```
+
+## Cosine similarity
+
+```{python}
+def cosine_similarity(x, y):
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    denom = np.linalg.norm(x) * np.linalg.norm(y)
+    if denom == 0:
+        return 0.0
+    return float(np.dot(x, y) / denom)
+```
+
+## Softmax
+
+```{python}
+def softmax(z):
+    z = np.asarray(z, dtype=float)
+    z = z - np.max(z)
+    exp_z = np.exp(z)
+    return exp_z / exp_z.sum()
+```
+
+## Scaled dot-product attention
+
+```{python}
+def attention(Q, K, V, mask=None):
+    Q = np.asarray(Q, dtype=float)
+    K = np.asarray(K, dtype=float)
+    V = np.asarray(V, dtype=float)
+    d_k = Q.shape[-1]
+    scores = Q @ K.T / np.sqrt(d_k)
+    if mask is not None:
+        scores = scores + mask
+    weights = np.apply_along_axis(softmax, 1, scores)
+    return weights @ V, weights
+```

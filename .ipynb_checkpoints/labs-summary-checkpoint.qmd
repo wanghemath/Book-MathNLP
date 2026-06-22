@@ -1,0 +1,44 @@
+---
+title: "Python Labs"
+---
+
+The computer labs are designed for independent study.  Each lab should include enough background explanation before the programming begins, followed by guided code, experiments, interpretation questions, and short exercises.
+
+## Lab design principles
+
+- Begin with the mathematical idea before importing libraries.
+- Use small corpora before using real datasets.
+- Make every array shape explicit.
+- Include interpretation questions after each experiment.
+- Keep code friendly for Google Colab.
+- Avoid notebook-only LaTeX commands that render poorly in Colab.
+
+## Planned labs
+
+| Chapter | Topic | Notebook | Colab |
+|---:|---|---|---|
+| 1 | What Is Natural Language Processing? | `chapter-01-what-is-nlp.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-01-what-is-nlp.ipynb) |
+| 2 | Text, Tokens, and Vocabularies | `chapter-02-text-tokens-vocabularies.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-02-text-tokens-vocabularies.ipynb) |
+| 3 | Documents as Vectors | `chapter-03-documents-as-vectors.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-03-documents-as-vectors.ipynb) |
+| 4 | Probability and Language | `chapter-04-probability-and-language.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-04-probability-and-language.ipynb) |
+| 5 | N-Gram Language Models | `chapter-05-ngram-language-models.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-05-ngram-language-models.ipynb) |
+| 6 | Naive Bayes and Text Classification | `chapter-06-naive-bayes-text-classification.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-06-naive-bayes-text-classification.ipynb) |
+| 7 | Vector Space Models | `chapter-07-vector-space-models.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-07-vector-space-models.ipynb) |
+| 8 | Word Embeddings | `chapter-08-word-embeddings.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-08-word-embeddings.ipynb) |
+| 9 | Geometry of Embedding Spaces | `chapter-09-geometry-of-embeddings.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-09-geometry-of-embeddings.ipynb) |
+| 10 | Neural Networks for Text | `chapter-10-neural-networks-for-text.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-10-neural-networks-for-text.ipynb) |
+| 11 | Recurrent Neural Networks | `chapter-11-recurrent-neural-networks.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-11-recurrent-neural-networks.ipynb) |
+| 12 | LSTM and GRU Models | `chapter-12-lstm-gru-models.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-12-lstm-gru-models.ipynb) |
+| 13 | Attention Mechanisms | `chapter-13-attention-mechanisms.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-13-attention-mechanisms.ipynb) |
+| 14 | Self-Attention | `chapter-14-self-attention.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-14-self-attention.ipynb) |
+| 15 | The Transformer Architecture | `chapter-15-transformers.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-15-transformers.ipynb) |
+| 16 | Positional Encoding and Sequence Geometry | `chapter-16-positional-encoding.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-16-positional-encoding.ipynb) |
+| 17 | Autoregressive Language Models | `chapter-17-autoregressive-language-models.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-17-autoregressive-language-models.ipynb) |
+| 18 | Training Large Language Models | `chapter-18-training-large-language-models.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-18-training-large-language-models.ipynb) |
+| 19 | Embeddings, Retrieval, and RAG | `chapter-19-embeddings-retrieval-rag.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-19-embeddings-retrieval-rag.ipynb) |
+| 20 | Evaluation of Language Models | `chapter-20-evaluation.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-20-evaluation.ipynb) |
+| 21 | Information Theory and Language | `chapter-21-information-theory.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-21-information-theory.ipynb) |
+| 22 | Optimization for NLP | `chapter-22-optimization-for-nlp.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-22-optimization-for-nlp.ipynb) |
+| 23 | Graphs and Language | `chapter-23-graphs-and-language.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-23-graphs-and-language.ipynb) |
+| 24 | Topology and Geometry of Language Representations | `chapter-24-topology-geometry-language.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-24-topology-geometry-language.ipynb) |
+| 25 | Ethics, Bias, and Mathematical Responsibility | `chapter-25-ethics-bias-responsibility.ipynb` | [Open in Colab](https://colab.research.google.com/github/wanghemath/Book-NLP-Math/blob/main/labs/chapter-25-ethics-bias-responsibility.ipynb) |

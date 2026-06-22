@@ -1,0 +1,1117 @@
+---
+title: "Word Embeddings"
+subtitle: "Distributional semantics, matrix factorization, skip-gram models, and geometry of meaning"
+---
+
+::: {.chapter-opening}
+In Chapter 7, a document was represented as a vector in vocabulary space.  The coordinates of that vector were counts, TF-IDF weights, or low-rank latent coordinates derived from a document-term matrix.  In this chapter we reverse the viewpoint: instead of representing documents by words, we represent **words themselves** as vectors.
+
+A word embedding is a map from a discrete vocabulary into a continuous vector space.  This is one of the central mathematical ideas in modern NLP.  It converts symbolic data into geometric data: words have lengths, angles, neighborhoods, projections, and directions.  Once words become vectors, we can use linear algebra, probability, optimization, and geometry to study meaning.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. define a word embedding as a function $e:V\to R^m$;
+2. explain how one-hot vectors differ from dense embeddings;
+3. construct co-occurrence matrices from a corpus;
+4. interpret the distributional hypothesis mathematically;
+5. compute empirical probabilities for word-context pairs;
+6. define pointwise mutual information and positive PMI;
+7. connect matrix factorization to word embeddings;
+8. derive the skip-gram softmax objective;
+9. explain negative sampling as a computational approximation;
+10. state the GloVe weighted least-squares objective;
+11. analyze embedding geometry using norms, cosine similarity, and analogies;
+12. implement toy embeddings from scratch in Python;
+13. visualize embedding spaces with Plotly and Plotly.js;
+14. use AI tools to critique embedding assumptions and detect possible bias.
+
+Throughout this chapter, $V=\{v_1,\ldots,v_d\}$ denotes a finite vocabulary, $d=|V|$ is the vocabulary size, and $m$ is the embedding dimension, usually with $m\ll d$.
+
+## From symbols to vectors
+
+A token is a discrete object.  If the vocabulary is
+
+$$
+V=\{v_1,v_2,\ldots,v_d\},
+$$
+
+then a token $v_j$ can be represented by the one-hot vector
+
+$$
+\delta_j=(0,\ldots,0,1,0,\ldots,0)^T\in R^d,
+$$
+
+where the $1$ occurs in position $j$.  This representation is exact but not semantic.  For $i\neq j$,
+
+$$
+\delta_i^T\delta_j=0.
+$$
+
+Thus every pair of distinct words is equally dissimilar.  The words "cat" and "dog" are no closer than "cat" and "gradient".
+
+A word embedding replaces the one-hot representation with a dense vector:
+
+$$
+e:V\longrightarrow R^m,
+\qquad
+v_j\longmapsto e_j.
+$$
+
+Equivalently, the embedding is stored in a matrix
+
+$$
+E=\begin{bmatrix}
+--- & e_1^T & ---\\
+--- & e_2^T & ---\\
+& \vdots & \\
+--- & e_d^T & ---
+\end{bmatrix}
+\in R^{d\times m}.
+$$
+
+The embedding of token $v_j$ is the $j$th row of $E$:
+
+$$
+e_j=E_{j:}\in R^m.
+$$
+
+If a token is encoded as a one-hot vector $\delta_j$, then the lookup operation can be written as matrix multiplication:
+
+$$
+\delta_j^T E=e_j^T.
+$$
+
+::: {.math-card}
+**Embedding lookup.**  A word embedding matrix $E\in R^{d\times m}$ converts a one-hot token vector into a dense vector:
+
+$$
+\delta_j^TE=e_j^T.
+$$
+
+This is why an embedding layer in a neural network is mathematically a trainable matrix lookup.
+:::
+
+## Why dense embeddings are useful
+
+One-hot vectors live in a high-dimensional coordinate system where each coordinate is an arbitrary vocabulary index.  Dense embeddings live in a lower-dimensional representation space in which geometry is learned from data.
+
+The central hope is that semantic or syntactic relationships become geometric relationships:
+
+- similar words have small distance or large cosine similarity;
+- related categories form clusters;
+- some relationships correspond approximately to directions;
+- analogy tasks can be expressed using vector arithmetic;
+- downstream models can use continuous features rather than sparse symbolic indicators.
+
+This does not mean that embeddings contain "true meaning."  It means that the training objective forces words with similar statistical behavior to receive related vectors.
+
+## The distributional hypothesis
+
+The guiding principle behind many word embedding methods is the **distributional hypothesis**:
+
+> Words that occur in similar contexts tend to have related meanings.
+
+Mathematically, each word $w\in V$ can be described by a context distribution
+
+$$
+P(C=c\mid W=w),
+$$
+
+where $C$ is a random context word.  If two words $w$ and $w'$ have similar conditional context distributions, then they should have nearby representations.
+
+One way to state this is:
+
+$$
+P(C=\cdot\mid W=w)\approx P(C=\cdot\mid W=w')
+\quad\Longrightarrow\quad
+e(w)\approx e(w').
+$$
+
+This is a statistical assumption, not a theorem.  It is often useful, but it can fail when words have multiple meanings, when corpora are biased, or when context alone is not enough.
+
+::: {.math-card}
+**Distributional semantics.**  A word embedding is a finite-dimensional summary of a word's empirical context distribution.  The geometry of the embedding space reflects statistical regularities in the corpus.
+:::
+
+## Co-occurrence matrices
+
+Let a corpus be represented as a token sequence
+
+$$
+w_1,w_2,\ldots,w_T,
+\qquad w_t\in V.
+$$
+
+Choose a context window size $h\geq 1$.  For each position $t$, the context of $w_t$ is the set of nearby positions
+
+$$
+\{s:1\leq s\leq T,\ 0<|s-t|\leq h\}.
+$$
+
+The word-context co-occurrence matrix is
+
+$$
+C\in R_{\geq 0}^{d\times d},
+$$
+
+where
+
+$$
+C_{ij}=\#\{(t,s):w_t=v_i,\ w_s=v_j,\ 0<|s-t|\leq h\}.
+$$
+
+Rows correspond to center words, and columns correspond to context words.  The row
+
+$$
+C_{i:}
+$$
+
+is a count-based description of the contexts in which word $v_i$ appears.
+
+The simplest possible word representation is to use the row vector $C_{i:}$ itself.  This is usually high-dimensional and sparse.  Embedding methods compress or transform this information into lower-dimensional vectors.
+
+## Empirical probabilities
+
+Let
+
+$$
+N=\sum_{i=1}^d\sum_{j=1}^d C_{ij}
+$$
+
+be the total number of observed word-context pairs.  The empirical joint distribution is
+
+$$
+\widehat P(W=v_i,C=v_j)=\frac{C_{ij}}{N}.
+$$
+
+The marginal distributions are
+
+$$
+\widehat P(W=v_i)=\frac{\sum_j C_{ij}}{N},
+\qquad
+\widehat P(C=v_j)=\frac{\sum_i C_{ij}}{N}.
+$$
+
+The empirical conditional distribution of contexts given a word is
+
+$$
+\widehat P(C=v_j\mid W=v_i)
+=
+\frac{C_{ij}}{\sum_{k=1}^d C_{ik}}.
+$$
+
+This conditional distribution is the probabilistic object that the embedding should summarize.
+
+## PMI and PPMI
+
+A raw co-occurrence count is not enough.  Common words such as "the" or "and" co-occur with many words simply because they are frequent.  Pointwise mutual information corrects for marginal frequency.
+
+The empirical pointwise mutual information of a word-context pair is
+
+$$
+\operatorname{PMI}(v_i,v_j)
+=
+\log\frac{\widehat P(W=v_i,C=v_j)}
+{\widehat P(W=v_i)\widehat P(C=v_j)}.
+$$
+
+Equivalently, using counts,
+
+$$
+\operatorname{PMI}(v_i,v_j)
+=
+\log\frac{C_{ij}N}{\left(\sum_k C_{ik}\right)\left(\sum_k C_{kj}\right)},
+$$
+
+when $C_{ij}>0$.
+
+Positive PMI keeps only positive association:
+
+$$
+\operatorname{PPMI}(v_i,v_j)=\max\{\operatorname{PMI}(v_i,v_j),0\}.
+$$
+
+A positive PMI value means that the pair occurs more often than expected under independence.  A negative PMI value means that the pair occurs less often than expected under independence.
+
+::: {.math-card}
+**PMI compares joint occurrence with independence.**
+
+$$
+\operatorname{PMI}(w,c)=\log\frac{P(w,c)}{P(w)P(c)}.
+$$
+
+If $W$ and $C$ were independent, then $P(w,c)=P(w)P(c)$ and the PMI would be $0$.
+:::
+
+## Matrix factorization viewpoint
+
+Let $M\in R^{d\times d}$ be a transformed co-occurrence matrix, such as a PPMI matrix.  A low-rank embedding seeks matrices
+
+$$
+E\in R^{d\times m},
+\qquad
+F\in R^{d\times m},
+$$
+
+such that
+
+$$
+M\approx EF^T.
+$$
+
+Here $E$ contains word embeddings and $F$ contains context embeddings.  The approximation says
+
+$$
+M_{ij}\approx e_i^Tf_j.
+$$
+
+Thus the inner product between a word vector and a context vector approximates a transformed co-occurrence statistic.
+
+A classical way to obtain such embeddings is the singular value decomposition.  Suppose
+
+$$
+M=U\Sigma V^T.
+$$
+
+The rank-$m$ approximation is
+
+$$
+M_m=U_m\Sigma_m V_m^T.
+$$
+
+A common embedding choice is
+
+$$
+E=U_m\Sigma_m^{1/2},
+\qquad
+F=V_m\Sigma_m^{1/2}.
+$$
+
+Then
+
+$$
+EF^T=U_m\Sigma_mV_m^T=M_m.
+$$
+
+This directly connects word embeddings to the SVD theory from Chapter 7.
+
+## Prediction viewpoint
+
+Matrix factorization is one route to embeddings.  Neural prediction is another.  In the prediction viewpoint, embeddings are learned because they help predict nearby words.
+
+Let $w$ be a center word and $c$ be a context word.  The skip-gram model assigns
+
+$$
+P_\theta(c\mid w)=
+\frac{\exp(u_c^Tv_w)}
+{\sum_{c'\in V}\exp(u_{c'}^Tv_w)},
+$$
+
+where
+
+- $v_w\in R^m$ is the input embedding of the center word;
+- $u_c\in R^m$ is the output embedding of the context word;
+- $\theta$ denotes all embedding parameters.
+
+Given observed word-context pairs $D=\{(w_\ell,c_\ell)\}_{\ell=1}^N$, the negative log-likelihood is
+
+$$
+L(\theta)
+=-\sum_{\ell=1}^N \log P_\theta(c_\ell\mid w_\ell).
+$$
+
+Equivalently,
+
+$$
+L(\theta)
+=\sum_{\ell=1}^N
+\left[
+- u_{c_\ell}^Tv_{w_\ell}
++\log\sum_{c'\in V}\exp(u_{c'}^Tv_{w_\ell})
+\right].
+$$
+
+This is a multiclass cross-entropy objective.
+
+## Gradient of the skip-gram softmax loss
+
+For one observed pair $(w,c)$, define scores
+
+$$
+z_k=u_k^Tv_w,
+\qquad k=1,\ldots,d,
+$$
+
+and probabilities
+
+$$
+p_k=\frac{\exp(z_k)}{\sum_{r=1}^d\exp(z_r)}.
+$$
+
+The single-pair loss is
+
+$$
+\ell(w,c)=-\log p_c.
+$$
+
+The gradient with respect to a score is
+
+$$
+\frac{\partial \ell}{\partial z_k}=p_k-1_{\{k=c\}}.
+$$
+
+Therefore,
+
+$$
+\frac{\partial \ell}{\partial v_w}
+=\sum_{k=1}^d (p_k-1_{\{k=c\}})u_k,
+$$
+
+and
+
+$$
+\frac{\partial \ell}{\partial u_k}
+=(p_k-1_{\{k=c\}})v_w.
+$$
+
+This formula shows the learning mechanism:
+
+- the true context vector $u_c$ is pulled closer to $v_w$;
+- all other context vectors are pushed away in proportion to their predicted probabilities;
+- the update is global because the softmax denominator sums over the whole vocabulary.
+
+## Negative sampling
+
+The full softmax is expensive when $d$ is large.  Negative sampling replaces the multiclass softmax problem by several binary classification problems.
+
+For an observed positive pair $(w,c)$ and negative samples $n_1,\ldots,n_K$, the negative-sampling objective for one pair is often written as
+
+$$
+\ell_{\text{NS}}(w,c)
+= -\log\sigma(u_c^Tv_w)
+-\sum_{r=1}^K\log\sigma(-u_{n_r}^Tv_w),
+$$
+
+where
+
+$$
+\sigma(x)=\frac{1}{1+e^{-x}}.
+$$
+
+The positive pair is encouraged to have a large inner product, while sampled negative pairs are encouraged to have small inner products.
+
+Negative sampling changes the training objective.  It is not merely a computational trick for the same loss.  It learns vectors by asking whether a word-context pair came from the corpus or from a noise distribution.
+
+## GloVe as weighted least squares
+
+GloVe is another influential embedding method.  It begins with a co-occurrence matrix $C$ and learns word vectors $v_i$, context vectors $u_j$, and biases $a_i,b_j$ by minimizing
+
+$$
+J=
+\sum_{i=1}^d\sum_{j=1}^d
+f(C_{ij})
+\left(v_i^Tu_j+a_i+b_j-\log C_{ij}\right)^2.
+$$
+
+The weight function $f(C_{ij})$ reduces the influence of rare and extremely frequent pairs.  The model tries to make inner products approximate log co-occurrence counts, up to additive word and context biases.
+
+The mathematical form is a weighted matrix approximation problem.  Unlike ordinary SVD, it does not assign equal weight to every matrix entry.
+
+## Embedding geometry
+
+Once words have vectors, we can analyze them geometrically.  The most common similarity measure is cosine similarity:
+
+$$
+\operatorname{cos}(e_i,e_j)
+=
+\frac{e_i^Te_j}{\lVert e_i\rVert_2\lVert e_j\rVert_2}.
+$$
+
+Nearest-neighbor search asks for
+
+$$
+\operatorname{NN}(w)=\arg\max_{v\in V,\ v\neq w}\operatorname{cos}(e(w),e(v)).
+$$
+
+Analogy tasks use vector arithmetic.  Given words $a,b,c$, the classical query
+
+$$
+a:b\approx c:?
+$$
+
+is approximated by
+
+$$
+\hat d
+=
+\arg\max_{w\in V\setminus\{a,b,c\}}
+\operatorname{cos}\left(e(w),e(b)-e(a)+e(c)\right).
+$$
+
+A famous informal example is
+
+$$
+e(\text{king})-e(\text{man})+e(\text{woman})\approx e(\text{queen}).
+$$
+
+This behavior is not guaranteed by the definition of an embedding.  It emerges only when the training data and objective organize certain relationships approximately as linear directions.
+
+## What embeddings do not solve
+
+Word embeddings are powerful, but they have limitations.
+
+First, a single vector per word cannot represent different meanings of the same word.  The word "bank" may refer to a financial institution or the side of a river.  A static embedding averages across contexts.
+
+Second, embeddings can encode social and historical biases present in the training corpus.  Similarity in the embedding space reflects patterns in data, not moral or factual correctness.
+
+Third, nearest neighbors can be unstable in high dimensions.  Very frequent words, anisotropy, and hubness can distort neighborhood structure.
+
+Fourth, word embeddings alone do not model word order.  They represent tokens, not full contextual syntax.
+
+These limitations motivate contextual embeddings and transformers in later chapters.
+
+# Python examples
+
+We now build a small embedding pipeline from scratch.  The examples are intentionally small so that every mathematical object is visible.
+
+## A tiny corpus
+
+```{python}
+import re
+from collections import Counter, defaultdict
+
+import numpy as np
+import pandas as pd
+
+corpus = [
+    "linear algebra studies vectors matrices and spaces",
+    "singular value decomposition finds low dimensional structure",
+    "probability models uncertainty in language data",
+    "language models predict words from context",
+    "word embeddings represent words as vectors",
+    "vectors and matrices are central to machine learning",
+    "context helps determine the meaning of words",
+    "statistics and probability help evaluate language models",
+    "machine learning learns representations from data",
+    "embeddings place related words near each other"
+]
+
+def tokenize(text):
+    return re.findall(r"[a-z]+", text.lower())
+
+tokenized = [tokenize(doc) for doc in corpus]
+tokenized[:2]
+```
+
+## Vocabulary construction
+
+```{python}
+counts = Counter(token for doc in tokenized for token in doc)
+vocab = sorted(counts)
+word_to_id = {word: i for i, word in enumerate(vocab)}
+id_to_word = {i: word for word, i in word_to_id.items()}
+
+print("vocabulary size:", len(vocab))
+print(vocab)
+```
+
+## Word-context pairs
+
+The following function constructs center-context pairs using a symmetric window of radius $h$.
+
+```{python}
+def make_pairs(tokenized_docs, window=2):
+    pairs = []
+    for doc in tokenized_docs:
+        ids = [word_to_id[w] for w in doc]
+        for t, center in enumerate(ids):
+            left = max(0, t - window)
+            right = min(len(ids), t + window + 1)
+            for s in range(left, right):
+                if s != t:
+                    pairs.append((center, ids[s]))
+    return pairs
+
+pairs = make_pairs(tokenized, window=2)
+print("number of word-context pairs:", len(pairs))
+print([(id_to_word[i], id_to_word[j]) for i, j in pairs[:12]])
+```
+
+## Co-occurrence matrix
+
+```{python}
+def cooccurrence_matrix(pairs, d):
+    C = np.zeros((d, d), dtype=float)
+    for i, j in pairs:
+        C[i, j] += 1.0
+    return C
+
+C = cooccurrence_matrix(pairs, len(vocab))
+C_df = pd.DataFrame(C, index=vocab, columns=vocab)
+C_df.iloc[:8, :8]
+```
+
+## PPMI matrix
+
+```{python}
+def ppmi_matrix(C, eps=1e-12):
+    total = C.sum()
+    row_sum = C.sum(axis=1, keepdims=True)
+    col_sum = C.sum(axis=0, keepdims=True)
+    expected = row_sum @ col_sum / max(total, eps)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        pmi = np.log((C * total + eps) / (row_sum @ col_sum + eps))
+    pmi[C == 0] = 0.0
+    return np.maximum(pmi, 0.0)
+
+M = ppmi_matrix(C)
+M_df = pd.DataFrame(M, index=vocab, columns=vocab)
+M_df.round(2).iloc[:8, :8]
+```
+
+## SVD embeddings from PPMI
+
+We factor the PPMI matrix and keep the first $m$ singular directions.
+
+```{python}
+def svd_embeddings(M, m=2):
+    U, s, Vt = np.linalg.svd(M, full_matrices=False)
+    E = U[:, :m] * np.sqrt(s[:m])
+    F = Vt[:m, :].T * np.sqrt(s[:m])
+    return E, F, s
+
+E2, F2, singular_values = svd_embeddings(M, m=2)
+emb_df = pd.DataFrame(E2, index=vocab, columns=["z1", "z2"])
+emb_df.head()
+```
+
+## Nearest neighbors
+
+```{python}
+def row_normalize(X, eps=1e-12):
+    norms = np.linalg.norm(X, axis=1, keepdims=True)
+    return X / np.maximum(norms, eps)
+
+def nearest_neighbors(word, E, k=5):
+    idx = word_to_id[word]
+    En = row_normalize(E)
+    scores = En @ En[idx]
+    order = np.argsort(-scores)
+    rows = []
+    for j in order:
+        if j != idx:
+            rows.append((id_to_word[j], float(scores[j])))
+        if len(rows) == k:
+            break
+    return pd.DataFrame(rows, columns=["word", "cosine_similarity"])
+
+nearest_neighbors("language", E2, k=6)
+```
+
+Because the corpus is tiny, the neighbors are not stable.  That is part of the lesson: embeddings need enough data to estimate meaningful context distributions.
+
+## Compare count-context and PPMI-SVD neighbors
+
+```{python}
+print("Neighbors from raw co-occurrence rows")
+display(nearest_neighbors("language", C, k=5))
+
+print("Neighbors from rank-2 PPMI-SVD embeddings")
+display(nearest_neighbors("language", E2, k=5))
+```
+
+Raw co-occurrence and PPMI-SVD embeddings can give different neighbors because they encode different geometry.  Raw counts emphasize frequency; PPMI emphasizes association beyond chance; SVD compresses the result into a low-dimensional subspace.
+
+## A tiny skip-gram softmax calculation
+
+The next code implements the skip-gram probability for one center word.
+
+```{python}
+rng = np.random.default_rng(7243)
+d = len(vocab)
+m = 4
+
+V_in = rng.normal(0, 0.1, size=(d, m))
+U_out = rng.normal(0, 0.1, size=(d, m))
+
+def softmax(z):
+    z = z - np.max(z)
+    ez = np.exp(z)
+    return ez / ez.sum()
+
+def skipgram_probs(center_word):
+    i = word_to_id[center_word]
+    scores = U_out @ V_in[i]
+    probs = softmax(scores)
+    return pd.DataFrame({"word": vocab, "probability": probs}).sort_values(
+        "probability", ascending=False
+    )
+
+skipgram_probs("language").head(8)
+```
+
+At initialization, the probabilities are almost uniform because the random inner products are small.  Training changes the vectors so observed context words receive higher probability.
+
+## One negative-sampling update
+
+```{python}
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+def negative_sampling_step(V_in, U_out, center, positive, negatives, lr=0.05):
+    i = word_to_id[center]
+    j = word_to_id[positive]
+    neg_ids = [word_to_id[w] for w in negatives]
+
+    v = V_in[i].copy()
+
+    # Positive pair gradient for -log sigmoid(u_j^T v)
+    score_pos = U_out[j] @ v
+    grad_v = (sigmoid(score_pos) - 1.0) * U_out[j]
+    grad_u_pos = (sigmoid(score_pos) - 1.0) * v
+
+    # Negative pair gradients for -log sigmoid(-u_n^T v)
+    grad_u_negs = []
+    for n in neg_ids:
+        score_neg = U_out[n] @ v
+        grad_v += sigmoid(score_neg) * U_out[n]
+        grad_u_negs.append((n, sigmoid(score_neg) * v))
+
+    V_in[i] -= lr * grad_v
+    U_out[j] -= lr * grad_u_pos
+    for n, grad_u in grad_u_negs:
+        U_out[n] -= lr * grad_u
+
+    return V_in, U_out
+
+center = "language"
+positive = "models"
+negatives = ["algebra", "matrices", "singular"]
+
+before = U_out[word_to_id[positive]] @ V_in[word_to_id[center]]
+V_in, U_out = negative_sampling_step(V_in, U_out, center, positive, negatives)
+after = U_out[word_to_id[positive]] @ V_in[word_to_id[center]]
+
+print("positive inner product before:", round(float(before), 4))
+print("positive inner product after: ", round(float(after), 4))
+```
+
+The update tends to increase the inner product of the observed pair and decrease the inner products of sampled negative pairs.
+
+## Plotly visualization from Python
+
+```{python}
+#| fig-cap: "Two-dimensional word embeddings obtained from PPMI and SVD."
+try:
+    import plotly.express as px
+
+    plot_df = emb_df.reset_index().rename(columns={"index": "word"})
+    fig = px.scatter(
+        plot_df,
+        x="z1",
+        y="z2",
+        text="word",
+        hover_name="word",
+        title="Toy word embedding map from PPMI-SVD"
+    )
+    fig.update_traces(textposition="top center")
+    fig.update_layout(xaxis_title="embedding coordinate 1", yaxis_title="embedding coordinate 2")
+    fig.show()
+except Exception as e:
+    print("Plotly figure skipped:", e)
+```
+
+# Interactive HTML: embedding analogy explorer
+
+Now define a target vector depending on a scalar $\alpha$:
+
+$$
+z(\alpha)=e(\text{king})-\alpha e(\text{man})+\alpha e(\text{woman}).
+$$
+
+When $\alpha=1$, this is the classical analogy vector
+
+$$
+e(\text{king})-e(\text{man})+e(\text{woman}).
+$$
+
+```{=html}
+<div class="interactive-card nlp-interactive" id="ch08-embedding-card">
+  <h3>Interactive: Word analogy as vector arithmetic</h3>
+  <p>
+    Move the slider to change the analogy strength.  The point labeled target is
+    king - α man + α woman.  The nearest labeled word to the target is computed by cosine similarity.
+  </p>
+  <label for="ch08-alpha-slider"><strong>α:</strong> <span id="ch08-alpha-value">1.00</span></label>
+  <input id="ch08-alpha-slider" type="range" min="0" max="1.5" value="1" step="0.05" style="width: 100%; max-width: 560px;">
+  <div id="ch08-embedding-plot" class="plotly-demo" style="height: 470px;"></div>
+  <div id="ch08-analogy-summary" style="font-family: system-ui, sans-serif; margin-top: 0.75rem;"></div>
+  <div id="ch08-analogy-status" class="plotly-status" aria-live="polite">Loading interactive figure...</div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  function ready(fn) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", fn, {once: true});
+    } else {
+      fn();
+    }
+  }
+
+  function setStatus(message, isError) {
+    var status = document.getElementById("ch08-analogy-status");
+    if (!status) return;
+    status.textContent = message || "";
+    status.classList.toggle("plotly-error", Boolean(isError));
+    status.style.display = message ? "block" : "none";
+  }
+
+  function loadPlotly(callback) {
+    if (window.Plotly && typeof window.Plotly.react === "function") {
+      callback();
+      return;
+    }
+
+    var existing = document.querySelector("script[data-nlp-plotly-loader]");
+    if (!existing) {
+      existing = document.createElement("script");
+      existing.src = "https://cdn.plot.ly/plotly-2.35.2.min.js";
+      existing.async = true;
+      existing.setAttribute("data-nlp-plotly-loader", "true");
+      existing.onerror = function() {
+        setStatus("Plotly.js could not be loaded. Check your internet connection or the CDN setting in _quarto.yml.", true);
+      };
+      document.head.appendChild(existing);
+    }
+
+    var attempts = 0;
+    var timer = window.setInterval(function() {
+      attempts += 1;
+      if (window.Plotly && typeof window.Plotly.react === "function") {
+        window.clearInterval(timer);
+        callback();
+      } else if (attempts > 80) {
+        window.clearInterval(timer);
+        setStatus("Plotly.js was not available, so the interactive figure could not be drawn.", true);
+      }
+    }, 100);
+  }
+
+  ready(function() {
+    var plot = document.getElementById("ch08-embedding-plot");
+    var slider = document.getElementById("ch08-alpha-slider");
+    var value = document.getElementById("ch08-alpha-value");
+    var summary = document.getElementById("ch08-analogy-summary");
+
+    if (!plot || !slider || !value || !summary) {
+      setStatus("The interactive HTML container was not found on this page.", true);
+      return;
+    }
+
+    loadPlotly(function() {
+      var words = ["man", "woman", "king", "queen", "prince", "princess", "doctor", "nurse", "city", "village"];
+      var coords = {
+        "man": [0.0, 0.0],
+        "woman": [1.0, 0.0],
+        "king": [0.2, 1.2],
+        "queen": [1.2, 1.2],
+        "prince": [0.25, 0.85],
+        "princess": [1.25, 0.85],
+        "doctor": [0.15, -0.75],
+        "nurse": [0.9, -0.65],
+        "city": [2.2, 0.2],
+        "village": [2.0, -0.35]
+      };
+
+      function norm(v) {
+        return Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+      }
+
+      function cosine(a, b) {
+        var denom = norm(a) * norm(b);
+        if (denom < 1e-12) return -Infinity;
+        return (a[0] * b[0] + a[1] * b[1]) / denom;
+      }
+
+      function update() {
+        var alpha = parseFloat(slider.value);
+        value.textContent = alpha.toFixed(2);
+
+        var king = coords["king"];
+        var man = coords["man"];
+        var woman = coords["woman"];
+        var target = [
+          king[0] - alpha * man[0] + alpha * woman[0],
+          king[1] - alpha * man[1] + alpha * woman[1]
+        ];
+
+        var xs = words.map(function(w) { return coords[w][0]; });
+        var ys = words.map(function(w) { return coords[w][1]; });
+
+        var bestWord = null;
+        var bestScore = -Infinity;
+        words.forEach(function(w) {
+          if (["king", "man", "woman"].indexOf(w) >= 0) return;
+          var score = cosine(coords[w], target);
+          if (score > bestScore) {
+            bestScore = score;
+            bestWord = w;
+          }
+        });
+
+        var data = [
+          {
+            type: "scatter",
+            mode: "markers+text",
+            x: xs,
+            y: ys,
+            text: words,
+            textposition: "top center",
+            marker: {size: 12},
+            hoverinfo: "text",
+            name: "word vectors"
+          },
+          {
+            type: "scatter",
+            mode: "markers+text",
+            x: [target[0]],
+            y: [target[1]],
+            text: ["target"],
+            textposition: "bottom center",
+            marker: {size: 16, symbol: "star"},
+            hovertext: ["king - α man + α woman"],
+            hoverinfo: "text",
+            name: "analogy target"
+          },
+          {
+            type: "scatter",
+            mode: "lines",
+            x: [coords["king"][0], target[0]],
+            y: [coords["king"][1], target[1]],
+            hoverinfo: "skip",
+            name: "analogy displacement"
+          }
+        ];
+
+        window.Plotly.react(plot, data, {
+          title: "Toy embedding geometry for analogy arithmetic",
+          xaxis: {title: "coordinate 1", zeroline: true, range: [-0.4, 2.6]},
+          yaxis: {title: "coordinate 2", zeroline: true, range: [-1.0, 1.6]},
+          margin: {l: 55, r: 25, t: 60, b: 55},
+          showlegend: false
+        }, {responsive: true});
+
+        summary.innerHTML =
+          "<strong>Target vector:</strong> king - " + alpha.toFixed(2) + " man + " + alpha.toFixed(2) + " woman" +
+          " &nbsp; <strong>Nearest candidate:</strong> " + bestWord +
+          " &nbsp; <strong>cosine:</strong> " + bestScore.toFixed(3) +
+          "<br><em>Mathematical point:</em> analogy behavior depends on whether relationships are approximately encoded as linear directions.";
+        setStatus("");
+      }
+
+      slider.addEventListener("input", update);
+      update();
+    });
+  });
+})();
+</script>
+```
+
+This interactive is deliberately idealized.  Real embeddings are high-dimensional, noisy, and trained from data.  Nevertheless, the same vector operation and cosine nearest-neighbor rule are used.
+
+# Worked example: PPMI by hand
+
+Suppose a tiny corpus produces the following co-occurrence counts:
+
+$$
+C=
+\begin{bmatrix}
+10 & 2\\
+1 & 7
+\end{bmatrix}.
+$$
+
+The total count is
+
+$$
+N=10+2+1+7=20.
+$$
+
+For entry $(1,1)$,
+
+$$
+P(W=1,C=1)=\frac{10}{20}=0.5,
+$$
+
+while
+
+$$
+P(W=1)=\frac{12}{20}=0.6,
+\qquad
+P(C=1)=\frac{11}{20}=0.55.
+$$
+
+Thus
+
+$$
+\operatorname{PMI}(1,1)
+=\log\frac{0.5}{0.6\cdot 0.55}
+=\log(1.515\ldots)>0.
+$$
+
+The pair $(1,1)$ occurs more often than expected under independence.
+
+For entry $(1,2)$,
+
+$$
+P(W=1,C=2)=\frac{2}{20}=0.1,
+$$
+
+while
+
+$$
+P(W=1)P(C=2)=\frac{12}{20}\cdot\frac{9}{20}=0.27.
+$$
+
+Therefore
+
+$$
+\operatorname{PMI}(1,2)=\log\frac{0.1}{0.27}<0,
+$$
+
+and the PPMI value is set to zero.
+
+# AI-assisted learning components
+
+AI tools can help students explore word embeddings, but they should be used as mathematical assistants rather than authorities.
+
+## Prompt 1: explain an embedding method mathematically
+
+Use an AI assistant to answer:
+
+> Explain the skip-gram model as a maximum likelihood problem.  Define the vocabulary, the input embedding matrix, the output embedding matrix, the softmax probability, and the negative log-likelihood.  Avoid implementation details until the mathematical objective is clear.
+
+Then check whether the answer includes:
+
+- a conditional probability $P(c\mid w)$;
+- inner products between word and context vectors;
+- a softmax denominator over the vocabulary;
+- a sum over observed word-context pairs;
+- a clear distinction between input and output embeddings.
+
+## Prompt 2: audit a nearest-neighbor result
+
+Ask:
+
+> I trained word embeddings and found the nearest neighbors of the word "model".  How can I tell whether the neighbors reflect semantics, syntax, frequency effects, or corpus bias?  Give a mathematical checklist.
+
+A good answer should mention cosine similarity, vector norms, word frequency, training corpus, context window, and the difference between association and truth.
+
+## Prompt 3: derive the gradient
+
+Ask:
+
+> For the skip-gram softmax loss $\ell(w,c)=-\log P(c\mid w)$, derive $\partial \ell/\partial v_w$ and explain the sign of the update.
+
+Then compare the result with the gradient derived earlier in this chapter.
+
+## Prompt 4: detect hidden assumptions
+
+Ask:
+
+> What assumptions are hidden in the distributional hypothesis?  Give examples where words appear in similar contexts but should not be considered semantically equivalent.
+
+This encourages students to connect mathematical modeling assumptions with linguistic and social limitations.
+
+# Exercises
+
+## Conceptual exercises
+
+1. Explain why one-hot vectors do not encode semantic similarity.
+2. What information is contained in a row of a co-occurrence matrix?
+3. Why does PMI correct for word frequency better than raw co-occurrence counts?
+4. What is the difference between a word embedding matrix and a context embedding matrix?
+5. In what sense is GloVe a matrix approximation method?
+6. Why can static word embeddings struggle with polysemy?
+7. Why might cosine similarity be preferred over Euclidean distance for word embeddings?
+8. What does it mean for an analogy to be represented by a linear direction?
+
+## Mathematical exercises
+
+1. Let $E\in R^{d\times m}$ and $\delta_j\in R^d$ be the $j$th one-hot vector.  Prove that $\delta_j^TE$ returns the $j$th row of $E$.
+2. Let $C$ be a co-occurrence matrix.  Derive the empirical joint and marginal distributions from $C$.
+3. Show that $\operatorname{PMI}(w,c)=0$ when $W$ and $C$ are independent.
+4. Let $M=U\Sigma V^T$ and define $E=U_m\Sigma_m^{1/2}$ and $F=V_m\Sigma_m^{1/2}$.  Show that $EF^T$ equals the rank-$m$ truncated SVD approximation.
+5. Derive the gradient of the skip-gram softmax loss with respect to the center-word embedding.
+6. For the negative-sampling loss, compute the derivative of $-\log\sigma(u_c^Tv_w)$ with respect to $v_w$.
+7. Let $x,y\in R^m$ be nonzero.  Prove that cosine similarity is invariant under positive rescaling of either vector.
+8. Suppose $e(b)-e(a)\approx e(d)-e(c)$.  Explain why this supports the analogy $a:b\approx c:d$.
+
+## Computational exercises
+
+1. Change the context window size in the Python code from $h=2$ to $h=1$ and $h=3$.  Compare the co-occurrence matrices.
+2. Compute PPMI embeddings with dimensions $m=2,3,5$.  How do nearest neighbors change?
+3. Replace PPMI with raw co-occurrence counts before SVD.  Compare the geometry.
+4. Implement a function that returns the top $k$ word pairs with largest PMI values.
+5. Train the toy negative-sampling model for several epochs over all word-context pairs.  Visualize the resulting embeddings.
+6. Use a larger text sample and compare embeddings trained from different corpora.
+7. Investigate whether frequent words have larger embedding norms in your experiment.
+8. Create a Plotly visualization that lets the user choose a word and displays its nearest neighbors.
+
+# Mini-project: build and audit toy word embeddings
+
+Choose a small corpus related to one domain, such as mathematics course descriptions, university advising pages, research abstracts, or textbook chapter summaries.  Build word embeddings from scratch using the following pipeline:
+
+1. tokenize the corpus;
+2. build a vocabulary;
+3. construct a word-context co-occurrence matrix;
+4. compute a PPMI matrix;
+5. compute SVD embeddings;
+6. find nearest neighbors for selected words;
+7. visualize embeddings in two dimensions;
+8. write a short mathematical audit of the results.
+
+Your audit should answer:
+
+- What does a row of the co-occurrence matrix mean?
+- What does PMI emphasize?
+- How much information is lost when projecting to two dimensions?
+- Which nearest neighbors are sensible?
+- Which nearest neighbors are artifacts of the corpus?
+- What would change if the corpus were larger?
+
+# Lab connection
+
+The computer lab for this chapter should guide students through a complete word-embedding workflow:
+
+1. build co-occurrence matrices;
+2. compute empirical probabilities;
+3. compute PMI and PPMI;
+4. obtain SVD embeddings;
+5. implement nearest-neighbor search;
+6. test analogy arithmetic;
+7. implement a small skip-gram negative-sampling model;
+8. use Plotly to visualize embeddings;
+9. use AI to critique mathematical assumptions and possible bias.
+
+# Summary
+
+Word embeddings transform discrete tokens into continuous vectors.  Mathematically, an embedding is a map
+
+$$
+e:V\to R^m.
+$$
+
+Count-based methods begin with co-occurrence matrices and transform them using PMI, PPMI, and matrix factorization.  Prediction-based methods learn embeddings by optimizing objectives such as skip-gram softmax or negative sampling.  In both cases, the resulting vectors encode statistical regularities from the corpus.
+
+The central message is:
+
+> Word meaning is not inserted into the vectors by hand.  It is induced from patterns of co-occurrence, prediction, and optimization.
+
+This chapter completes the bridge from classical vector-space models to modern neural NLP.  The next chapter studies the geometry of embedding spaces more systematically, including clustering, visualization, anisotropy, and bias.

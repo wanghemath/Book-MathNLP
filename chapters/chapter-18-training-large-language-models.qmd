@@ -1,0 +1,978 @@
+---
+title: "Training Large Language Models"
+subtitle: "Pretraining, fine-tuning, instruction tuning, and alignment as optimization problems"
+---
+
+::: {.chapter-opening}
+Chapter 17 described an autoregressive language model as a conditional probability model for the next token.  This chapter explains how such a model is trained.  The main mathematical idea is simple: training a large language model is empirical risk minimization over token sequences.  Pretraining, supervised fine-tuning, instruction tuning, preference learning, and alignment differ mainly in the data distribution, the loss function, and the constraints placed on the updated model.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+- Write language-model pretraining as maximum likelihood estimation.
+- Derive the token-level cross-entropy loss from the autoregressive factorization.
+- Explain teacher forcing, causal masking, and padding masks in the training objective.
+- Compute the gradient of the softmax cross-entropy loss with respect to logits.
+- Distinguish pretraining, supervised fine-tuning, instruction tuning, and preference tuning.
+- Explain KL-regularized fine-tuning as constrained distributional movement away from a reference model.
+- Describe pairwise preference modeling using the Bradley--Terry logistic model.
+- Interpret RLHF and DPO-style methods as optimization problems on conditional distributions.
+- Implement small pieces of the training objective from scratch in Python.
+
+## 18.1 From a language model to a statistical estimator
+
+Let $V$ be a finite vocabulary and let a token sequence be
+
+$$
+w_{1:T}=(w_1,\ldots,w_T) \in V^T.
+$$
+
+An autoregressive language model with parameters $\theta$ defines
+
+$$
+p_\theta(w_{1:T})
+=
+\prod_{t=1}^T p_\theta(w_t \mid w_{<t}).
+$$
+
+Training means choosing $\theta$ using data.  Suppose the training corpus consists of $N$ token sequences
+
+$$
+D=\{w^{(1)}_{1:T_1},\ldots,w^{(N)}_{1:T_N}\}.
+$$
+
+The maximum likelihood estimator is
+
+$$
+\hat \theta
+=
+\arg\max_\theta
+\prod_{i=1}^N
+p_\theta(w^{(i)}_{1:T_i}).
+$$
+
+Because products of many small probabilities are numerically unstable, we maximize log-likelihood or equivalently minimize negative log-likelihood:
+
+$$
+\hat\theta
+=
+\arg\min_\theta
+\left[-\sum_{i=1}^N \log p_\theta(w^{(i)}_{1:T_i})\right].
+$$
+
+Using the autoregressive factorization,
+
+$$
+-\log p_\theta(w^{(i)}_{1:T_i})
+=
+-\sum_{t=1}^{T_i}
+\log p_\theta(w_t^{(i)} \mid w_{<t}^{(i)}).
+$$
+
+Thus the training problem is a large supervised learning problem in disguise.  Each prefix $w_{<t}$ is an input and the next token $w_t$ is the label.
+
+::: {.callout-note}
+## Pretraining objective
+
+The standard autoregressive pretraining loss is
+
+$$
+L_{\text{pre}}(\theta)
+=
+-\frac{1}{M}
+\sum_{i=1}^N\sum_{t=1}^{T_i}
+\log p_\theta(w_t^{(i)} \mid w_{<t}^{(i)}),
+$$
+
+where $M=\sum_i T_i$ is the number of predicted tokens.  This is the empirical cross-entropy between the data distribution and the model distribution.
+:::
+
+## 18.2 Training data as samples from an unknown distribution
+
+A mathematically clean way to view the corpus is as a sample from an unknown population distribution $P_{\text{data}}$ on token sequences.  The population risk for language modeling is
+
+$$
+R(\theta)
+=
+E_{W_{1:T}\sim P_{\text{data}}}
+\left[
+-\sum_{t=1}^T \log p_\theta(W_t \mid W_{<t})
+\right].
+$$
+
+The empirical training loss replaces the expectation by an average over the observed corpus.  This gives the usual statistical learning picture:
+
+$$
+\text{population risk} \quad \longrightarrow \quad \text{empirical risk} \quad \longrightarrow \quad \text{optimization algorithm}.
+$$
+
+For MS Statistics students, this viewpoint is important because the training corpus is not neutral.  It induces an empirical distribution.  The model learns from that distribution and inherits its coverage, imbalances, style, and noise.
+
+## 18.3 Tokens, contexts, and labels
+
+Given a sequence
+
+$$
+w_{1:T}=(w_1,w_2,\ldots,w_T),
+$$
+
+training forms the pairs
+
+$$
+(w_{<1},w_1),\;(w_{<2},w_2),\;\ldots,\;(w_{<T},w_T).
+$$
+
+The first context $w_{<1}$ is usually represented by a beginning-of-sequence token.  The target at position $t$ is not the entire future.  It is only the next token $w_t$.  However, minimizing next-token loss over many positions encourages the model to capture long-range structure because the prefix may contain earlier semantic and syntactic information.
+
+For a vocabulary ordered as $V=\{v_1,\ldots,v_d\}$, the model produces logits
+
+$$
+z_\theta(w_{<t})\in R^d.
+$$
+
+The probability assigned to token $v_j$ is
+
+$$
+p_\theta(v_j\mid w_{<t})
+=
+\frac{\exp(z_j)}{\sum_{k=1}^d \exp(z_k)}.
+$$
+
+If the true next token is $v_y$, the token loss is
+
+$$
+\ell(z,y)
+=
+-\log \frac{\exp(z_y)}{\sum_{k=1}^d \exp(z_k)}
+=
+-z_y+\log\sum_{k=1}^d \exp(z_k).
+$$
+
+This is the same softmax cross-entropy loss used in multiclass classification, applied at every token position.
+
+## 18.4 Gradient of token-level cross-entropy
+
+Let
+
+$$
+p=\operatorname{softmax}(z).
+$$
+
+Let $e_y\in R^d$ be the one-hot vector for the correct class.  The token loss is
+
+$$
+\ell(z,y)=-\log p_y.
+$$
+
+A direct calculation gives
+
+$$
+\frac{\partial \ell}{\partial z_j}=p_j-(e_y)_j.
+$$
+
+Therefore,
+
+$$
+\nabla_z \ell = p-e_y.
+$$
+
+This simple formula is central.  The model is pushed to decrease probabilities assigned to incorrect tokens and increase the probability assigned to the observed token.
+
+::: {.math-card}
+**Interpretation.** If the model assigns too little probability to the observed next token, the residual $p-e_y$ is large in the direction that corrects the logits.  Training a language model is therefore repeated probability calibration over a huge number of next-token classification problems.
+:::
+
+## 18.5 Teacher forcing
+
+During training, the model is given the true previous tokens as context.  This is called **teacher forcing**.  For example, if the training sequence is
+
+```text
+<bos> math models learn from data <eos>
+```
+
+then the model is trained on contexts such as
+
+```text
+<bos> math models
+```
+
+with target
+
+```text
+learn
+```
+
+The model does not train on its own generated mistakes at this stage.  Mathematically, the loss uses contexts from the empirical data distribution, not contexts produced by the model.  This difference is one source of the gap between training and generation.
+
+## 18.6 Batching, padding, and masks
+
+In practice, sequences of different lengths are placed into a rectangular array.  Suppose a batch has $B$ sequences and maximum length $T_{\max}$.  The token array has shape
+
+$$
+B\times T_{\max}.
+$$
+
+Shorter sequences are padded.  Let
+
+$$
+m_{i,t}\in \{0,1\}
+$$
+
+be a mask indicating whether token position $(i,t)$ is real or padding.  The masked training loss is
+
+$$
+L(\theta)
+=
+-
+\frac{1}{\sum_{i,t}m_{i,t}}
+\sum_{i=1}^B\sum_{t=1}^{T_{\max}}
+ m_{i,t}
+\log p_\theta(w_{i,t}\mid w_{i,<t}).
+$$
+
+Padding positions must not contribute to the loss.  In decoder-only Transformers, causal masks are also used so that position $t$ cannot attend to positions greater than $t$.
+
+## 18.7 Optimization: stochastic gradients and AdamW
+
+The loss function for a large language model is nonconvex and high-dimensional.  Let $\theta\in R^P$ denote all parameters.  A generic stochastic-gradient update is
+
+$$
+\theta_{s+1}
+=
+\theta_s-\eta_s \widehat{\nabla L}(\theta_s),
+$$
+
+where $\widehat{\nabla L}$ is a gradient estimate computed from a minibatch and $\eta_s$ is a learning rate.
+
+Modern training often uses adaptive optimizers.  A simplified Adam-style update maintains moving averages of gradients and squared gradients:
+
+$$
+m_s=\beta_1m_{s-1}+(1-\beta_1)g_s,
+$$
+
+$$
+v_s=\beta_2v_{s-1}+(1-\beta_2)g_s\odot g_s.
+$$
+
+Then the parameter update has the coordinatewise form
+
+$$
+\theta_{s+1}
+=
+\theta_s
+-
+\eta_s
+\frac{\widehat m_s}{\sqrt{\widehat v_s}+\epsilon}.
+$$
+
+AdamW separates weight decay from the gradient update.  A schematic update is
+
+$$
+\theta_{s+1}
+=
+(1-\eta_s\lambda)\theta_s
+-
+\eta_s
+\frac{\widehat m_s}{\sqrt{\widehat v_s}+\epsilon}.
+$$
+
+Here $\lambda$ controls weight decay.  From an applied mathematics viewpoint, AdamW is a stochastic, adaptive, preconditioned first-order method with explicit shrinkage.
+
+## 18.8 Validation loss, overfitting, and early stopping
+
+The training loss estimates performance on the training distribution.  To estimate generalization, we hold out validation data and compute
+
+$$
+L_{\text{val}}(\theta)
+=
+-
+\frac{1}{M_{\text{val}}}
+\sum_{(i,t)\in \text{validation}}
+\log p_\theta(w_t^{(i)}\mid w_{<t}^{(i)}).
+$$
+
+A useful diagnostic is the training-validation gap:
+
+$$
+L_{\text{val}}(\theta)-L_{\text{train}}(\theta).
+$$
+
+A large positive gap suggests overfitting, distribution mismatch, or both.  In very large pretraining, the situation is more subtle because data diversity, model capacity, optimization budget, and evaluation distribution interact.
+
+## 18.9 Supervised fine-tuning
+
+Pretraining learns a broad next-token model.  **Supervised fine-tuning** updates the model on a more targeted dataset.  For instruction tuning, each training example often has a prompt and a desired response:
+
+$$
+x_i=\text{prompt},\qquad y_i=\text{response}.
+$$
+
+The conditional fine-tuning objective is
+
+$$
+L_{\text{SFT}}(\theta)
+=
+-
+\frac{1}{M}
+\sum_{i=1}^N\sum_{t=1}^{T_i}
+\log p_\theta(y_{i,t}\mid x_i,y_{i,<t}).
+$$
+
+The prompt tokens provide context, but the loss is often applied only to the response tokens.  This is an important masking detail.  If prompt tokens are included in the loss, the model is trained to reproduce prompts rather than only to generate useful responses.
+
+::: {.callout-warning}
+## Masking matters
+
+For instruction fine-tuning, one often wants
+
+$$
+\text{loss on response tokens only}.
+$$
+
+The mask determines which tokens count as labels.  This small implementation choice changes the statistical problem being solved.
+:::
+
+## 18.10 Fine-tuning as distributional movement
+
+Let $p_0$ be the pretrained reference model and let $p_\theta$ be the fine-tuned model.  Fine-tuning changes conditional distributions:
+
+$$
+p_0(\cdot\mid c)
+\quad \longrightarrow \quad
+p_\theta(\cdot\mid c).
+$$
+
+If the fine-tuning dataset is small, moving too far from the reference model can reduce general ability.  A common mathematical safeguard is a KL penalty:
+
+$$
+L_{\text{KL-SFT}}(\theta)
+=
+L_{\text{SFT}}(\theta)
++
+\beta
+E_c\left[
+D_{\mathrm{KL}}\left(
+ p_\theta(\cdot\mid c)\;\|\;p_0(\cdot\mid c)
+\right)
+\right].
+$$
+
+The KL divergence is
+
+$$
+D_{\mathrm{KL}}(p\|q)=\sum_{j=1}^d p_j\log\frac{p_j}{q_j}.
+$$
+
+The coefficient $\beta\geq 0$ controls how strongly the fine-tuned model is discouraged from moving away from the reference model.
+
+## 18.11 Preference data and reward models
+
+Some training data does not specify a single correct response.  Instead, it gives preferences.  For a prompt $x$, suppose humans or another evaluator prefer response $y^+$ over response $y^-$.  A common model assumes there is a scalar reward function
+
+$$
+r_\phi(x,y)\in R
+$$
+
+and that preference probabilities follow a Bradley--Terry logistic model:
+
+$$
+P_\phi(y^+ \succ y^-\mid x)
+=
+\sigma\left(r_\phi(x,y^+)-r_\phi(x,y^-)\right),
+$$
+
+where
+
+$$
+\sigma(a)=\frac{1}{1+\exp(-a)}.
+$$
+
+The negative log-likelihood for one preference pair is
+
+$$
+\ell_{\text{pref}}(\phi)
+=
+-
+\log \sigma\left(r_\phi(x,y^+)-r_\phi(x,y^-)\right).
+$$
+
+This is logistic regression on pairwise differences of rewards.
+
+## 18.12 KL-regularized policy optimization viewpoint
+
+A language model can also be viewed as a policy.  Given a prompt $x$, it samples a response $Y$ from
+
+$$
+Y\sim p_\theta(\cdot\mid x).
+$$
+
+Suppose a reward model $r_\phi(x,Y)$ assigns a scalar score.  A KL-regularized objective is
+
+$$
+J(\theta)
+=
+E_{Y\sim p_\theta(\cdot\mid x)}[r_\phi(x,Y)]
+-
+\beta
+D_{\mathrm{KL}}\left(
+ p_\theta(\cdot\mid x)\;\|\;p_0(\cdot\mid x)
+\right).
+$$
+
+The first term encourages high-reward responses.  The second term prevents the model from drifting too far from a reference model.  This is the mathematical core behind many alignment-style training procedures.
+
+The optimization is difficult because the response $Y$ is a discrete sequence.  Gradient estimates can have high variance.  Practical algorithms introduce approximations, clipping, baselines, and minibatch estimates.  The mathematical principle, however, is the same: maximize reward while controlling distributional change.
+
+## 18.13 Direct preference optimization viewpoint
+
+Preference tuning can sometimes be written directly in terms of log-probabilities rather than explicitly training a separate reward model.  A common form compares the preferred response $y^+$ and rejected response $y^-$ under the current model and a reference model.
+
+Define
+
+$$
+\Delta_\theta
+=
+\log p_\theta(y^+\mid x)-\log p_\theta(y^-\mid x),
+$$
+
+and
+
+$$
+\Delta_0
+=
+\log p_0(y^+\mid x)-\log p_0(y^-\mid x).
+$$
+
+A direct preference loss has the logistic form
+
+$$
+L_{\text{DPO}}(\theta)
+=
+-
+\log \sigma\left(\beta(\Delta_\theta-\Delta_0)\right).
+$$
+
+This encourages the updated model to increase the relative log-probability of the preferred response compared with the reference model.  The reference model acts as a statistical anchor.
+
+## 18.14 Parameter-efficient fine-tuning
+
+Fine-tuning every parameter can be expensive.  A parameter-efficient method freezes most of the pretrained model and trains only a small number of new parameters.
+
+A simple mathematical model is a low-rank update to a weight matrix.  Suppose a pretrained layer contains
+
+$$
+W_0\in R^{m\times n}.
+$$
+
+Instead of training all entries of $W_0$, we train matrices
+
+$$
+A\in R^{r\times n},\qquad B\in R^{m\times r},
+$$
+
+where $r\ll \min(m,n)$, and use
+
+$$
+W=W_0+BA.
+$$
+
+The update $BA$ has rank at most $r$.  This turns a large update in $R^{m\times n}$ into a smaller optimization problem with $r(m+n)$ trainable parameters.
+
+::: {.math-card}
+**Linear algebra viewpoint.** Parameter-efficient fine-tuning restricts the update direction to a low-dimensional subspace or manifold of the full parameter space.
+:::
+
+## 18.15 What changes across training stages?
+
+The following table summarizes the mathematical differences.
+
+| Stage | Data | Objective | Main mathematical object |
+|---|---|---|---|
+| Pretraining | large unlabeled text corpus | next-token negative log-likelihood | conditional distribution $p_\theta(w_t\mid w_{<t})$ |
+| Supervised fine-tuning | prompt-response pairs | response-token cross-entropy | conditional response model $p_\theta(y\mid x)$ |
+| Instruction tuning | instruction-following examples | masked conditional cross-entropy | prompt-conditioned generation |
+| Reward modeling | pairwise preferences | logistic pairwise loss | scalar reward $r_\phi(x,y)$ |
+| KL-regularized tuning | prompts and rewards/preferences | reward minus KL penalty | constrained distributional shift |
+| Parameter-efficient tuning | task data | any fine-tuning loss | low-dimensional parameter update |
+
+## 18.16 Python example: token-level cross-entropy
+
+The next examples use small arrays so that every quantity is visible.
+
+```{python}
+#| label: ch18-cross-entropy
+#| echo: true
+
+import numpy as np
+
+np.set_printoptions(precision=4, suppress=True)
+
+def softmax(logits):
+    logits = np.asarray(logits, dtype=float)
+    shifted = logits - logits.max(axis=-1, keepdims=True)
+    exp_values = np.exp(shifted)
+    return exp_values / exp_values.sum(axis=-1, keepdims=True)
+
+def cross_entropy_from_logits(logits, targets):
+    probs = softmax(logits)
+    n = len(targets)
+    losses = -np.log(probs[np.arange(n), targets])
+    return losses, losses.mean(), probs
+
+vocab = ["math", "models", "learn", "data"]
+logits = np.array([
+    [2.0, 1.0, 0.0, -1.0],
+    [0.2, 1.8, 1.1, -0.5],
+    [-0.3, 0.4, 2.2, 1.0]
+])
+targets = np.array([0, 2, 3])
+
+losses, mean_loss, probs = cross_entropy_from_logits(logits, targets)
+print("probabilities:\n", probs)
+print("token losses:", losses)
+print("mean loss:", mean_loss)
+print("perplexity:", np.exp(mean_loss))
+```
+
+## 18.17 Python example: gradient with respect to logits
+
+```{python}
+#| label: ch18-logit-gradient
+#| echo: true
+
+probs = softmax(logits)
+one_hot = np.zeros_like(probs)
+one_hot[np.arange(len(targets)), targets] = 1.0
+
+grad_logits = (probs - one_hot) / len(targets)
+print("gradient of mean cross-entropy with respect to logits:\n", grad_logits)
+print("row sums should be zero:", grad_logits.sum(axis=1))
+```
+
+The row sums are zero because adding the same constant to all logits does not change the softmax distribution.
+
+## 18.18 Python example: masked response loss
+
+Instruction fine-tuning often uses a loss mask.  In the following toy example, prompt tokens have mask value $0$ and response tokens have mask value $1$.
+
+```{python}
+#| label: ch18-masked-loss
+#| echo: true
+
+# Shape: batch size 2, length 5, vocabulary size 4.
+rng = np.random.default_rng(18)
+logits_batch = rng.normal(size=(2, 5, 4))
+target_batch = np.array([
+    [0, 1, 2, 3, 0],
+    [1, 2, 0, 0, 3]
+])
+
+# Only response tokens count.
+loss_mask = np.array([
+    [0, 0, 1, 1, 1],
+    [0, 1, 1, 0, 1]
+], dtype=float)
+
+probs_batch = softmax(logits_batch)
+selected = probs_batch[
+    np.arange(2)[:, None],
+    np.arange(5)[None, :],
+    target_batch
+]
+
+token_losses = -np.log(selected)
+masked_mean = (token_losses * loss_mask).sum() / loss_mask.sum()
+
+print("token losses:\n", token_losses)
+print("loss mask:\n", loss_mask)
+print("masked mean loss:", masked_mean)
+```
+
+## 18.19 Python example: KL penalty between current and reference models
+
+```{python}
+#| label: ch18-kl-penalty
+#| echo: true
+
+def kl_divergence(p, q):
+    p = np.asarray(p, dtype=float)
+    q = np.asarray(q, dtype=float)
+    return np.sum(p * (np.log(p + 1e-12) - np.log(q + 1e-12)), axis=-1)
+
+current_logits = np.array([
+    [2.2, 1.4, 0.1, -0.5],
+    [0.0, 1.2, 2.1, -0.8]
+])
+reference_logits = np.array([
+    [1.8, 1.3, 0.4, -0.1],
+    [0.2, 1.0, 1.6, -0.2]
+])
+
+p_current = softmax(current_logits)
+p_reference = softmax(reference_logits)
+kl_values = kl_divergence(p_current, p_reference)
+
+print("current probabilities:\n", p_current)
+print("reference probabilities:\n", p_reference)
+print("KL(current || reference):", kl_values)
+print("mean KL:", kl_values.mean())
+```
+
+## 18.20 Python example: preference loss
+
+```{python}
+#| label: ch18-preference-loss
+#| echo: true
+
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
+
+def preference_loss(reward_chosen, reward_rejected):
+    margin = reward_chosen - reward_rejected
+    return -np.log(sigmoid(margin) + 1e-12)
+
+reward_chosen = np.array([2.0, 0.8, 1.5, 0.4])
+reward_rejected = np.array([0.5, 1.1, 0.0, 0.2])
+losses = preference_loss(reward_chosen, reward_rejected)
+
+print("reward margins:", reward_chosen - reward_rejected)
+print("preference probabilities:", sigmoid(reward_chosen - reward_rejected))
+print("preference losses:", losses)
+print("mean preference loss:", losses.mean())
+```
+
+## 18.21 Python example: low-rank adaptation
+
+```{python}
+#| label: ch18-low-rank-adaptation
+#| echo: true
+
+rng = np.random.default_rng(1818)
+
+m, n, r = 6, 5, 2
+W0 = rng.normal(scale=0.2, size=(m, n))
+A = rng.normal(scale=0.05, size=(r, n))
+B = rng.normal(scale=0.05, size=(m, r))
+
+Delta = B @ A
+W = W0 + Delta
+
+print("W0 shape:", W0.shape)
+print("A shape:", A.shape)
+print("B shape:", B.shape)
+print("rank of update B A:", np.linalg.matrix_rank(Delta))
+print("trainable full matrix parameters:", m * n)
+print("trainable low-rank parameters:", r * (m + n))
+```
+
+## 18.22 Interactive: training objective explorer
+
+This interactive shows how three ingredients affect a stylized training curve: learning rate, batch size, and KL regularization strength.  It is not a physical law of neural-network training; it is a visualization of the qualitative roles of step size, gradient noise, and distributional anchoring.
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: training objective explorer</h3>
+  <p>
+    Adjust the learning rate, batch size, and KL penalty.  The plot shows a toy optimization trajectory for training loss and validation loss.
+  </p>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; align-items:end;">
+    <label>Learning rate
+      <input id="ch18-lr" type="range" min="0.02" max="0.60" step="0.01" value="0.18" style="width:100%;">
+      <span id="ch18-lr-value">0.18</span>
+    </label>
+    <label>Batch size
+      <input id="ch18-batch" type="range" min="16" max="512" step="16" value="128" style="width:100%;">
+      <span id="ch18-batch-value">128</span>
+    </label>
+    <label>KL penalty beta
+      <input id="ch18-beta" type="range" min="0.00" max="1.00" step="0.02" value="0.20" style="width:100%;">
+      <span id="ch18-beta-value">0.20</span>
+    </label>
+  </div>
+
+  <div id="ch18-training-plot" class="plotly-demo"></div>
+  <p id="ch18-training-status" class="plotly-status"></p>
+</div>
+
+<script>
+(function(){
+  function status(message) {
+    var node = document.getElementById('ch18-training-status');
+    if (node) node.textContent = message;
+  }
+
+  function loadLocalPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    var existing = document.querySelector('script[data-local-plotly="true"]');
+    if (existing) {
+      existing.addEventListener('load', callback);
+      existing.addEventListener('error', function(){ status('Plotly.js was not available, so the interactive figure could not be drawn.'); });
+      return;
+    }
+    var script = document.createElement('script');
+    script.src = '../assets/plotly.min.js';
+    script.async = true;
+    script.dataset.localPlotly = 'true';
+    script.onload = callback;
+    script.onerror = function(){ status('Plotly.js was not available, so the interactive figure could not be drawn. Check that assets/plotly.min.js exists.'); };
+    document.head.appendChild(script);
+  }
+
+  function deterministicNoise(step, scale) {
+    return scale * (Math.sin(1.7 * step) + 0.45 * Math.sin(0.41 * step + 1.2));
+  }
+
+  function simulate(lr, batch, beta) {
+    var steps = [];
+    var train = [];
+    var valid = [];
+    var kl = [];
+    var loss = 3.2;
+    var validationFloor = 1.55 + 0.35 * Math.exp(-3.0 * beta);
+    var trainFloor = 1.15 + 0.22 * beta;
+    var noiseScale = 0.30 / Math.sqrt(batch / 16.0);
+    var instability = Math.max(0, lr - 0.36);
+
+    for (var s = 0; s <= 80; s++) {
+      var progress = 1 - Math.exp(-lr * s / 5.0);
+      var trainLoss = 3.2 - (3.2 - trainFloor) * progress;
+      trainLoss += deterministicNoise(s, noiseScale * (1 - 0.6 * progress));
+      trainLoss += instability * instability * 8.0 * Math.max(0, s - 20) / 80.0;
+
+      var overfit = Math.max(0, s - 45) / 35.0;
+      var validLoss = 3.25 - (3.25 - validationFloor) * (1 - Math.exp(-lr * s / 6.5));
+      validLoss += 0.22 * overfit * (1 - beta);
+      validLoss += deterministicNoise(s + 3, noiseScale * 0.55);
+      validLoss += instability * instability * 10.0 * Math.max(0, s - 18) / 80.0;
+
+      var klValue = (1 - Math.exp(-lr * s / 8.0)) * (1.15 / (1 + 4.0 * beta));
+      klValue += 0.04 * Math.sin(s / 4.0);
+
+      steps.push(s);
+      train.push(Math.max(trainLoss, 0.4));
+      valid.push(Math.max(validLoss, 0.4));
+      kl.push(Math.max(klValue, 0.0));
+    }
+    return {steps: steps, train: train, valid: valid, kl: kl};
+  }
+
+  function init() {
+    var plot = document.getElementById('ch18-training-plot');
+    if (!plot || !window.Plotly) return;
+
+    var lrSlider = document.getElementById('ch18-lr');
+    var batchSlider = document.getElementById('ch18-batch');
+    var betaSlider = document.getElementById('ch18-beta');
+    var lrValue = document.getElementById('ch18-lr-value');
+    var batchValue = document.getElementById('ch18-batch-value');
+    var betaValue = document.getElementById('ch18-beta-value');
+
+    function update() {
+      var lr = parseFloat(lrSlider.value);
+      var batch = parseInt(batchSlider.value, 10);
+      var beta = parseFloat(betaSlider.value);
+      lrValue.textContent = lr.toFixed(2);
+      batchValue.textContent = String(batch);
+      betaValue.textContent = beta.toFixed(2);
+
+      var sim = simulate(lr, batch, beta);
+      var traces = [
+        {
+          x: sim.steps,
+          y: sim.train,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'training loss'
+        },
+        {
+          x: sim.steps,
+          y: sim.valid,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'validation loss'
+        },
+        {
+          x: sim.steps,
+          y: sim.kl,
+          type: 'scatter',
+          mode: 'lines',
+          name: 'KL drift',
+          yaxis: 'y2'
+        }
+      ];
+
+      var layout = {
+        margin: {l: 50, r: 55, t: 20, b: 45},
+        xaxis: {title: 'optimization step'},
+        yaxis: {title: 'loss'},
+        yaxis2: {
+          title: 'KL drift',
+          overlaying: 'y',
+          side: 'right',
+          rangemode: 'tozero'
+        },
+        legend: {orientation: 'h', x: 0.02, y: 1.15}
+      };
+
+      window.Plotly.react(plot, traces, layout, {responsive: true, displayModeBar: false});
+      status('Higher batch size reduces gradient noise.  Larger beta keeps the model closer to the reference distribution.');
+    }
+
+    lrSlider.addEventListener('input', update);
+    batchSlider.addEventListener('input', update);
+    betaSlider.addEventListener('input', update);
+    update();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ loadLocalPlotly(init); });
+  } else {
+    loadLocalPlotly(init);
+  }
+})();
+</script>
+```
+
+## 18.23 AI-assisted learning components
+
+Use an AI assistant as a mathematical critic, not as an authority.  The following prompts are designed for students to check understanding.
+
+### Prompt 1: identify the objective
+
+```text
+I am studying language model training.  Given a training setup, help me identify the data distribution, model distribution, loss function, mask, and optimization variable.  Do not give code first.  Start with mathematical notation.
+```
+
+### Prompt 2: audit a fine-tuning dataset
+
+```text
+I have a prompt-response fine-tuning dataset.  Help me decide which tokens should be included in the loss mask and explain how the choice changes the statistical objective.
+```
+
+### Prompt 3: compare alignment objectives
+
+```text
+Compare supervised fine-tuning, reward-model training, KL-regularized policy optimization, and direct preference optimization.  For each one, state the objective function and the random variables.
+```
+
+### Prompt 4: detect overclaiming
+
+```text
+A student says: "RLHF makes a model truthful."  Critique this statement mathematically.  Discuss what objective is optimized and why optimizing that objective does not automatically prove truthfulness.
+```
+
+## 18.24 Common mistakes
+
+1. **Confusing pretraining with memorization.** The objective estimates conditional token distributions.  Memorization may occur, but it is not the mathematical objective.
+2. **Ignoring masks.** The mask determines which tokens are treated as labels.
+3. **Treating KL divergence as symmetric.** In general, $D_{\mathrm{KL}}(p\|q)\neq D_{\mathrm{KL}}(q\|p)$.
+4. **Assuming lower training loss always means better behavior.** Fine-tuning may improve one distribution while hurting another.
+5. **Equating reward with truth.** A reward model estimates preferences or scores, not a theorem about correctness.
+6. **Forgetting the reference model.** Many preference objectives are meaningful only relative to a reference distribution.
+
+## 18.25 Worked calculation
+
+Suppose a vocabulary has three tokens and the model assigns probabilities
+
+$$
+p_\theta(\cdot\mid c)=(0.70,0.20,0.10).
+$$
+
+If the observed token is token $2$, the token loss is
+
+$$
+\ell=-\log(0.20)\approx 1.609.
+$$
+
+If a reference model has
+
+$$
+p_0(\cdot\mid c)=(0.60,0.30,0.10),
+$$
+
+then
+
+$$
+D_{\mathrm{KL}}(p_\theta\|p_0)
+=0.70\log\frac{0.70}{0.60}
++0.20\log\frac{0.20}{0.30}
++0.10\log\frac{0.10}{0.10}.
+$$
+
+Numerically,
+
+$$
+D_{\mathrm{KL}}(p_\theta\|p_0)
+\approx 0.70(0.154)-0.20(0.405)+0
+\approx 0.027.
+$$
+
+With $\beta=0.5$, the KL-regularized token objective is approximately
+
+$$
+1.609+0.5(0.027)=1.6225.
+$$
+
+The penalty is small here because the current model is close to the reference distribution.
+
+## 18.26 Exercises
+
+1. **Pretraining objective.** Starting from the autoregressive factorization, derive the negative log-likelihood loss for a corpus of variable-length sequences.
+2. **Softmax gradient.** Prove that $\nabla_z\ell=p-e_y$ for the multiclass cross-entropy loss.
+3. **Masking.** Construct a prompt-response example and write a binary mask that applies loss only to the response tokens.
+4. **KL direction.** Compute both $D_{\mathrm{KL}}(p\|q)$ and $D_{\mathrm{KL}}(q\|p)$ for $p=(0.8,0.2)$ and $q=(0.5,0.5)$.
+5. **Preference loss.** For rewards $r^+=1.4$ and $r^-=0.2$, compute the Bradley--Terry preference probability and loss.
+6. **Low-rank update.** If $W_0\in R^{4096\times 4096}$ and rank $r=8$, compare the number of full fine-tuning parameters with the number of low-rank update parameters.
+7. **Validation gap.** Suppose training loss decreases but validation loss increases.  Give at least two mathematical explanations.
+8. **Objective comparison.** Write one paragraph comparing supervised fine-tuning and preference tuning as empirical risk minimization problems.
+
+## 18.27 Mini-project
+
+Choose a small text dataset and implement a miniature training pipeline.
+
+1. Build a vocabulary and encode token sequences.
+2. Construct next-token input-target pairs.
+3. Train a simple model such as a bigram table, linear classifier, or tiny neural model.
+4. Track training loss and validation loss.
+5. Add a mask that excludes selected tokens from the loss.
+6. Add a KL penalty relative to a reference distribution.
+7. Write a mathematical report explaining the objective, the masks, and the learned conditional distributions.
+
+## 18.28 Python lab connection
+
+The associated independent-study lab is planned as:
+
+```text
+labs/chapter-18-training-large-language-models.ipynb
+```
+
+The lab should include:
+
+- background on maximum likelihood and cross-entropy,
+- implementation of token-level losses,
+- masked instruction-tuning losses,
+- KL-regularized fine-tuning on toy distributions,
+- pairwise preference loss,
+- a small training loop,
+- interpretation questions that force students to separate data, model, objective, and optimizer.
+
+## 18.29 What to remember
+
+- Pretraining is maximum likelihood estimation for next-token prediction.
+- The token-level loss is multiclass cross-entropy.
+- Teacher forcing uses true previous tokens during training.
+- Masks define which tokens contribute to the empirical risk.
+- Fine-tuning changes a pretrained conditional distribution.
+- KL penalties control movement away from a reference model.
+- Preference data can be modeled with pairwise logistic losses.
+- Alignment-style objectives optimize mathematical proxies for desired behavior; they do not automatically prove correctness, truthfulness, or safety.
+
+## Notes and references
+
+This chapter connects maximum likelihood estimation, stochastic optimization, preference learning, and modern language-model training.  Useful background sources include @jurafsky_martin_slp3, @bishop_prml_2006, @goodfellow_deep_learning_2016, @vaswani_attention_2017, @brown_gpt3_2020, @ouyang_2022_training, and @rafailov_2023_dpo.

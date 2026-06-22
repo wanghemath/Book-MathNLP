@@ -1,0 +1,112 @@
+---
+title: "Interactive Diagnostics"
+---
+
+# Interactive diagnostics
+
+This page helps diagnose whether the HTML interactives in the NLP book can load Plotly.js.
+
+## What should work
+
+The following chapters contain embedded Plotly.js interactives:
+
+- Chapter 1: classifier boundary explorer
+- Chapter 2: vocabulary threshold explorer
+- Chapter 3: TF-IDF retrieval explorer
+- Chapter 4: temperature/entropy explorer
+- Chapter 5: smoothing explorer
+- Chapter 6: Naive Bayes log-odds explorer
+- Chapter 7: rank-k latent semantic map
+- Chapter 8: embedding analogy explorer
+- Chapter 9: embedding geometry explorer
+- Chapter 10: softmax classifier explorer
+- Chapter 11: recurrent memory explorer
+
+## Most common causes of a blank interactive
+
+1. The local file `assets/plotly.min.js` was not copied into `_book/assets/`.
+2. A browser extension blocked JavaScript.
+3. The page was rendered to PDF instead of HTML.
+4. The output site is opened from a path where local scripts are blocked.
+5. An older cached version of the page is being displayed.
+
+## Quick browser check
+
+Open the HTML page and press **Option-Command-I** on macOS or **Ctrl-Shift-I** on Windows/Linux.  In the Console tab, run:
+
+```javascript
+window.Plotly && Plotly.version
+```
+
+A working page should print a Plotly version, such as `2.35.2`.
+
+## Minimal Plotly test
+
+```{=html}
+<div class="interactive-card nlp-interactive" id="diag-card">
+  <h3>Minimal Plotly Test</h3>
+  <p>If this renders, the page can load and execute Plotly.js.</p>
+  <div id="diag-plot" class="plotly-demo" style="height:360px;"></div>
+  <div id="diag-status" class="plotly-status">Loading diagnostic figure...</div>
+</div>
+<script>
+(function() {
+  function setStatus(message, isError) {
+    var el = document.getElementById("diag-status");
+    if (!el) return;
+    el.textContent = message || "";
+    el.classList.toggle("plotly-error", Boolean(isError));
+    el.style.display = message ? "block" : "none";
+  }
+  function ready(fn) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", fn, {once: true});
+    } else {
+      fn();
+    }
+  }
+  function loadPlotly(callback) {
+    if (window.Plotly && typeof window.Plotly.react === "function") {
+      callback();
+      return;
+    }
+    var script = document.querySelector("script[data-nlp-plotly-loader]");
+    if (!script) {
+      script = document.createElement("script");
+      script.src = "assets/plotly.min.js";
+      script.async = true;
+      script.setAttribute("data-nlp-plotly-loader", "true");
+      script.onerror = function() {
+        setStatus("Plotly.js failed to load from the local assets folder.", true);
+      };
+      document.head.appendChild(script);
+    }
+    var attempts = 0;
+    var timer = setInterval(function() {
+      attempts += 1;
+      if (window.Plotly && typeof window.Plotly.react === "function") {
+        clearInterval(timer);
+        callback();
+      } else if (attempts > 80) {
+        clearInterval(timer);
+        setStatus("Plotly.js was not available after waiting.", true);
+      }
+    }, 100);
+  }
+  ready(function() {
+    loadPlotly(function() {
+      var plot = document.getElementById("diag-plot");
+      if (!plot) {
+        setStatus("The diagnostic plot container was not found.", true);
+        return;
+      }
+      Plotly.react(plot, [{x: [1, 2, 3, 4], y: [1, 4, 2, 5], type: "scatter", mode: "lines+markers"}], {
+        title: "Minimal Plotly diagnostic",
+        margin: {l: 50, r: 20, t: 60, b: 50}
+      }, {responsive: true});
+      setStatus("");
+    });
+  });
+})();
+</script>
+```

@@ -1,0 +1,308 @@
+---
+title: "Learning Roadmap"
+subtitle: "A Guided Path Through Mathematical Natural Language Processing"
+---
+
+::: {.hero-box}
+This roadmap explains how to move through *Mathematical Foundations of Natural Language Processing*. It connects the 25 chapters, 25 Google Colab labs, mathematical prerequisites, learning milestones, and possible project directions.
+:::
+
+Natural language processing can look like a collection of separate tools: tokenizers, classifiers, embeddings, transformers, retrieval systems, and evaluation metrics. The purpose of this book is to show that these tools are connected by a small number of mathematical ideas.
+
+The main journey is:
+
+```text
+raw text
+  -> tokens and vocabularies
+  -> vectors and matrices
+  -> probability models
+  -> embeddings and geometry
+  -> neural sequence maps
+  -> attention and transformers
+  -> language models and retrieval
+  -> evaluation, auditing, and responsible use
+```
+
+Students should not try to memorize every method. Instead, they should ask the same questions in every chapter:
+
+1. What is the mathematical object?
+2. What map or probability distribution is being learned?
+3. What loss function or evaluation criterion is used?
+4. What assumptions are made?
+5. What can fail, and how can we diagnose it?
+
+## Suggested preparation
+
+Before starting, students should be comfortable with the following ideas. The book and labs review these ideas when needed, but independent study is easier if students can recognize them.
+
+| Area | Useful background | Where it appears |
+|---|---|---|
+| Linear algebra | vectors, matrices, inner products, norms, projections, SVD | document vectors, embeddings, attention, transformers |
+| Probability | conditional probability, likelihood, expectation, entropy | language models, Naive Bayes, decoding, evaluation |
+| Optimization | gradients, loss functions, stochastic gradient descent | neural networks, transformer training, fine-tuning |
+| Statistics | train/test split, classification metrics, calibration, uncertainty | evaluation, model comparison, auditing |
+| Graphs | adjacency matrices, random walks, Laplacians | dependency graphs, PageRank, graph neural networks |
+| Geometry and topology | distances, neighborhoods, connected components, persistence intuition | embedding geometry, representation diagnostics |
+| Python | lists, dictionaries, NumPy arrays, pandas, plotting | all labs |
+
+Helpful companion pages:
+
+- [Mathematical Background](math-background.qmd)
+- [Notation and Core Notions](notion.qmd)
+- [Python Reference](python-reference.qmd)
+- [Computer Labs](labs-summary.qmd)
+- [References](references.qmd)
+
+## The seven-part structure
+
+The book is organized into seven parts. Each part adds a new mathematical language for NLP.
+
+| Part | Chapters | Main viewpoint | Main computational object |
+|---:|---:|---|---|
+| I | 1--3 | language as data | tokens, vocabularies, document-term matrices |
+| II | 4--6 | language as probability | empirical distributions, likelihoods, classifiers |
+| III | 7--9 | language as geometry | vector spaces, embeddings, similarity maps |
+| IV | 10--12 | language as sequence computation | neural maps, hidden states, gated memory |
+| V | 13--16 | language as attention | query-key-value operators, positional geometry |
+| VI | 17--20 | language models and retrieval | autoregressive models, RAG systems, evaluation |
+| VII | 21--25 | advanced mathematical perspectives | information, optimization, graphs, topology, ethics |
+
+## Part I. Language as Data
+
+**Goal:** Convert raw text into mathematical objects.
+
+In this part, students learn that NLP begins with representation. A sentence is not directly a vector or probability distribution. It must first be segmented, normalized, indexed, and counted.
+
+| Chapter | Lab | Core questions |
+|---:|---|---|
+| 1 | [What Is Natural Language Processing?](chapters/chapter-01-what-is-nlp.qmd) / [Lab 1](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-01-what-is-nlp.ipynb) | What is an NLP pipeline? How does text become data? |
+| 2 | [Text, Tokens, and Vocabularies](chapters/chapter-02-text-tokens-vocabularies.qmd) / [Lab 2](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-02-text-tokens-vocabularies.ipynb) | What is a token? How do vocabulary choices change the data? |
+| 3 | [Documents as Vectors](chapters/chapter-03-documents-as-vectors.qmd) / [Lab 3](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-03-documents-as-vectors.ipynb) | How do count vectors, TF-IDF, and cosine similarity represent documents? |
+
+**Checkpoint after Part I:** Students should be able to build a small vocabulary, construct a document-term matrix, compute cosine similarity, and explain why preprocessing choices affect downstream models.
+
+## Part II. Probability Models for Language
+
+**Goal:** Model language using finite probability distributions.
+
+This part introduces the probabilistic view of NLP. A language model assigns probabilities to tokens or token sequences. A classifier assigns probabilities or scores to labels. Smoothing, likelihood, and entropy become central tools.
+
+| Chapter | Lab | Core questions |
+|---:|---|---|
+| 4 | [Probability and Language](chapters/chapter-04-probability-and-language.qmd) / [Lab 4](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-04-probability-and-language.ipynb) | What is an empirical token distribution? What are entropy and KL divergence? |
+| 5 | [N-gram Language Models](chapters/chapter-05-ngram-language-models.qmd) / [Lab 5](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-05-ngram-language-models.ipynb) | How does the Markov assumption create an $n$-gram model? |
+| 6 | [Naive Bayes Text Classification](chapters/chapter-06-naive-bayes-text-classification.qmd) / [Lab 6](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-06-naive-bayes-text-classification.ipynb) | How does Bayes rule become a text classifier? Why do log-probabilities matter? |
+
+**Checkpoint after Part II:** Students should be able to estimate token probabilities, compute log-likelihood and perplexity, use smoothing, and implement multinomial Naive Bayes from scratch.
+
+## Part III. Linear Algebra of Language
+
+**Goal:** Understand language as geometry in high-dimensional vector spaces.
+
+This part moves from sparse document vectors to dense word embeddings. Students learn that similarity, projection, low-rank approximation, and clustering are not merely computational tricks; they are geometric operations.
+
+| Chapter | Lab | Core questions |
+|---:|---|---|
+| 7 | [Vector Space Models](chapters/chapter-07-vector-space-models.qmd) / [Lab 7](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-07-vector-space-models.ipynb) | How do document vectors support search and retrieval? |
+| 8 | [Word Embeddings](chapters/chapter-08-word-embeddings.qmd) / [Lab 8](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-08-word-embeddings.ipynb) | How do co-occurrence, PMI, SVD, and negative sampling produce embeddings? |
+| 9 | [Geometry of Embeddings](chapters/chapter-09-geometry-of-embeddings.qmd) / [Lab 9](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-09-geometry-of-embeddings.ipynb) | What do distance, angle, anisotropy, hubness, and clustering reveal? |
+
+**Checkpoint after Part III:** Students should be able to compute cosine nearest neighbors, interpret SVD as dimensionality reduction, visualize embeddings, and diagnose geometric artifacts such as hubness or anisotropy.
+
+## Part IV. Neural Networks for Sequences
+
+**Goal:** Move from fixed vector representations to learned sequence maps.
+
+This part introduces neural networks for text. Students first study embedding lookup and pooling, then learn why order-sensitive models such as RNNs and gated RNNs were historically important.
+
+| Chapter | Lab | Core questions |
+|---:|---|---|
+| 10 | [Neural Networks for Text](chapters/chapter-10-neural-networks-for-text.qmd) / [Lab 10](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-10-neural-networks-for-text.ipynb) | How do embeddings, pooling, softmax, and cross-entropy form a neural text classifier? |
+| 11 | [Recurrent Neural Networks](chapters/chapter-11-recurrent-neural-networks.qmd) / [Lab 11](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-11-recurrent-neural-networks.ipynb) | How does recurrence model order? What is backpropagation through time? |
+| 12 | [LSTM and GRU Models](chapters/chapter-12-lstm-gru-models.qmd) / [Lab 12](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-12-lstm-gru-models.ipynb) | How do gates help preserve or forget information? |
+
+**Checkpoint after Part IV:** Students should be able to explain hidden states, recurrent updates, vanishing gradients, gating, and the role of nonlinear sequence maps in NLP.
+
+## Part V. Attention and Transformers
+
+**Goal:** Build the mathematical core of modern transformer models.
+
+This part studies attention as a matrix operator. Students learn how queries, keys, values, masks, positional encodings, residual connections, and normalization combine into a transformer block.
+
+| Chapter | Lab | Core questions |
+|---:|---|---|
+| 13 | [Attention Mechanisms](chapters/chapter-13-attention-mechanisms.qmd) / [Lab 13](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-13-attention-mechanisms.ipynb) | How do attention weights arise from query-key similarities? |
+| 14 | [Self-Attention](chapters/chapter-14-self-attention.qmd) / [Lab 14](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-14-self-attention.ipynb) | How does each token become context-dependent? Why do masks matter? |
+| 15 | [Transformers](chapters/chapter-15-transformers.qmd) / [Lab 15](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-15-transformers.ipynb) | How do attention, feedforward maps, residuals, and layer normalization form a block? |
+| 16 | [Positional Encoding and Sequence Geometry](chapters/chapter-16-positional-encoding.qmd) / [Lab 16](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-16-positional-encoding.ipynb) | How is order represented in a model built from set-like attention operations? |
+
+**Checkpoint after Part V:** Students should be able to implement scaled dot-product attention, explain masking, derive the shapes of transformer matrices, and describe why positional information is necessary.
+
+## Part VI. Large Language Models and Retrieval
+
+**Goal:** Connect transformer mathematics to language modeling, training, retrieval, and evaluation.
+
+This part focuses on systems that generate and retrieve language. Students study autoregressive factorization, training objectives, supervised fine-tuning, preference learning, retrieval-augmented generation, and model evaluation.
+
+| Chapter | Lab | Core questions |
+|---:|---|---|
+| 17 | [Autoregressive Language Models](chapters/chapter-17-autoregressive-language-models.qmd) / [Lab 17](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-17-autoregressive-language-models.ipynb) | How does the chain rule define next-token prediction? |
+| 18 | [Training Large Language Models](chapters/chapter-18-training-large-language-models.qmd) / [Lab 18](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-18-training-large-language-models.ipynb) | How do pretraining, SFT, preference losses, and low-rank adaptation fit together? |
+| 19 | [Embeddings, Retrieval, and RAG](chapters/chapter-19-embeddings-retrieval-rag.qmd) / [Lab 19](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-19-embeddings-retrieval-rag.ipynb) | How do sparse, dense, hybrid, and reranked retrieval support generation? |
+| 20 | [Evaluation](chapters/chapter-20-evaluation.qmd) / [Lab 20](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-20-evaluation-of-language-models.ipynb) | How should NLP systems be evaluated statistically and critically? |
+
+**Checkpoint after Part VI:** Students should be able to compute perplexity, implement decoding rules, build a small retrieval pipeline, evaluate retrieval and classification metrics, and explain why evaluation requires uncertainty and subgroup analysis.
+
+## Part VII. Advanced Mathematical Perspectives
+
+**Goal:** Use deeper mathematical viewpoints to understand and audit NLP systems.
+
+The final part returns to the mathematical foundations and uses them as diagnostic tools. Information theory measures uncertainty and divergence. Optimization explains training dynamics. Graphs model relations. Topology studies shape. Ethics and responsibility ask whether models should be trusted in context.
+
+| Chapter | Lab | Core questions |
+|---:|---|---|
+| 21 | [Information Theory](chapters/chapter-21-information-theory.qmd) / [Lab 21](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-21-information-theory.ipynb) | What do entropy, cross-entropy, KL divergence, mutual information, and PMI measure? |
+| 22 | [Optimization for NLP](chapters/chapter-22-optimization-for-nlp.qmd) / [Lab 22](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-22-optimization-for-nlp.ipynb) | How do gradients, SGD, Adam, AdamW, clipping, and masked losses train NLP models? |
+| 23 | [Graphs and Language](chapters/chapter-23-graphs-and-language.qmd) / [Lab 23](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-23-graphs-and-language.ipynb) | How do language relations become graphs and message-passing systems? |
+| 24 | [Topology, Geometry, and Language](chapters/chapter-24-topology-geometry-language.qmd) / [Lab 24](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-24-topology-geometry-language.ipynb) | What can neighborhoods, connected components, Betti numbers, and persistence reveal? |
+| 25 | [Ethics, Bias, and Responsibility](chapters/chapter-25-ethics-bias-responsibility.qmd) / [Lab 25](https://colab.research.google.com/github/wanghemath/Book-MathNLP/blob/main/labs/chapter-25-ethics-bias-responsibility.ipynb) | How can fairness, calibration, privacy, factuality, and accountability be audited? |
+
+**Checkpoint after Part VII:** Students should be able to connect advanced mathematical tools to practical NLP diagnostics and explain why responsible use is part of the mathematical modeling workflow.
+
+## Three possible learning pathways
+
+Different students may use the book in different ways.
+
+### Pathway A. Mathematical foundations first
+
+This pathway is best for students who want a rigorous conceptual foundation before studying large models.
+
+```text
+Chapters 1--9
+then 21--22
+then 10--20
+then 23--25
+```
+
+This path emphasizes tokens, vectors, probability, geometry, information theory, and optimization before modern architectures.
+
+### Pathway B. Modern NLP systems first
+
+This pathway is best for students who want to reach transformers, LLMs, and RAG quickly.
+
+```text
+Chapters 1--3
+then 10
+then 13--20
+then 4--9 and 21--25 as deeper foundations
+```
+
+This path introduces the main system components early, then returns to the mathematical foundations in more depth.
+
+### Pathway C. Full semester course
+
+This pathway is best for a 14-week graduate course.
+
+| Week | Main chapters | Labs | Theme |
+|---:|---|---|---|
+| 1 | 1--2 | 1--2 | NLP pipeline, tokenization, vocabularies |
+| 2 | 3--4 | 3--4 | document vectors, probability distributions |
+| 3 | 5--6 | 5--6 | $n$-gram models, Naive Bayes |
+| 4 | 7--8 | 7--8 | vector space retrieval, embeddings |
+| 5 | 9--10 | 9--10 | embedding geometry, neural text models |
+| 6 | 11--12 | 11--12 | RNNs, LSTMs, GRUs |
+| 7 | 13--14 | 13--14 | attention and self-attention |
+| 8 | 15--16 | 15--16 | transformers and positional encoding |
+| 9 | 17--18 | 17--18 | autoregressive LMs and training objectives |
+| 10 | 19--20 | 19--20 | retrieval, RAG, evaluation |
+| 11 | 21--22 | 21--22 | information theory and optimization |
+| 12 | 23--24 | 23--24 | graphs, topology, geometry |
+| 13 | 25 | 25 | ethics, bias, responsibility |
+| 14 | project presentations | project notebooks | synthesis and communication |
+
+## Independent-study workflow
+
+For each chapter, students should complete the following cycle.
+
+1. **Read the chapter.** Focus on definitions, equations, and examples.
+2. **Reproduce one calculation by hand.** For example, compute a cosine similarity, one row of attention, or one Naive Bayes log-score.
+3. **Open the Colab lab.** Run all cells once before changing anything.
+4. **Modify one variable.** Change a smoothing parameter, embedding dimension, threshold, temperature, or graph radius.
+5. **Explain the effect.** Write two or three sentences connecting the result to the mathematics.
+6. **Complete the exercises.** Use the hints only after attempting the problem.
+7. **Complete the mini-project.** Extend the lab to a new toy dataset or new diagnostic question.
+8. **Write a reflection.** State one assumption, one limitation, and one possible improvement.
+
+## Milestones and evidence of learning
+
+The following milestones can be used for self-assessment or course grading.
+
+| Milestone | Evidence |
+|---|---|
+| Representation fluency | Build token lists, vocabularies, and document-term matrices without templates |
+| Probabilistic reasoning | Compute likelihood, log-likelihood, entropy, KL divergence, and perplexity |
+| Geometric reasoning | Use cosine similarity, projections, SVD, clustering, and visualization appropriately |
+| Neural modeling | Explain embeddings, softmax, cross-entropy, gradients, recurrence, and gating |
+| Transformer literacy | Implement attention and identify the role of masks, heads, residuals, and positions |
+| Retrieval literacy | Compare sparse, dense, hybrid, and reranked retrieval systems |
+| Evaluation literacy | Report metrics with uncertainty and examine subgroup behavior |
+| Responsible modeling | Identify bias, distribution shift, factuality risk, and deployment limitations |
+| Communication | Explain mathematical NLP ideas clearly in writing and code comments |
+
+## Suggested final project directions
+
+A good final project should combine mathematics, computation, and critical evaluation. Possible directions include:
+
+1. **Transparent retrieval system:** compare TF-IDF, dense toy embeddings, hybrid retrieval, and reranking on a course-document corpus.
+2. **Small language model study:** train and evaluate an $n$-gram or small neural next-token model with different smoothing or decoding choices.
+3. **Embedding geometry audit:** compare nearest neighbors, PCA plots, anisotropy, hubness, and semantic directions across corpora.
+4. **RAG reliability audit:** build a small RAG system and evaluate retrieval quality, citation support, and answer faithfulness.
+5. **Fairness and calibration study:** evaluate a text classifier across subgroups and study threshold, calibration, and uncertainty tradeoffs.
+6. **Graph representation project:** build a co-occurrence, dependency, or knowledge graph and analyze PageRank, communities, or message passing.
+7. **Topology of embeddings:** build neighborhood graphs or Vietoris--Rips summaries for embeddings and compare geometric shape across labels or domains.
+
+A strong project report should include:
+
+- a clear research question;
+- the mathematical representation used;
+- the dataset and preprocessing choices;
+- the model or algorithm;
+- quantitative results;
+- visualizations or diagnostic tables;
+- limitations and responsible-use discussion.
+
+## Recommended repository organization
+
+The GitHub repository should have a structure similar to:
+
+```text
+Book-MathNLP/
+  index.qmd
+  introduction.qmd
+  math-background.qmd
+  notion.qmd
+  python-reference.qmd
+  labs-summary.qmd
+  roadmap.qmd
+  references.qmd
+  references.bib
+  chapters/
+    chapter-01-what-is-nlp.qmd
+    ...
+    chapter-25-ethics-bias-responsibility.qmd
+  labs/
+    chapter-01-what-is-nlp.ipynb
+    ...
+    chapter-25-ethics-bias-responsibility.ipynb
+  assets/
+    style.scss
+    interactive.js
+```
+
+## Closing perspective
+
+The central message of the book is that modern NLP is not magic. It is a layered mathematical system. Text is discretized into tokens. Tokens become vectors. Vectors define probabilities, similarities, graphs, and neural maps. Models are trained by optimization and judged by statistical evidence. Responsible use requires understanding not only how a model works, but also where it fails.
+
+Students who complete this roadmap should be able to read modern NLP papers and systems with a clearer question in mind:
+
+> What are the objects, maps, probabilities, losses, and assumptions behind this language system?

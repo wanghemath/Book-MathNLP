@@ -1,0 +1,1016 @@
+---
+title: "Topology and Geometry of Language Representations"
+subtitle: "Metric spaces, persistent homology, and representation diagnostics"
+---
+
+::: {.chapter-opening}
+Modern NLP represents words, sentences, documents, and prompts as high-dimensional vectors.  Once language objects become vectors, a corpus becomes a point cloud, a similarity graph, or a finite metric space.  Linear algebra explains directions, projections, and low-rank structure; probability explains uncertainty and likelihood; topology asks a complementary question: what qualitative shape is present in the representation space?  This chapter develops the topology and geometry of language representations from a clean mathematical point of view, with emphasis on finite metric spaces, neighborhood graphs, simplicial complexes, persistent homology, and representation diagnostics.
+:::
+
+## 24.1 Learning goals
+
+After reading this chapter, students should be able to:
+
+- view a collection of language embeddings as a finite metric space;
+- construct neighborhood graphs and Vietoris--Rips complexes from pairwise distances;
+- compute and interpret Betti numbers in dimensions 0 and 1;
+- explain persistent homology as a multiscale summary of shape;
+- distinguish geometric summaries from topological summaries;
+- understand how clustering, loops, anisotropy, and intrinsic dimension appear in embedding spaces;
+- use persistent features carefully as diagnostics rather than as automatic semantic truths;
+- implement small topological summaries from scratch in Python;
+- use AI tools to critique representation geometry and topology responsibly.
+
+::: {.callout-note}
+## Guiding question
+What is the shape of a language representation space?
+
+A linear-algebra answer might examine singular values, principal components, and distances.  A statistical answer might estimate class separation or uncertainty.  A topological answer asks whether the data form connected components, branching structures, loops, voids, or other multiscale patterns that persist across distance thresholds.
+:::
+
+## 24.2 From embeddings to point clouds
+
+Let $T$ be a collection of language objects.  Depending on the problem, the objects may be:
+
+- words in a vocabulary;
+- tokens in one sentence;
+- sentence embeddings from a corpus;
+- document embeddings;
+- contextual token embeddings from one layer of a Transformer;
+- prompts, questions, answers, or retrieved chunks.
+
+An embedding model is a map
+
+$$
+f_\theta:T\to R^d.
+$$
+
+For objects $t_1,\ldots,t_n$, define
+
+$$
+x_i=f_\theta(t_i)\in R^d,
+\qquad
+X=\{x_1,\ldots,x_n\}\subset R^d.
+$$
+
+Thus a finite collection of language objects becomes a finite point cloud.  The point cloud may be studied by Euclidean distances,
+
+$$
+d_E(x_i,x_j)=\|x_i-x_j\|_2,
+$$
+
+cosine distances,
+
+$$
+d_C(x_i,x_j)=1-\frac{x_i^T x_j}{\|x_i\|_2\|x_j\|_2},
+$$
+
+or other task-dependent dissimilarities.
+
+::: {.math-card}
+**Finite metric-space viewpoint.**  For topological data analysis, the central object is often not the coordinate matrix $X\in R^{n\times d}$ itself, but the pairwise distance matrix
+
+$$
+D=(d_{ij}),
+\qquad
+d_{ij}=d(x_i,x_j).
+$$
+
+Many topological constructions use only $D$, so they can be applied to Euclidean embeddings, cosine embeddings, edit-distance spaces, or learned similarity spaces.
+:::
+
+## 24.3 Geometry versus topology
+
+Geometry studies quantities such as lengths, angles, curvature, projections, and distances.  Topology studies qualitative features that are stable under continuous deformation, such as connected components and holes.
+
+For language embeddings, geometry asks questions such as:
+
+- Which sentence is nearest to a query?
+- Which direction separates two topics?
+- How much variance is explained by the first few principal components?
+- Are embeddings anisotropic?
+
+Topology asks questions such as:
+
+- How many connected clusters appear at a given scale?
+- Do clusters merge gradually or suddenly?
+- Is there evidence of loop-like structure among semantic groups?
+- Does the same qualitative shape persist across several scales?
+
+A simple example helps.  Suppose sentence embeddings lie approximately on a circle because the sentences describe a cyclic process such as morning, afternoon, evening, night, and morning again.  PCA may show a two-dimensional plane.  Clustering may find local groups.  Persistent homology can detect a one-dimensional loop.
+
+## 24.4 Neighborhood graphs
+
+A first topological construction is the $\varepsilon$-neighborhood graph.  Given a finite metric space $(X,d)$ and a scale parameter $\varepsilon\ge 0$, define a graph
+
+$$
+G_\varepsilon=(V,E_\varepsilon),
+\qquad
+V=\{1,\ldots,n\},
+$$
+
+where
+
+$$
+(i,j)\in E_\varepsilon
+\quad\Longleftrightarrow\quad
+d(x_i,x_j)\le \varepsilon.
+$$
+
+As $\varepsilon$ increases, the graph changes:
+
+- for very small $\varepsilon$, every point is isolated;
+- at moderate $\varepsilon$, nearby points form local clusters;
+- at larger $\varepsilon$, clusters merge;
+- for sufficiently large $\varepsilon$, the graph becomes connected.
+
+The number of connected components is the zeroth Betti number:
+
+$$
+\beta_0(G_\varepsilon)=\text{number of connected components of }G_\varepsilon.
+$$
+
+For a graph, the number of independent cycles is the graph cycle rank:
+
+$$
+\beta_1^{\mathrm{graph}}(G_\varepsilon)=|E_\varepsilon|-|V|+\beta_0(G_\varepsilon).
+$$
+
+This graph quantity counts cycles before considering whether triangular cycles should be filled in.  Persistent homology refines this idea by using simplicial complexes.
+
+## 24.5 Simplicial complexes
+
+A simplicial complex is a collection of finite subsets closed under taking subsets.  Its elements are called simplices.
+
+- A 0-simplex is a vertex.
+- A 1-simplex is an edge.
+- A 2-simplex is a filled triangle.
+- A 3-simplex is a filled tetrahedron.
+
+If $\sigma$ is a simplex and $\tau\subseteq \sigma$, then $\tau$ must also be a simplex.  This closure condition is important: if a filled triangle is present, then its three edges and three vertices must be present.
+
+For a finite metric space, the most common construction is the Vietoris--Rips complex.
+
+::: {.math-card}
+**Vietoris--Rips complex.**  Given $(X,d)$ and $\varepsilon\ge 0$, the Vietoris--Rips complex $\operatorname{VR}_\varepsilon(X)$ contains a simplex $\{i_0,\ldots,i_k\}$ whenever all pairwise distances are at most $\varepsilon$:
+
+$$
+d(x_{i_a},x_{i_b})\le \varepsilon
+\quad
+\text{for all }a,b.
+$$
+
+Equivalently, $\operatorname{VR}_\varepsilon(X)$ is the clique complex of the $\varepsilon$-neighborhood graph.
+:::
+
+This construction is useful for language embeddings because it converts similarity information into a multiscale combinatorial object.
+
+## 24.6 Betti numbers
+
+Betti numbers count independent topological features.  Informally:
+
+$$
+\beta_0 = \text{number of connected components},
+$$
+
+$$
+\beta_1 = \text{number of independent one-dimensional loops},
+$$
+
+$$
+\beta_2 = \text{number of independent two-dimensional voids}.
+$$
+
+For a graph without filled triangles, the formula
+
+$$
+\beta_1=|E|-|V|+\beta_0
+$$
+
+counts independent graph cycles.  For a simplicial complex, some graph cycles become boundaries of filled triangles and therefore should not count as holes.
+
+For a 2-dimensional simplicial complex with vertices, edges, and triangles, one can compute
+
+$$
+\beta_1 = \dim \ker \partial_1 - \operatorname{rank}\partial_2,
+$$
+
+where
+
+$$
+\partial_1:C_1\to C_0
+$$
+
+maps oriented edges to differences of endpoints, and
+
+$$
+\partial_2:C_2\to C_1
+$$
+
+maps oriented triangles to signed sums of boundary edges.
+
+Since
+
+$$
+\dim\ker \partial_1 = |E| - \operatorname{rank}\partial_1,
+$$
+
+and for a graph
+
+$$
+\operatorname{rank}\partial_1 = |V|-\beta_0,
+$$
+
+we get
+
+$$
+\beta_1
+=
+|E|-|V|+\beta_0-\operatorname{rank}\partial_2.
+$$
+
+This formula shows why filled triangles matter: the rank of $\partial_2$ subtracts cycles that have become triangle boundaries.
+
+## 24.7 Filtrations and persistent homology
+
+A single value of $\varepsilon$ is arbitrary.  Persistent homology studies all scales at once.  Since
+
+$$
+\varepsilon_1\le \varepsilon_2
+\quad\Longrightarrow\quad
+\operatorname{VR}_{\varepsilon_1}(X)\subseteq \operatorname{VR}_{\varepsilon_2}(X),
+$$
+
+we obtain a nested sequence
+
+$$
+\operatorname{VR}_{\varepsilon_1}(X)
+\subseteq
+\operatorname{VR}_{\varepsilon_2}(X)
+\subseteq
+\cdots
+\subseteq
+\operatorname{VR}_{\varepsilon_m}(X).
+$$
+
+This is called a filtration.
+
+As $\varepsilon$ increases, features appear and disappear.  A connected component is born when a point appears and dies when it merges with an older component.  A loop is born when edges close a cycle and dies when the loop becomes filled by triangles.
+
+A persistent homology summary records intervals
+
+$$
+[b_i,d_i),
+$$
+
+where $b_i$ is the birth scale and $d_i$ is the death scale of a feature.  The persistence length is
+
+$$
+d_i-b_i.
+$$
+
+Longer intervals are usually interpreted as more stable multiscale features.  Short intervals are often interpreted as local noise, although this interpretation depends on the problem.
+
+::: {.callout-warning}
+## Interpretation warning
+A persistent loop in an embedding space is not automatically a linguistic fact.  It may come from semantic structure, sampling design, normalization, model architecture, dimensionality reduction, or numerical artifacts.  Topology gives diagnostics; interpretation still requires domain reasoning.
+:::
+
+## 24.8 Why topology can help NLP
+
+Topological summaries are useful because they are less tied to a particular coordinate system than raw embedding coordinates.  If two embedding spaces are transformed by rotations or small metric perturbations, their large-scale topological summaries may remain similar.
+
+In NLP, topology can help analyze:
+
+- whether sentence embeddings form topic clusters;
+- whether generated texts cover the same representation shape as human texts;
+- whether contextual embeddings collapse into a narrow cone;
+- whether different layers of a Transformer gradually change representation geometry;
+- whether retrieval chunks form disconnected semantic islands;
+- whether class labels align with connected components or cut across them.
+
+This is especially useful for mathematical NLP because it gives students a way to ask structural questions beyond accuracy.
+
+## 24.9 Local dimension and anisotropy
+
+Topology should be combined with geometry.  Two important geometric diagnostics are local intrinsic dimension and anisotropy.
+
+Let $x_i$ be a point and let $N_k(i)$ be its $k$ nearest neighbors.  Let
+
+$$
+Y_i = \{x_j-x_i:j\in N_k(i)\}.
+$$
+
+The local covariance matrix is
+
+$$
+C_i = \frac{1}{k}\sum_{j\in N_k(i)} (x_j-x_i)(x_j-x_i)^T.
+$$
+
+If the eigenvalues of $C_i$ are
+
+$$
+\lambda_1\ge \lambda_2\ge\cdots\ge\lambda_d\ge 0,
+$$
+
+then the number of large eigenvalues gives a local dimension heuristic.  For example, a curve has approximately one large local eigenvalue, a surface has approximately two, and a full-dimensional cloud has many.
+
+Anisotropy means that vectors concentrate in a narrow cone or a few dominant directions.  One diagnostic is the spectrum of the centered covariance matrix
+
+$$
+C=\frac{1}{n}\sum_{i=1}^n (x_i-\bar x)(x_i-\bar x)^T.
+$$
+
+A very steep spectrum indicates that the cloud is dominated by a few directions.  This can affect nearest-neighbor retrieval and apparent topological structure.
+
+## 24.10 Persistent homology and representation layers
+
+For a Transformer, each layer produces a representation matrix
+
+$$
+H^{(\ell)}\in R^{T\times d},
+$$
+
+for tokens in a sentence, or a collection of sentence embeddings across a dataset.  We can treat the rows of $H^{(\ell)}$ as a point cloud and compare topological summaries across layers.
+
+For each layer $\ell$, one may compute a persistence summary
+
+$$
+\operatorname{PH}_k(H^{(\ell)}),
+$$
+
+where $k=0$ studies components and $k=1$ studies loops.  This gives a layerwise diagnostic:
+
+$$
+\ell \mapsto \operatorname{PH}_k(H^{(\ell)}).
+$$
+
+Possible observations include:
+
+- early layers preserve local lexical neighborhoods;
+- middle layers separate syntactic or semantic roles;
+- later layers may collapse task-relevant examples into decision regions;
+- instruction-tuned models may reshape prompt and answer representations.
+
+These are hypotheses to test, not universal laws.
+
+## 24.11 Stability viewpoint
+
+A major reason persistent homology is attractive is stability.  Informally, if two point clouds are close as metric spaces, then their persistence diagrams are close.  The precise form of stability depends on the construction and the metric used on diagrams.
+
+Let $D_X$ and $D_Y$ be persistence diagrams for two point clouds.  A common diagram distance is the bottleneck distance
+
+$$
+d_B(D_X,D_Y),
+$$
+
+which matches points in one diagram to points in the other, allowing points to be matched to the diagonal.  The diagonal represents zero-persistence features.
+
+The stability principle says, informally,
+
+$$
+\text{small perturbation of distances}
+\quad\Longrightarrow\quad
+\text{small perturbation of persistence diagrams}.
+$$
+
+For NLP, this matters because embeddings are noisy and model-dependent.  A diagnostic that changes wildly under tiny perturbations is not reliable.
+
+## 24.12 Mapper and semantic organization
+
+Another topological method is Mapper.  Mapper starts with:
+
+1. a point cloud $X$;
+2. a filter function $g:X\to R^q$;
+3. a cover of the filter range;
+4. a clustering method inside each cover element.
+
+The output is a graph whose nodes are local clusters and whose edges indicate overlap.  In NLP, possible filter functions include:
+
+- first principal component score;
+- sentiment score;
+- document length;
+- perplexity under a language model;
+- retrieval score;
+- topic probability;
+- projection onto a semantic direction.
+
+Mapper can reveal branching or circular organization, but it has tuning choices: cover size, overlap, clustering method, and distance metric.
+
+## 24.13 A worked example: six sentence embeddings
+
+Suppose six short sentence embeddings have pairwise distances arranged so that points $1,2,3$ are close to each other and points $4,5,6$ are close to each other, with a larger distance between the two groups.
+
+At a small scale $\varepsilon$, all six points are disconnected:
+
+$$
+\beta_0=6,
+\qquad
+\beta_1=0.
+$$
+
+At a moderate scale, each group forms a triangle.  If the triangles are filled in the Rips complex, each group is contractible:
+
+$$
+\beta_0=2,
+\qquad
+\beta_1=0.
+$$
+
+At a larger scale, the two groups connect by at least one edge:
+
+$$
+\beta_0=1.
+$$
+
+This is a topological version of clustering.  The death times of connected components encode inter-cluster distances.  In dimension 0, persistent homology is closely related to single-linkage hierarchical clustering.
+
+## 24.14 Interactive: Vietoris--Rips complex for a toy embedding cloud
+
+The interactive below uses a two-dimensional toy embedding cloud with two semantic arcs and a bridge point.  Move the distance threshold $\varepsilon$.  The plot draws the neighborhood graph.  The summary reports connected components, edges, filled triangles, and an exact $\beta_1$ value for the clique complex up to dimension 2.
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: Vietoris--Rips filtration for language-like embeddings</h3>
+  <p>
+    Increase the scale parameter to connect nearby embeddings.  Components merge, cycles may appear, and filled triangles may kill cycles.  This is the basic idea behind persistent homology.
+  </p>
+
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; align-items:end;">
+    <label>Distance threshold epsilon:
+      <input id="ch24-eps" type="range" min="0.25" max="2.40" step="0.05" value="0.90" style="width:100%;">
+      <span id="ch24-eps-label">0.90</span>
+    </label>
+    <label>Point cloud:
+      <select id="ch24-cloud" style="width:100%;">
+        <option value="circle">cyclic semantic path</option>
+        <option value="clusters">two topic clusters</option>
+      </select>
+    </label>
+    <label>Show labels:
+      <select id="ch24-labels" style="width:100%;">
+        <option value="yes">yes</option>
+        <option value="no">no</option>
+      </select>
+    </label>
+  </div>
+
+  <div id="ch24-status" class="plotly-status">Loading local Plotly...</div>
+  <div id="ch24-rips-plot" class="plotly-demo"></div>
+  <pre id="ch24-summary" style="white-space:pre-wrap;"></pre>
+</div>
+
+<script>
+(function() {
+  function loadPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    const candidates = [
+      "../assets/plotly.min.js",
+      "assets/plotly.min.js",
+      "./assets/plotly.min.js"
+    ];
+    let i = 0;
+    function tryNext() {
+      if (window.Plotly) {
+        callback();
+        return;
+      }
+      if (i >= candidates.length) {
+        const status = document.getElementById("ch24-status");
+        if (status) {
+          status.textContent = "Plotly.js was not available, so the interactive figure could not be drawn. Check that assets/plotly.min.js exists in the rendered site.";
+        }
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = candidates[i++];
+      script.onload = function() { callback(); };
+      script.onerror = tryNext;
+      document.head.appendChild(script);
+    }
+    tryNext();
+  }
+
+  const clouds = {
+    circle: {
+      labels: ["morning", "class", "lunch", "office", "evening", "reading", "sleep", "dream"],
+      xy: [[1.00,0.00],[0.70,0.72],[-0.05,1.02],[-0.78,0.65],[-1.02,-0.05],[-0.62,-0.82],[0.15,-0.98],[0.86,-0.48]]
+    },
+    clusters: {
+      labels: ["proof", "theorem", "lemma", "gradient", "model", "loss", "bridge", "noise"],
+      xy: [[-1.20,0.30],[-0.88,0.72],[-0.62,0.12],[0.62,-0.20],[0.95,0.25],[1.25,-0.35],[0.02,0.05],[0.00,1.20]]
+    }
+  };
+
+  function dist(a, b) {
+    const dx = a[0] - b[0];
+    const dy = a[1] - b[1];
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function edgesAndTriangles(points, eps) {
+    const n = points.length;
+    const edges = [];
+    const edgeIndex = {};
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        if (dist(points[i], points[j]) <= eps) {
+          edgeIndex[i + "," + j] = edges.length;
+          edges.push([i, j]);
+        }
+      }
+    }
+    const triangles = [];
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        for (let k = j + 1; k < n; k++) {
+          if (edgeIndex[i + "," + j] !== undefined && edgeIndex[i + "," + k] !== undefined && edgeIndex[j + "," + k] !== undefined) {
+            triangles.push([i, j, k]);
+          }
+        }
+      }
+    }
+    return {edges: edges, edgeIndex: edgeIndex, triangles: triangles};
+  }
+
+  function components(n, edges) {
+    const parent = Array.from({length: n}, function(_, i) { return i; });
+    function find(a) {
+      while (parent[a] !== a) {
+        parent[a] = parent[parent[a]];
+        a = parent[a];
+      }
+      return a;
+    }
+    function union(a, b) {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent[rb] = ra;
+    }
+    edges.forEach(function(e) { union(e[0], e[1]); });
+    const roots = new Set(parent.map(function(_, i) { return find(i); }));
+    return roots.size;
+  }
+
+  function matrixRank(mat, tol) {
+    if (mat.length === 0 || mat[0].length === 0) return 0;
+    const A = mat.map(function(row) { return row.slice(); });
+    const m = A.length;
+    const n = A[0].length;
+    let rank = 0;
+    let row = 0;
+    for (let col = 0; col < n && row < m; col++) {
+      let pivot = row;
+      for (let r = row + 1; r < m; r++) {
+        if (Math.abs(A[r][col]) > Math.abs(A[pivot][col])) pivot = r;
+      }
+      if (Math.abs(A[pivot][col]) <= tol) continue;
+      const tmp = A[row];
+      A[row] = A[pivot];
+      A[pivot] = tmp;
+      const div = A[row][col];
+      for (let c = col; c < n; c++) A[row][c] /= div;
+      for (let r = 0; r < m; r++) {
+        if (r !== row) {
+          const factor = A[r][col];
+          for (let c = col; c < n; c++) A[r][c] -= factor * A[row][c];
+        }
+      }
+      rank++;
+      row++;
+    }
+    return rank;
+  }
+
+  function betaNumbers(points, eps) {
+    const n = points.length;
+    const et = edgesAndTriangles(points, eps);
+    const c = components(n, et.edges);
+    const graphCycles = et.edges.length - n + c;
+    const B2 = Array.from({length: et.edges.length}, function() { return Array(et.triangles.length).fill(0); });
+    et.triangles.forEach(function(tri, col) {
+      const i = tri[0], j = tri[1], k = tri[2];
+      B2[et.edgeIndex[j + "," + k]][col] = 1;
+      B2[et.edgeIndex[i + "," + k]][col] = -1;
+      B2[et.edgeIndex[i + "," + j]][col] = 1;
+    });
+    const r2 = matrixRank(B2, 1e-9);
+    const beta1 = Math.max(0, graphCycles - r2);
+    return {beta0: c, beta1: beta1, graphCycles: graphCycles, rankB2: r2, edges: et.edges, triangles: et.triangles};
+  }
+
+  function initCh24() {
+    const epsSlider = document.getElementById("ch24-eps");
+    const cloudSelect = document.getElementById("ch24-cloud");
+    const labelsSelect = document.getElementById("ch24-labels");
+    const status = document.getElementById("ch24-status");
+    const summary = document.getElementById("ch24-summary");
+    if (!epsSlider || !cloudSelect || !labelsSelect || !window.Plotly) return;
+    if (status) status.textContent = "";
+
+    function update() {
+      const eps = parseFloat(epsSlider.value);
+      const cloud = clouds[cloudSelect.value];
+      const points = cloud.xy;
+      const labels = cloud.labels;
+      const result = betaNumbers(points, eps);
+      document.getElementById("ch24-eps-label").textContent = eps.toFixed(2);
+
+      const edgeX = [];
+      const edgeY = [];
+      result.edges.forEach(function(e) {
+        edgeX.push(points[e[0]][0], points[e[1]][0], null);
+        edgeY.push(points[e[0]][1], points[e[1]][1], null);
+      });
+
+      const edgeTrace = {
+        x: edgeX,
+        y: edgeY,
+        mode: "lines",
+        type: "scatter",
+        line: {width: 2},
+        hoverinfo: "skip",
+        name: "edges"
+      };
+
+      const pointTrace = {
+        x: points.map(function(p) { return p[0]; }),
+        y: points.map(function(p) { return p[1]; }),
+        mode: labelsSelect.value === "yes" ? "markers+text" : "markers",
+        type: "scatter",
+        text: labels,
+        textposition: "top center",
+        marker: {size: 16, line: {width: 1}},
+        hovertemplate: "%{text}<br>x=%{x:.2f}<br>y=%{y:.2f}<extra></extra>",
+        name: "embeddings"
+      };
+
+      Plotly.react("ch24-rips-plot", [edgeTrace, pointTrace], {
+        title: "Neighborhood graph at scale epsilon = " + eps.toFixed(2),
+        xaxis: {scaleanchor: "y", zeroline: false, range: [-1.7, 1.7]},
+        yaxis: {zeroline: false, range: [-1.45, 1.45]},
+        margin: {t: 50, r: 20, b: 40, l: 40},
+        showlegend: false
+      }, {responsive: true});
+
+      summary.textContent =
+        "Vietoris--Rips summary up to dimension 2\n" +
+        "points: " + points.length + "\n" +
+        "edges: " + result.edges.length + "\n" +
+        "filled triangles: " + result.triangles.length + "\n" +
+        "beta_0 components: " + result.beta0 + "\n" +
+        "graph cycle rank: " + result.graphCycles + "\n" +
+        "rank(boundary_2): " + result.rankB2 + "\n" +
+        "beta_1 loops after filled triangles: " + result.beta1;
+    }
+
+    [epsSlider, cloudSelect, labelsSelect].forEach(function(node) {
+      node.addEventListener("input", update);
+      node.addEventListener("change", update);
+    });
+    update();
+  }
+
+  function ready(callback) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback);
+    } else {
+      callback();
+    }
+  }
+
+  ready(function() { loadPlotly(initCh24); });
+})();
+</script>
+```
+
+## 24.15 Python example: pairwise distances
+
+We begin with a tiny collection of two-dimensional embeddings.  In a real NLP application these would come from TF-IDF, SVD, Word2Vec, a sentence-transformer model, or a Transformer layer.
+
+```{python}
+import numpy as np
+import pandas as pd
+
+labels = ["morning", "class", "lunch", "office", "evening", "reading", "sleep", "dream"]
+X = np.array([
+    [1.00, 0.00],
+    [0.70, 0.72],
+    [-0.05, 1.02],
+    [-0.78, 0.65],
+    [-1.02, -0.05],
+    [-0.62, -0.82],
+    [0.15, -0.98],
+    [0.86, -0.48],
+])
+
+D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(axis=2))
+pd.DataFrame(np.round(D, 2), index=labels, columns=labels)
+```
+
+The distance matrix is the input to the Vietoris--Rips construction.
+
+## 24.16 Python example: neighborhood graph and components
+
+The following code builds the $\varepsilon$-neighborhood graph and counts connected components.
+
+```{python}
+def epsilon_edges(D, eps):
+    n = D.shape[0]
+    edges = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            if D[i, j] <= eps:
+                edges.append((i, j))
+    return edges
+
+class UnionFind:
+    def __init__(self, n):
+        self.parent = list(range(n))
+
+    def find(self, a):
+        while self.parent[a] != a:
+            self.parent[a] = self.parent[self.parent[a]]
+            a = self.parent[a]
+        return a
+
+    def union(self, a, b):
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[rb] = ra
+
+    def count_components(self):
+        return len({self.find(i) for i in range(len(self.parent))})
+
+def beta0_graph(D, eps):
+    n = D.shape[0]
+    uf = UnionFind(n)
+    edges = epsilon_edges(D, eps)
+    for i, j in edges:
+        uf.union(i, j)
+    return uf.count_components(), edges
+
+for eps in [0.4, 0.8, 1.1, 1.5]:
+    b0, edges = beta0_graph(D, eps)
+    print(f"epsilon={eps:.1f}, edges={len(edges)}, beta0={b0}")
+```
+
+## 24.17 Python example: Betti numbers for a Rips complex up to dimension 2
+
+Now we include filled triangles.  The function below computes $\beta_0$ and $\beta_1$ for the clique complex up to dimension 2.
+
+```{python}
+def rips_edges_triangles(D, eps):
+    n = D.shape[0]
+    edges = epsilon_edges(D, eps)
+    edge_index = {edge: k for k, edge in enumerate(edges)}
+    triangles = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            for k in range(j + 1, n):
+                if ((i, j) in edge_index and
+                    (i, k) in edge_index and
+                    (j, k) in edge_index):
+                    triangles.append((i, j, k))
+    return edges, edge_index, triangles
+
+def rank_matrix(A, tol=1e-10):
+    if A.size == 0:
+        return 0
+    return np.linalg.matrix_rank(A, tol=tol)
+
+def betti_0_1_rips(D, eps):
+    n = D.shape[0]
+    beta0, edges = beta0_graph(D, eps)
+    edges, edge_index, triangles = rips_edges_triangles(D, eps)
+
+    graph_cycle_rank = len(edges) - n + beta0
+
+    # Boundary matrix partial_2: C_2 -> C_1.
+    B2 = np.zeros((len(edges), len(triangles)))
+    for col, (i, j, k) in enumerate(triangles):
+        # oriented boundary: [j,k] - [i,k] + [i,j]
+        B2[edge_index[(j, k)], col] = 1
+        B2[edge_index[(i, k)], col] = -1
+        B2[edge_index[(i, j)], col] = 1
+
+    rank_b2 = rank_matrix(B2)
+    beta1 = graph_cycle_rank - rank_b2
+    return {
+        "epsilon": eps,
+        "vertices": n,
+        "edges": len(edges),
+        "triangles": len(triangles),
+        "beta0": beta0,
+        "graph_cycle_rank": graph_cycle_rank,
+        "rank_boundary_2": rank_b2,
+        "beta1": int(round(beta1)),
+    }
+
+summary = [betti_0_1_rips(D, eps) for eps in [0.4, 0.8, 1.1, 1.5]]
+pd.DataFrame(summary)
+```
+
+The graph cycle rank can be positive even when $\beta_1=0$, because filled triangles may kill cycles.
+
+## 24.18 Python example: a small persistence table
+
+A persistence algorithm tracks births and deaths exactly.  Here we build a simple scale table for $\beta_0$ and $\beta_1$ by evaluating several thresholds.
+
+```{python}
+eps_grid = np.linspace(0.25, 2.0, 15)
+rows = [betti_0_1_rips(D, float(eps)) for eps in eps_grid]
+betti_table = pd.DataFrame(rows)
+betti_table[["epsilon", "edges", "triangles", "beta0", "beta1"]]
+```
+
+This table is not a replacement for a full persistent homology library, but it shows the idea: topology changes as the scale changes.
+
+## 24.19 Python example: local intrinsic dimension
+
+We estimate local dimension by looking at the spectrum of local covariance matrices.
+
+```{python}
+def local_dimension_scores(X, k=3):
+    D = np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(axis=2))
+    scores = []
+    for i in range(X.shape[0]):
+        nn = np.argsort(D[i])[1:k+1]
+        Y = X[nn] - X[i]
+        C = (Y.T @ Y) / k
+        eigvals = np.linalg.eigvalsh(C)[::-1]
+        ratio = eigvals[0] / eigvals.sum() if eigvals.sum() > 0 else np.nan
+        scores.append({
+            "point": labels[i],
+            "lambda1": eigvals[0],
+            "lambda2": eigvals[1],
+            "lambda1_fraction": ratio,
+        })
+    return pd.DataFrame(scores)
+
+local_dimension_scores(X, k=3)
+```
+
+A point with most local variance in one direction has a curve-like neighborhood.  A point with substantial variance in two directions has a more surface-like neighborhood.
+
+## 24.20 Python example: topology as a representation diagnostic
+
+The next code compares a circular cloud and a two-cluster cloud.  Both may have similar variance, but their topological summaries behave differently.
+
+```{python}
+rng = np.random.default_rng(24)
+
+angles = np.linspace(0, 2*np.pi, 18, endpoint=False)
+circle = np.c_[np.cos(angles), np.sin(angles)] + 0.05 * rng.normal(size=(18, 2))
+
+cluster_a = rng.normal(loc=[-1.0, 0.0], scale=0.18, size=(9, 2))
+cluster_b = rng.normal(loc=[1.0, 0.0], scale=0.18, size=(9, 2))
+clusters = np.vstack([cluster_a, cluster_b])
+
+def distance_matrix(X):
+    return np.sqrt(((X[:, None, :] - X[None, :, :]) ** 2).sum(axis=2))
+
+def betti_curve(X, eps_grid):
+    D = distance_matrix(X)
+    rows = []
+    for eps in eps_grid:
+        rows.append(betti_0_1_rips(D, float(eps)))
+    return pd.DataFrame(rows)
+
+eps_grid = np.linspace(0.15, 0.75, 7)
+circle_curve = betti_curve(circle, eps_grid)
+cluster_curve = betti_curve(clusters, eps_grid)
+
+comparison = pd.DataFrame({
+    "epsilon": eps_grid,
+    "circle_beta0": circle_curve["beta0"],
+    "circle_beta1": circle_curve["beta1"],
+    "clusters_beta0": cluster_curve["beta0"],
+    "clusters_beta1": cluster_curve["beta1"],
+})
+comparison
+```
+
+The circular cloud tends to develop a one-dimensional loop over an intermediate range of scales.  The two-cluster cloud emphasizes component merging instead.
+
+## 24.21 Python Plotly visualization
+
+The following code produces a Plotly visualization in Python.  It is useful when students work in Jupyter or Google Colab.
+
+```{python}
+#| eval: false
+import plotly.graph_objects as go
+
+eps = 0.8
+b0, edges = beta0_graph(D, eps)
+edge_x, edge_y = [], []
+for i, j in edges:
+    edge_x += [X[i, 0], X[j, 0], None]
+    edge_y += [X[i, 1], X[j, 1], None]
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode="lines", name="edges"))
+fig.add_trace(go.Scatter(
+    x=X[:, 0], y=X[:, 1], mode="markers+text",
+    text=labels, textposition="top center", name="points"
+))
+fig.update_layout(
+    title=f"Epsilon graph with beta0={b0}",
+    xaxis=dict(scaleanchor="y"),
+    width=700,
+    height=500
+)
+fig.show()
+```
+
+## 24.22 AI-assisted learning: topology audit prompts
+
+AI tools can be helpful for brainstorming diagnostics, but they should not replace mathematical checks.  Students can use the following prompts:
+
+::: {.ai-box}
+**Prompt 1: representation-space audit**
+
+I have sentence embeddings from two models.  Suggest a mathematical plan for comparing their geometry and topology.  Include distance choices, normalization choices, PCA/SVD diagnostics, connected-component persistence, and possible failure modes.
+:::
+
+::: {.ai-box}
+**Prompt 2: interpretation critique**
+
+A persistent loop appears in a sentence-embedding point cloud.  Give at least five possible explanations, including semantic explanations and artifact explanations.  For each explanation, propose a test.
+:::
+
+::: {.ai-box}
+**Prompt 3: code review**
+
+Review my Python code for a Vietoris--Rips complex.  Check whether I incorrectly count graph cycles as topological loops after triangles are filled.  Explain the role of the boundary matrix $\partial_2$.
+:::
+
+## 24.23 Common mistakes
+
+1. **Confusing a graph cycle with a topological loop.**  A triangle in a graph is a cycle, but in a Rips complex it is usually filled, so it does not contribute to $\beta_1$.
+
+2. **Using dimensionality reduction as evidence of topology.**  A loop in a two-dimensional visualization may be introduced or destroyed by projection.  Compute topology from the original metric when possible.
+
+3. **Ignoring normalization.**  Euclidean distance and cosine distance can give very different filtrations.
+
+4. **Overinterpreting short bars.**  Low-persistence features may be noise or sampling artifacts.
+
+5. **Forgetting sample-size effects.**  Persistent homology depends on how densely the underlying shape is sampled.
+
+6. **Treating persistent homology as a black box.**  Students should understand vertices, edges, triangles, boundary maps, and Betti numbers before using a library.
+
+## 24.24 Exercises
+
+1. Let $X$ be four points forming the corners of a square.  Compute $\beta_0$ and graph cycle rank for the neighborhood graph at a scale where adjacent corners are connected but diagonals are not.
+
+2. For the same square, decide whether the Vietoris--Rips complex has a one-dimensional loop at that scale.
+
+3. Increase the scale until the diagonals appear.  What happens to the Rips complex and $\beta_1$?
+
+4. Let $X$ be three points forming a triangle.  Explain why the graph cycle rank is 1 but the Rips complex has $\beta_1=0$ once the filled triangle appears.
+
+5. Suppose two embedding models produce the same nearest-neighbor classification accuracy.  Design a topological diagnostic that could still distinguish them.
+
+6. Explain why cosine distance may be preferable to Euclidean distance for sentence embeddings that vary strongly in norm.
+
+7. Derive the formula $\beta_1=|E|-|V|+\beta_0-\operatorname{rank}\partial_2$ for a 2-dimensional simplicial complex.
+
+8. Construct a toy dataset of 12 points sampled from two circles.  Predict how $\beta_0$ and $\beta_1$ should behave as $\varepsilon$ increases.
+
+9. In a retrieval system, suppose retrieved document chunks form three disconnected components in embedding space.  Give two possible good interpretations and two possible bad interpretations.
+
+10. Use an AI tool to generate a topological interpretation of a point cloud, then write a critique explaining which parts are supported by mathematics and which parts are speculative.
+
+## 24.25 Mini-project: topology of course-advising embeddings
+
+Build a small corpus of 30--60 short documents about university advising topics such as registration, transfer credit, degree requirements, co-op, graduate electives, and academic standing.  Compute embeddings using any available method, for example TF-IDF/SVD or a sentence embedding model.  Then:
+
+1. choose a distance metric;
+2. compute a distance matrix;
+3. build $\varepsilon$-neighborhood graphs over a range of thresholds;
+4. plot $\beta_0$ as a function of $\varepsilon$;
+5. compute simple graph cycle ranks and, if possible, Rips $\beta_1$ values;
+6. compare the topology with known document categories;
+7. write a short interpretation and a cautionary note.
+
+This project connects topology, retrieval, and responsible interpretation.
+
+## 24.26 Lab connection
+
+The accompanying lab should guide students through:
+
+- constructing a point cloud from small text embeddings;
+- computing Euclidean and cosine distance matrices;
+- building neighborhood graphs;
+- computing connected components;
+- computing $\beta_0$ and $\beta_1$ for small Rips complexes;
+- plotting Betti curves;
+- comparing circular, clustered, and noisy point clouds;
+- applying the same tools to a small NLP corpus.
+
+## 24.27 Summary
+
+This chapter introduced a topological viewpoint on NLP representation spaces.  The central idea is simple: embeddings turn language objects into points, distances turn point clouds into finite metric spaces, and filtrations turn metric spaces into multiscale topological summaries.  Betti numbers and persistent homology provide tools for studying connected components, loops, and other qualitative structures.  These tools are most valuable when used together with linear algebra, probability, and domain knowledge.  In mathematical NLP, topology is not a replacement for modeling or evaluation; it is a structural lens for asking better questions about representation spaces.

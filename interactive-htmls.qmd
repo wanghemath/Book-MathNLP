@@ -1,0 +1,42 @@
+---
+title: "Interactive HTML Modules"
+---
+
+Interactive HTML modules can be used for visual explanations of NLP mathematics.  Good candidates include tokenization, cosine similarity, smoothing, SVD, embedding geometry, attention matrices, positional encoding, sampling temperature, perplexity, and persistent homology.
+
+## Design principles
+
+- Each module should teach one mathematical concept clearly.
+- Use Plotly.js or lightweight JavaScript visualizations when interactivity adds value.
+- Keep formulas in standard LaTeX format using MathJax.
+- Do not make the interactive component replace the explanation; it should support the explanation.
+
+## Planned modules
+
+| Chapter | Topic | HTML file |
+|---:|---|---|
+| 1 | What Is Natural Language Processing? | `interactive-htmls/chapter-01-what-is-nlp-interactive.html` |
+| 2 | Text, Tokens, and Vocabularies | `interactive-htmls/chapter-02-text-tokens-vocabularies-interactive.html` |
+| 3 | Documents as Vectors | `interactive-htmls/chapter-03-documents-as-vectors-interactive.html` |
+| 4 | Probability and Language | `interactive-htmls/chapter-04-probability-and-language-interactive.html` |
+| 5 | N-Gram Language Models | `interactive-htmls/chapter-05-ngram-language-models-interactive.html` |
+| 6 | Naive Bayes and Text Classification | `interactive-htmls/chapter-06-naive-bayes-text-classification-interactive.html` |
+| 7 | Vector Space Models | `interactive-htmls/chapter-07-vector-space-models-interactive.html` |
+| 8 | Word Embeddings | `interactive-htmls/chapter-08-word-embeddings-interactive.html` |
+| 9 | Geometry of Embedding Spaces | `interactive-htmls/chapter-09-geometry-of-embeddings-interactive.html` |
+| 10 | Neural Networks for Text | `interactive-htmls/chapter-10-neural-networks-for-text-interactive.html` |
+| 11 | Recurrent Neural Networks | `interactive-htmls/chapter-11-recurrent-neural-networks-interactive.html` |
+| 12 | LSTM and GRU Models | `interactive-htmls/chapter-12-lstm-gru-models-interactive.html` |
+| 13 | Attention Mechanisms | `interactive-htmls/chapter-13-attention-mechanisms-interactive.html` |
+| 14 | Self-Attention | `interactive-htmls/chapter-14-self-attention-interactive.html` |
+| 15 | The Transformer Architecture | `interactive-htmls/chapter-15-transformers-interactive.html` |
+| 16 | Positional Encoding and Sequence Geometry | `interactive-htmls/chapter-16-positional-encoding-interactive.html` |
+| 17 | Autoregressive Language Models | `interactive-htmls/chapter-17-autoregressive-language-models-interactive.html` |
+| 18 | Training Large Language Models | `interactive-htmls/chapter-18-training-large-language-models-interactive.html` |
+| 19 | Embeddings, Retrieval, and RAG | `interactive-htmls/chapter-19-embeddings-retrieval-rag-interactive.html` |
+| 20 | Evaluation of Language Models | `interactive-htmls/chapter-20-evaluation-interactive.html` |
+| 21 | Information Theory and Language | `interactive-htmls/chapter-21-information-theory-interactive.html` |
+| 22 | Optimization for NLP | `interactive-htmls/chapter-22-optimization-for-nlp-interactive.html` |
+| 23 | Graphs and Language | `interactive-htmls/chapter-23-graphs-and-language-interactive.html` |
+| 24 | Topology and Geometry of Language Representations | `interactive-htmls/chapter-24-topology-geometry-language-interactive.html` |
+| 25 | Ethics, Bias, and Mathematical Responsibility | `interactive-htmls/chapter-25-ethics-bias-responsibility-interactive.html` |

@@ -1,0 +1,484 @@
+---
+title: "Notation and Core Notions"
+subtitle: "A compact reference for mathematical NLP"
+---
+
+::: {.hero-box}
+This page collects the main notation, conventions, and core notions used throughout the book. It is designed as a quick reference for students moving between chapters, computer labs, and projects.
+:::
+
+Natural language processing combines discrete objects, continuous representations, probability models, optimization algorithms, and evaluation protocols. The same symbol may appear in several contexts, so this page explains the standard meaning used in this book and notes when a symbol has context-dependent interpretations.
+
+## 1. General conventions
+
+Unless otherwise stated:
+
+- vectors are column vectors;
+- matrices are written with capital letters;
+- finite sets are written with capital letters such as $V$, $D$, and $C$;
+- random variables are written with capital letters such as $X$ and $Y$;
+- observed values are written with lowercase letters such as $x$ and $y$;
+- logarithms are natural logarithms unless base $2$ is explicitly stated;
+- probabilities are defined over finite sets in most chapters;
+- all examples use small corpora so that the mathematical structure is visible.
+
+A recurring theme is that an NLP pipeline is a composition of maps:
+
+$$
+\text{text} \longrightarrow \text{tokens} \longrightarrow \text{indices} \longrightarrow \text{vectors} \longrightarrow \text{scores} \longrightarrow \text{probabilities} \longrightarrow \text{decisions}.
+$$
+
+Each arrow represents a modeling choice.
+
+## 2. Text, tokens, and vocabularies
+
+| Symbol | Meaning | Typical chapter use |
+|---|---|---|
+| $s$ | raw text string | preprocessing and tokenization |
+| $x_t$ | token at position $t$ | sequences and language models |
+| $x_{1:T}$ | token sequence $x_1,x_2,\ldots,x_T$ | sequence modeling |
+| $T$ | sequence length | RNNs, attention, transformers |
+| $V$ | vocabulary set | tokenization and vectorization |
+| $|V|$ | vocabulary size | language models and embeddings |
+| $w$ | a word, subword, or token type | vocabulary-level quantities |
+| $\iota$ | indexing map from tokens to integers | token ids |
+| $\langle\mathrm{unk}\rangle$ | unknown token | out-of-vocabulary handling |
+| $\langle\mathrm{bos}\rangle$ | beginning-of-sequence token | language modeling |
+| $\langle\mathrm{eos}\rangle$ | end-of-sequence token | language modeling |
+| $\langle\mathrm{pad}\rangle$ | padding token | batching variable-length sequences |
+
+A tokenizer maps a string to a finite sequence:
+
+$$
+\tau(s) = (x_1,x_2,\ldots,x_T), \qquad x_t \in V.
+$$
+
+The vocabulary is not just a list of words. It determines the sample space for probability models and the coordinate system for count vectors.
+
+::: {.callout-note}
+Changing the tokenizer changes the mathematical problem. A word tokenizer, character tokenizer, and subword tokenizer produce different vocabularies, different sequence lengths, and different probability distributions.
+:::
+
+## 3. Documents and corpora
+
+| Symbol | Meaning |
+|---|---|
+| $d_i$ | document $i$ |
+| $D$ | document collection or corpus |
+| $n$ | number of documents or examples |
+| $m$ | vocabulary size, often $m=|V|$ |
+| $c(w,d)$ | count of token $w$ in document $d$ |
+| $\mathrm{tf}(w,d)$ | term frequency of token $w$ in document $d$ |
+| $\mathrm{df}(w)$ | document frequency of token $w$ |
+| $\mathrm{idf}(w)$ | inverse document frequency of token $w$ |
+
+A corpus can be represented as a list of token sequences:
+
+$$
+D = \{x^{(1)}_{1:T_1}, x^{(2)}_{1:T_2}, \ldots, x^{(n)}_{1:T_n}\}.
+$$
+
+A document-term matrix is usually written as
+
+$$
+X \in \mathbb R^{n \times m},
+$$
+
+where row $i$ represents document $d_i$ and column $j$ represents token $w_j$.
+
+## 4. Vectors, matrices, and geometry
+
+| Symbol | Meaning |
+|---|---|
+| $x \in \mathbb R^d$ | feature vector or embedding |
+| $d$ | feature dimension or embedding dimension |
+| $X \in \mathbb R^{n \times d}$ | data matrix with $n$ examples and $d$ features |
+| $E \in \mathbb R^{|V| \times d}$ | embedding matrix |
+| $e_w$ | embedding vector for token $w$ |
+| $\lVert x \rVert$ | Euclidean norm of $x$ |
+| $x^\top y$ | inner product of vectors $x$ and $y$ |
+| $\cos(x,y)$ | cosine similarity |
+| $G = XX^\top$ | Gram matrix of pairwise inner products |
+
+The cosine similarity between two nonzero vectors is
+
+$$
+\cos(x,y) = \frac{x^\top y}{\lVert x \rVert\lVert y \rVert}.
+$$
+
+This score appears in TF-IDF retrieval, embedding search, clustering, nearest neighbors, and some attention interpretations.
+
+### Matrix factorization
+
+For a matrix $X \in \mathbb R^{n \times d}$, the singular value decomposition is
+
+$$
+X = U\Sigma V^\top.
+$$
+
+In NLP, low-rank approximations are used to reveal latent structure:
+
+$$
+X_k = U_k\Sigma_k V_k^\top.
+$$
+
+The same idea appears in latent semantic analysis, embedding geometry, representation diagnostics, and low-rank adaptation.
+
+## 5. Probability and language models
+
+| Symbol | Meaning |
+|---|---|
+| $p(x)$ | probability of event or token $x$ |
+| $p(x,y)$ | joint probability |
+| $p(y \mid x)$ | conditional probability |
+| $\hat p$ | empirical distribution estimated from data |
+| $\theta$ | model parameters |
+| $p_\theta$ | probability distribution defined by parameters $\theta$ |
+| $\ell(\theta)$ | loss or negative log-likelihood |
+| $L(\theta)$ | objective function |
+
+A language model assigns probabilities to token sequences. The autoregressive factorization is
+
+$$
+p_\theta(x_{1:T}) = \prod_{t=1}^T p_\theta(x_t \mid x_{<t}),
+$$
+
+where $x_{<t} = x_1,\ldots,x_{t-1}$.
+
+The negative log-likelihood for one sequence is
+
+$$
+-\log p_\theta(x_{1:T}) = -\sum_{t=1}^T \log p_\theta(x_t \mid x_{<t}).
+$$
+
+Per-token average negative log-likelihood is cross-entropy when the data distribution is fixed.
+
+## 6. Information theory
+
+| Symbol | Meaning |
+|---|---|
+| $H(p)$ | entropy of distribution $p$ |
+| $H(p,q)$ | cross-entropy between true distribution $p$ and model $q$ |
+| $D_{\mathrm{KL}}(p\Vert q)$ | Kullback--Leibler divergence from $p$ to $q$ |
+| $I(X;Y)$ | mutual information between $X$ and $Y$ |
+| $\mathrm{PMI}(x,y)$ | pointwise mutual information |
+| $\mathrm{PPL}$ | perplexity |
+
+Entropy measures average uncertainty:
+
+$$
+H(p) = -\sum_{x \in V} p(x)\log p(x).
+$$
+
+Cross-entropy measures average code length when data come from $p$ but are coded using $q$:
+
+$$
+H(p,q) = -\sum_{x \in V} p(x)\log q(x).
+$$
+
+KL divergence is the excess cross-entropy:
+
+$$
+D_{\mathrm{KL}}(p\Vert q) = \sum_{x \in V} p(x)\log\frac{p(x)}{q(x)}.
+$$
+
+Perplexity is often used to report language-model quality:
+
+$$
+\mathrm{PPL} = \exp\{H\}.
+$$
+
+Lower perplexity usually means the model assigns higher probability to the observed tokens, but it does not automatically imply better factuality, usefulness, fairness, or safety.
+
+## 7. Classification notation
+
+| Symbol | Meaning |
+|---|---|
+| $y$ | class label |
+| $C$ | set of classes |
+| $K$ | number of classes |
+| $p(y \mid x)$ | posterior class probability |
+| $\hat y$ | predicted class |
+| $W$ | classifier weight matrix |
+| $b$ | bias vector |
+| $z$ | logits or unnormalized scores |
+
+A common linear classifier computes logits
+
+$$
+z = Wx + b,
+$$
+
+then converts logits to probabilities using softmax:
+
+$$
+\mathrm{softmax}(z)_j = \frac{\exp(z_j)}{\sum_{k=1}^K \exp(z_k)}.
+$$
+
+The cross-entropy loss for a true class $y$ is
+
+$$
+\ell(z,y) = -\log \mathrm{softmax}(z)_y.
+$$
+
+## 8. Neural network notation
+
+| Symbol | Meaning |
+|---|---|
+| $h_t$ | hidden state at position $t$ |
+| $c_t$ | LSTM cell state at position $t$ |
+| $\sigma$ | sigmoid function |
+| $\tanh$ | hyperbolic tangent nonlinearity |
+| $\phi$ | generic nonlinear activation |
+| $W$, $U$, $b$ | neural-network parameters |
+| $\nabla_\theta L$ | gradient of objective with respect to parameters |
+| $\eta$ | learning rate |
+
+A simple recurrent neural network has the form
+
+$$
+h_t = \phi(W_x x_t + W_h h_{t-1} + b).
+$$
+
+A feedforward layer has the form
+
+$$
+h = \phi(Wx+b).
+$$
+
+Training usually means solving an empirical risk minimization problem:
+
+$$
+\min_\theta \frac{1}{n}\sum_{i=1}^n \ell(f_\theta(x_i),y_i).
+$$
+
+## 9. Attention and transformers
+
+| Symbol | Meaning |
+|---|---|
+| $q$ | query vector |
+| $k$ | key vector |
+| $v$ | value vector |
+| $Q$ | query matrix |
+| $K$ | key matrix |
+| $V$ | value matrix |
+| $A$ | attention weight matrix |
+| $d_k$ | key/query dimension |
+| $M$ | attention mask |
+| $P$ | positional encoding matrix |
+
+Scaled dot-product attention is
+
+$$
+\mathrm{Attention}(Q,K,V) = \mathrm{softmax}\left(\frac{QK^\top}{\sqrt{d_k}} + M\right)V.
+$$
+
+The matrix
+
+$$
+A = \mathrm{softmax}\left(\frac{QK^\top}{\sqrt{d_k}} + M\right)
+$$
+
+contains attention weights. Each row is usually a probability distribution over source positions.
+
+::: {.callout-warning}
+Attention weights are useful diagnostics, but they are not automatically faithful explanations of model behavior. They show one internal weighting pattern, not the full causal reason for a prediction.
+:::
+
+A transformer block combines attention, residual connections, normalization, and feedforward layers. A simplified encoder block is
+
+$$
+Z_1 = \mathrm{LayerNorm}(X + \mathrm{SelfAttention}(X)),
+$$
+
+$$
+Z_2 = \mathrm{LayerNorm}(Z_1 + \mathrm{FFN}(Z_1)).
+$$
+
+## 10. Retrieval and RAG notation
+
+| Symbol | Meaning |
+|---|---|
+| $q$ | user query, or query vector depending on context |
+| $d_i$ | document or chunk $i$ |
+| $r(q,d_i)$ | retrieval score for query $q$ and document $d_i$ |
+| $\mathrm{top}_k(q)$ | top $k$ retrieved documents for query $q$ |
+| $\mathrm{rel}(q,d)$ | relevance label |
+| $\mathrm{Recall@}k$ | fraction of relevant items retrieved in top $k$ |
+| $\mathrm{Precision@}k$ | fraction of top $k$ results that are relevant |
+| $\mathrm{MRR}$ | mean reciprocal rank |
+| $\mathrm{nDCG}$ | normalized discounted cumulative gain |
+
+A retrieval system ranks documents by a score:
+
+$$
+r(q,d_i) = \mathrm{sim}(\psi(q),\psi(d_i)),
+$$
+
+where $\psi$ is a representation map and $\mathrm{sim}$ is a similarity function.
+
+A retrieval-augmented generation system can be summarized as
+
+$$
+\text{query} \longrightarrow \text{retrieve context} \longrightarrow \text{generate answer conditioned on context}.
+$$
+
+When evaluating RAG, separate the retrieval problem from the generation problem. A wrong answer may be caused by poor retrieval, poor context use, hallucination, or ambiguity in the question.
+
+## 11. Graph notation
+
+| Symbol | Meaning |
+|---|---|
+| $G=(N,E)$ | graph with node set $N$ and edge set $E$ |
+| $A$ | adjacency matrix |
+| $D$ | degree matrix, or corpus depending on context |
+| $L=D-A$ | graph Laplacian |
+| $\tilde A$ | normalized or self-loop augmented adjacency matrix |
+| $N(i)$ | neighborhood of node $i$ |
+| $h_i$ | node representation |
+
+A graph convolution layer often has the form
+
+$$
+H' = \phi(\tilde AHW),
+$$
+
+where $H$ is a matrix of node features, $W$ is a learnable weight matrix, and $\tilde A$ controls message passing.
+
+Graph views of language include dependency graphs, word co-occurrence graphs, document-term bipartite graphs, citation graphs, and knowledge graphs.
+
+## 12. Topology and geometry notation
+
+| Symbol | Meaning |
+|---|---|
+| $X$ | finite point cloud or data matrix |
+| $d(x,y)$ | distance between points $x$ and $y$ |
+| $\epsilon$ | scale parameter |
+| $G_\epsilon$ | neighborhood graph at scale $\epsilon$ |
+| $\beta_0$ | number of connected components |
+| $\beta_1$ | number of one-dimensional loops |
+| $\mathrm{VR}_\epsilon(X)$ | Vietoris--Rips complex at scale $\epsilon$ |
+
+A Vietoris--Rips complex at scale $\epsilon$ contains a simplex whenever all its vertices are pairwise within distance $\epsilon$.
+
+For NLP, topology is used as a diagnostic lens: it can help compare embedding spaces, detect clustering, study loops or branches in representation trajectories, and summarize how local neighborhoods change with scale.
+
+## 13. Evaluation and responsibility notation
+
+| Symbol | Meaning |
+|---|---|
+| $\mathrm{TP}$ | true positives |
+| $\mathrm{FP}$ | false positives |
+| $\mathrm{TN}$ | true negatives |
+| $\mathrm{FN}$ | false negatives |
+| $\mathrm{Acc}$ | accuracy |
+| $\mathrm{Prec}$ | precision |
+| $\mathrm{Rec}$ | recall |
+| $F_1$ | harmonic mean of precision and recall |
+| $\mathrm{ECE}$ | expected calibration error |
+| $g$ | group or subgroup variable |
+| $\Delta_g$ | performance gap across groups |
+
+Precision and recall are
+
+$$
+\mathrm{Precision} = \frac{\mathrm{TP}}{\mathrm{TP}+\mathrm{FP}},
+$$
+
+$$
+\mathrm{Recall} = \frac{\mathrm{TP}}{\mathrm{TP}+\mathrm{FN}}.
+$$
+
+The $F_1$ score is
+
+$$
+F_1 = \frac{2\cdot \mathrm{Precision}\cdot \mathrm{Recall}}{\mathrm{Precision}+\mathrm{Recall}}.
+$$
+
+Calibration asks whether predicted probabilities match empirical frequencies. Fairness and responsibility require checking not only global averages but also subgroup errors, uncertainty, data provenance, privacy, and possible misuse.
+
+## 14. Common overloaded symbols
+
+Some symbols are used differently in different contexts. The local meaning should be clear from the chapter.
+
+| Symbol | Possible meanings |
+|---|---|
+| $X$ | data matrix, random variable, point cloud |
+| $D$ | corpus, degree matrix, dataset |
+| $A$ | attention matrix, adjacency matrix, event |
+| $q$ | probability distribution, query text, query vector |
+| $d$ | document, dimension, distance |
+| $V$ | vocabulary, value matrix in attention when written as $V$ |
+| $K$ | number of classes, key matrix, number of clusters |
+| $L$ | loss function, graph Laplacian, sequence length in some contexts |
+
+When ambiguity is possible, the text will specify the meaning explicitly.
+
+## 15. Chapter-by-chapter notation map
+
+| Chapters | Main notation to know |
+|---|---|
+| 1--3 | $s$, $x_t$, $V$, $D$, $X$, term counts, TF-IDF |
+| 4--6 | $p$, $\hat p$, likelihood, Bayes rule, class labels |
+| 7--9 | vectors, norms, cosine similarity, Gram matrices, SVD, embeddings |
+| 10--12 | neural parameters, hidden states, gates, gradients |
+| 13--16 | $Q$, $K$, $V$, attention matrices, masks, positional encodings |
+| 17--20 | autoregressive probabilities, cross-entropy, perplexity, retrieval metrics |
+| 21--22 | entropy, KL divergence, optimization objectives, SGD, AdamW |
+| 23--24 | adjacency matrices, Laplacians, point clouds, Betti numbers |
+| 25 | calibration, subgroup metrics, fairness gaps, privacy diagnostics |
+
+## 16. Reading formulas in this book
+
+Many formulas should be read both algebraically and computationally. For example,
+
+$$
+z = Wx+b
+$$
+
+means all of the following at once:
+
+1. algebraically, a linear map followed by a translation;
+2. geometrically, a projection onto score directions;
+3. statistically, a model for class logits;
+4. computationally, a matrix multiplication plus broadcasting;
+5. pedagogically, a place where dimensions must match.
+
+When studying a new formula, ask:
+
+- What are the dimensions of all objects?
+- Which quantities are fixed data and which are parameters?
+- Which operation creates the output?
+- What loss or metric will evaluate the output?
+- What failure modes are hidden by the notation?
+
+## 17. Python naming conventions used in labs
+
+The labs use Python variable names that mirror the mathematical notation.
+
+| Math notation | Python variable examples |
+|---|---|
+| $V$ | `vocab`, `vocab_list`, `token_to_id` |
+| $X$ | `X`, `X_counts`, `X_tfidf`, `X_emb` |
+| $y$ | `y`, `labels`, `y_true`, `y_pred` |
+| $p$ | `p`, `probs`, `p_hat` |
+| $Q,K,V$ | `Q`, `K`, `V_values` |
+| $A$ | `A`, `attention`, `adjacency` |
+| $\theta$ | `params`, `weights`, `model_params` |
+| $L$ | `loss`, `objective` |
+
+In code, `V` can conflict with the value matrix in attention. For this reason, labs often use `vocab` for the vocabulary and `V_values` for the value matrix.
+
+## 18. Minimal checklist for students
+
+Before starting a chapter or lab, check that you can identify:
+
+1. the input object;
+2. the output object;
+3. the representation space;
+4. the probability distribution or scoring function;
+5. the loss, metric, or diagnostic;
+6. the assumptions made by the representation;
+7. one possible failure mode.
+
+This checklist turns notation into understanding. The goal is not to memorize symbols, but to recognize the mathematical structure behind NLP systems.

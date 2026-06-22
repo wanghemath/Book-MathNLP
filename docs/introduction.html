@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>2&nbsp; Introduction – Mathematical Foundations of Natural Language Processing</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./roadmap.html" rel="next">
+<link href="./index.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-5ccb035bea26c1e21f80f44cf7c27909.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script>
+(function() {
+  if (window.Plotly || document.querySelector('script[data-local-plotly="true"]')) return;
+  var script = document.createElement('script');
+  var inChapters = window.location.pathname.indexOf('/chapters/') !== -1;
+  script.src = (inChapters ? '../' : '') + 'assets/plotly.min.js';
+  script.async = true;
+  script.setAttribute('data-local-plotly', 'true');
+  document.head.appendChild(script);
+})();
+</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.scss">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./introduction.html"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Introduction</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">Mathematical Foundations of Natural Language Processing</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/wanghemath/Book-NLP-Math" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Mathematical Foundations of Natural Language Processing</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./introduction.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Introduction</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./roadmap.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Learning Roadmap</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./notation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Notation and Core Notions</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./math-background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Mathematical Background</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part I. Language as Data</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-01-what-is-nlp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">What Is Natural Language Processing?</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-02-text-tokens-vocabularies.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Text, Tokens, and Vocabularies</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-03-documents-as-vectors.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Documents as Vectors</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part II. Probability Models for Language</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-04-probability-and-language.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Probability and Language</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-05-ngram-language-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">N-Gram Language Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-06-naive-bayes-text-classification.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Naive Bayes and Text Classification</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part III. Linear Algebra of Language</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-07-vector-space-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Vector Space Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-08-word-embeddings.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Word Embeddings</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-09-geometry-of-embeddings.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Geometry of Embedding Spaces</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part IV. Neural Networks for Sequences</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-10-neural-networks-for-text.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Neural Networks for Text</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-11-recurrent-neural-networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">16</span>&nbsp; <span class="chapter-title">Recurrent Neural Networks</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-12-lstm-gru-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">17</span>&nbsp; <span class="chapter-title">LSTM and GRU Models</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part V. Attention and Transformers</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-13-attention-mechanisms.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">18</span>&nbsp; <span class="chapter-title">Attention Mechanisms</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-14-self-attention.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">19</span>&nbsp; <span class="chapter-title">Self-Attention</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-15-transformers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">20</span>&nbsp; <span class="chapter-title">The Transformer Architecture</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-16-positional-encoding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">21</span>&nbsp; <span class="chapter-title">Positional Encoding and Sequence Geometry</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part VI. Large Language Models and Retrieval</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-17-autoregressive-language-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">22</span>&nbsp; <span class="chapter-title">Autoregressive Language Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-18-training-large-language-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">23</span>&nbsp; <span class="chapter-title">Training Large Language Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-19-embeddings-retrieval-rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">24</span>&nbsp; <span class="chapter-title">Chapter 19. Embeddings, Retrieval, and RAG</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-20-evaluation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">25</span>&nbsp; <span class="chapter-title">Chapter 20. Evaluation of Language Models</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part VII. Advanced Mathematical Perspectives</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-21-information-theory.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">26</span>&nbsp; <span class="chapter-title">Chapter 21. Information Theory and Language</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-22-optimization-for-nlp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">27</span>&nbsp; <span class="chapter-title">Optimization for NLP</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-23-graphs-and-language.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">28</span>&nbsp; <span class="chapter-title">Graphs and Language</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-24-topology-geometry-language.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">29</span>&nbsp; <span class="chapter-title">Topology and Geometry of Language Representations</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-25-ethics-bias-responsibility.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">30</span>&nbsp; <span class="chapter-title">Ethics, Bias, and Mathematical Responsibility</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./labs-summary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">31</span>&nbsp; <span class="chapter-title">Computer Labs</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./interactive-htmls.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">32</span>&nbsp; <span class="chapter-title">Interactive HTML Modules</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./interactive-diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">33</span>&nbsp; <span class="chapter-title">Interactive Diagnostics</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./final-projects.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">34</span>&nbsp; <span class="chapter-title">Final Projects</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./python-reference.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">35</span>&nbsp; <span class="chapter-title">Python Reference</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">36</span>&nbsp; <span class="chapter-title">References and Further Reading</span></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#goals-of-the-book" id="toc-goals-of-the-book" class="nav-link active" data-scroll-target="#goals-of-the-book"><span class="header-section-number">2.1</span> Goals of the book</a></li>
+  <li><a href="#why-a-mathematical-approach" id="toc-why-a-mathematical-approach" class="nav-link" data-scroll-target="#why-a-mathematical-approach"><span class="header-section-number">2.2</span> Why a mathematical approach?</a></li>
+  <li><a href="#the-central-pipeline" id="toc-the-central-pipeline" class="nav-link" data-scroll-target="#the-central-pipeline"><span class="header-section-number">2.3</span> The central pipeline</a></li>
+  <li><a href="#prerequisites" id="toc-prerequisites" class="nav-link" data-scroll-target="#prerequisites"><span class="header-section-number">2.4</span> Prerequisites</a></li>
+  <li><a href="#notation" id="toc-notation" class="nav-link" data-scroll-target="#notation"><span class="header-section-number">2.5</span> Notation</a></li>
+  <li><a href="#computational-philosophy" id="toc-computational-philosophy" class="nav-link" data-scroll-target="#computational-philosophy"><span class="header-section-number">2.6</span> Computational philosophy</a></li>
+  <li><a href="#how-to-use-the-computer-labs" id="toc-how-to-use-the-computer-labs" class="nav-link" data-scroll-target="#how-to-use-the-computer-labs"><span class="header-section-number">2.7</span> How to use the computer labs</a></li>
+  <li><a href="#responsible-use-of-ai-tools" id="toc-responsible-use-of-ai-tools" class="nav-link" data-scroll-target="#responsible-use-of-ai-tools"><span class="header-section-number">2.8</span> Responsible use of AI tools</a></li>
+  <li><a href="#chapter-roadmap" id="toc-chapter-roadmap" class="nav-link" data-scroll-target="#chapter-roadmap"><span class="header-section-number">2.9</span> Chapter roadmap</a>
+  <ul class="collapse">
+  <li><a href="#part-i.-language-as-data" id="toc-part-i.-language-as-data" class="nav-link" data-scroll-target="#part-i.-language-as-data"><span class="header-section-number">2.9.1</span> Part I. Language as Data</a></li>
+  <li><a href="#part-ii.-probability-models-for-language" id="toc-part-ii.-probability-models-for-language" class="nav-link" data-scroll-target="#part-ii.-probability-models-for-language"><span class="header-section-number">2.9.2</span> Part II. Probability Models for Language</a></li>
+  <li><a href="#part-iii.-linear-algebra-of-language" id="toc-part-iii.-linear-algebra-of-language" class="nav-link" data-scroll-target="#part-iii.-linear-algebra-of-language"><span class="header-section-number">2.9.3</span> Part III. Linear Algebra of Language</a></li>
+  <li><a href="#part-iv.-neural-networks-for-sequences" id="toc-part-iv.-neural-networks-for-sequences" class="nav-link" data-scroll-target="#part-iv.-neural-networks-for-sequences"><span class="header-section-number">2.9.4</span> Part IV. Neural Networks for Sequences</a></li>
+  <li><a href="#part-v.-attention-and-transformers" id="toc-part-v.-attention-and-transformers" class="nav-link" data-scroll-target="#part-v.-attention-and-transformers"><span class="header-section-number">2.9.5</span> Part V. Attention and Transformers</a></li>
+  <li><a href="#part-vi.-large-language-models-and-retrieval" id="toc-part-vi.-large-language-models-and-retrieval" class="nav-link" data-scroll-target="#part-vi.-large-language-models-and-retrieval"><span class="header-section-number">2.9.6</span> Part VI. Large Language Models and Retrieval</a></li>
+  <li><a href="#part-vii.-advanced-mathematical-perspectives" id="toc-part-vii.-advanced-mathematical-perspectives" class="nav-link" data-scroll-target="#part-vii.-advanced-mathematical-perspectives"><span class="header-section-number">2.9.7</span> Part VII. Advanced Mathematical Perspectives</a></li>
+  </ul></li>
+  <li><a href="#learning-outcomes-by-mathematical-theme" id="toc-learning-outcomes-by-mathematical-theme" class="nav-link" data-scroll-target="#learning-outcomes-by-mathematical-theme"><span class="header-section-number">2.10</span> Learning outcomes by mathematical theme</a></li>
+  <li><a href="#suggested-study-questions" id="toc-suggested-study-questions" class="nav-link" data-scroll-target="#suggested-study-questions"><span class="header-section-number">2.11</span> Suggested study questions</a></li>
+  <li><a href="#a-first-example-language-as-counting-and-prediction" id="toc-a-first-example-language-as-counting-and-prediction" class="nav-link" data-scroll-target="#a-first-example-language-as-counting-and-prediction"><span class="header-section-number">2.12</span> A first example: language as counting and prediction</a></li>
+  <li><a href="#what-this-book-is-not" id="toc-what-this-book-is-not" class="nav-link" data-scroll-target="#what-this-book-is-not"><span class="header-section-number">2.13</span> What this book is not</a></li>
+  <li><a href="#final-perspective" id="toc-final-perspective" class="nav-link" data-scroll-target="#final-perspective"><span class="header-section-number">2.14</span> Final perspective</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Introduction</span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+<p class="subtitle lead">Why Natural Language Processing Is a Mathematical Subject</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="hero-box">
+<p>Natural language processing is often introduced through applications: search engines, translation systems, chatbots, summarizers, speech interfaces, and large language models. This book takes a different but complementary route. It asks: <strong>what mathematical objects are being manipulated when a machine processes language?</strong></p>
+</div>
+<p>The answer is richer than a single method or model. Language can be represented as strings, finite sets, sequences, sparse vectors, probability distributions, matrices, graphs, geometric point clouds, and learned nonlinear maps. Modern NLP is powerful because these representations can be connected: tokens become vectors, vectors become probability models, probability models become neural networks, neural networks become attention-based sequence operators, and these operators become components of retrieval and generation systems.</p>
+<p>This book develops NLP through that mathematical chain.</p>
+<section id="goals-of-the-book" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="goals-of-the-book"><span class="header-section-number">2.1</span> Goals of the book</h2>
+<p>The main goal is to help students understand NLP as a mathematical discipline, not only as a collection of software tools. By the end of the book, students should be able to:</p>
+<ol type="1">
+<li>represent text using tokens, vocabularies, vectors, matrices, and probability distributions;</li>
+<li>derive and implement basic probabilistic language models;</li>
+<li>understand text classification through Bayes rules, likelihoods, and decision boundaries;</li>
+<li>explain document-term matrices, TF-IDF, cosine similarity, SVD, and embedding geometry;</li>
+<li>implement the core computations behind attention and transformer blocks;</li>
+<li>interpret autoregressive language modeling through conditional probability and cross-entropy;</li>
+<li>build small retrieval and retrieval-augmented generation systems;</li>
+<li>evaluate NLP systems using metrics, uncertainty, calibration, and subgroup analysis;</li>
+<li>connect NLP to information theory, optimization, graphs, geometry, topology, and ethics.</li>
+</ol>
+<p>The book is intentionally mathematical, but it is also computational. Each major idea is paired with a transparent Python implementation, usually on a small corpus that students can inspect directly.</p>
+</section>
+<section id="why-a-mathematical-approach" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="why-a-mathematical-approach"><span class="header-section-number">2.2</span> Why a mathematical approach?</h2>
+<p>Many NLP systems are large, but their core ideas can be studied on small examples. A sentence such as</p>
+<blockquote class="blockquote">
+<p>language models learn patterns from text</p>
+</blockquote>
+<p>can already illustrate much of the mathematical structure of NLP.</p>
+<p>It can be treated as:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Viewpoint</th>
+<th>Mathematical object</th>
+<th>Example question</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>string processing</td>
+<td>sequence of characters</td>
+<td>How should text be normalized?</td>
+</tr>
+<tr class="even">
+<td>tokenization</td>
+<td>finite sequence from a vocabulary</td>
+<td>What counts as a word or subword?</td>
+</tr>
+<tr class="odd">
+<td>vectorization</td>
+<td>vector in <span class="math inline">\(\mathbb R^d\)</span></td>
+<td>Which coordinates represent the document?</td>
+</tr>
+<tr class="even">
+<td>probability</td>
+<td>empirical or learned distribution</td>
+<td>How surprising is the next token?</td>
+</tr>
+<tr class="odd">
+<td>geometry</td>
+<td>point in a metric or inner product space</td>
+<td>Which texts are similar?</td>
+</tr>
+<tr class="even">
+<td>neural modeling</td>
+<td>parameterized nonlinear map</td>
+<td>How are features learned from data?</td>
+</tr>
+<tr class="odd">
+<td>attention</td>
+<td>weighted averaging operator</td>
+<td>Which tokens should influence each other?</td>
+</tr>
+<tr class="even">
+<td>evaluation</td>
+<td>statistical estimator</td>
+<td>How reliable is the measured performance?</td>
+</tr>
+<tr class="odd">
+<td>responsibility</td>
+<td>decision under social constraints</td>
+<td>Who is harmed by errors or bias?</td>
+</tr>
+</tbody>
+</table>
+<p>A mathematical perspective helps students see common structure across many models. For example, cosine similarity in TF-IDF retrieval, nearest-neighbor search in embedding space, attention scores in transformers, and reranking in retrieval-augmented generation all involve comparing representations. Cross-entropy appears in language modeling, classification, calibration, and preference learning. Matrix factorization appears in latent semantic analysis, embedding learning, low-rank adaptation, and representation diagnostics.</p>
+</section>
+<section id="the-central-pipeline" class="level2" data-number="2.3">
+<h2 data-number="2.3" class="anchored" data-anchor-id="the-central-pipeline"><span class="header-section-number">2.3</span> The central pipeline</h2>
+<p>A simplified NLP pipeline is:</p>
+<pre class="text"><code>raw text
+  -&gt; tokens
+  -&gt; vocabulary indices
+  -&gt; vectors or embeddings
+  -&gt; model scores
+  -&gt; probability distributions
+  -&gt; predictions, retrieved documents, or generated text
+  -&gt; evaluation and auditing</code></pre>
+<p>Each arrow hides mathematical choices. Tokenization determines the sample space. Vectorization determines what information is preserved. The model class determines which dependencies can be learned. The loss function determines what the system is optimized to do. The evaluation protocol determines what failures are visible.</p>
+<p>One guiding theme of the book is therefore:</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Every NLP system is a sequence of mathematical modeling decisions. Good NLP requires understanding those decisions, not merely running the final model.</p>
+</div>
+</div>
+</section>
+<section id="prerequisites" class="level2" data-number="2.4">
+<h2 data-number="2.4" class="anchored" data-anchor-id="prerequisites"><span class="header-section-number">2.4</span> Prerequisites</h2>
+<p>The book is written for advanced undergraduate students, master’s students, or beginning PhD students in applied mathematics, statistics, data science, computer science, computational linguistics, or related fields.</p>
+<p>Useful background includes:</p>
+<ul>
+<li><strong>linear algebra:</strong> vectors, matrices, inner products, norms, projections, eigenvalues, and singular value decomposition;</li>
+<li><strong>probability:</strong> conditional probability, likelihood, expectation, entropy, Bayes rule, and random variables;</li>
+<li><strong>statistics and machine learning:</strong> classification, validation, loss functions, empirical risk, and basic evaluation metrics;</li>
+<li><strong>calculus and optimization:</strong> gradients, gradient descent, stochastic gradients, and regularization;</li>
+<li><strong>Python:</strong> basic programming with lists, dictionaries, NumPy arrays, pandas data frames, and matplotlib plots.</li>
+</ul>
+<p>Students do not need prior NLP experience. The computer labs are designed for independent study and introduce the needed background before programming begins.</p>
+</section>
+<section id="notation" class="level2" data-number="2.5">
+<h2 data-number="2.5" class="anchored" data-anchor-id="notation"><span class="header-section-number">2.5</span> Notation</h2>
+<p>The following notation is used throughout the book.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Symbol</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><span class="math inline">\(V\)</span></td>
+<td>vocabulary set</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(|V|\)</span></td>
+<td>vocabulary size</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(x_1, x_2, \ldots, x_T\)</span></td>
+<td>token sequence of length <span class="math inline">\(T\)</span></td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(d\)</span></td>
+<td>embedding dimension or feature dimension</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(X \in \mathbb R^{n \times d}\)</span></td>
+<td>data matrix with <span class="math inline">\(n\)</span> examples and <span class="math inline">\(d\)</span> features</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(p(x)\)</span></td>
+<td>probability of token, document, or event <span class="math inline">\(x\)</span></td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(p(x_t \mid x_{&lt;t})\)</span></td>
+<td>autoregressive next-token probability</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\theta\)</span></td>
+<td>model parameters</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(\ell(\theta)\)</span></td>
+<td>loss function or objective</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(q, k, v\)</span></td>
+<td>query, key, and value vectors in attention</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(Q, K, V\)</span></td>
+<td>query, key, and value matrices</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(A\)</span></td>
+<td>attention weight matrix or adjacency matrix, depending on context</td>
+</tr>
+</tbody>
+</table>
+<p>For a probability distribution <span class="math inline">\(p\)</span> over a finite set <span class="math inline">\(V\)</span>, entropy is written as</p>
+<p><span class="math display">\[
+H(p) = -\sum_{x \in V} p(x) \log p(x).
+\]</span></p>
+<p>For two distributions <span class="math inline">\(p\)</span> and <span class="math inline">\(q\)</span>, cross-entropy is</p>
+<p><span class="math display">\[
+H(p,q) = -\sum_{x \in V} p(x) \log q(x),
+\]</span></p>
+<p>and KL divergence is</p>
+<p><span class="math display">\[
+D_{\mathrm{KL}}(p \Vert q) = \sum_{x \in V} p(x) \log \frac{p(x)}{q(x)}.
+\]</span></p>
+<p>For vectors <span class="math inline">\(u,v \in \mathbb R^d\)</span>, cosine similarity is</p>
+<p><span class="math display">\[
+\operatorname{cos}(u,v) = \frac{u \cdot v}{\|u\|\,\|v\|}.
+\]</span></p>
+<p>The attention operation is usually written as</p>
+<p><span class="math display">\[
+\operatorname{Attention}(Q,K,V) = \operatorname{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V.
+\]</span></p>
+<p>These formulas will appear repeatedly in different contexts.</p>
+</section>
+<section id="computational-philosophy" class="level2" data-number="2.6">
+<h2 data-number="2.6" class="anchored" data-anchor-id="computational-philosophy"><span class="header-section-number">2.6</span> Computational philosophy</h2>
+<p>The labs avoid treating NLP models as black boxes. Instead, students are asked to build small versions of the main algorithms. The goal is not to compete with industrial-scale models. The goal is to understand the computations well enough to inspect, modify, and evaluate them.</p>
+<p>For example, students will implement:</p>
+<ul>
+<li>tokenization and vocabulary construction;</li>
+<li>document-term matrices and TF-IDF;</li>
+<li>n-gram language models and smoothing;</li>
+<li>Naive Bayes classification;</li>
+<li>cosine retrieval and SVD-based latent spaces;</li>
+<li>word embeddings from co-occurrence statistics;</li>
+<li>attention and self-attention from matrix operations;</li>
+<li>transformer-style blocks;</li>
+<li>autoregressive decoding methods;</li>
+<li>retrieval metrics and transparent RAG pipelines;</li>
+<li>fairness, calibration, and bias diagnostics.</li>
+</ul>
+<p>Whenever possible, the book uses small datasets created inside the notebook. This makes the mathematical structure visible. Students can print the vocabulary, inspect the matrix entries, compute probabilities by hand, and compare manual calculations with Python output.</p>
+</section>
+<section id="how-to-use-the-computer-labs" class="level2" data-number="2.7">
+<h2 data-number="2.7" class="anchored" data-anchor-id="how-to-use-the-computer-labs"><span class="header-section-number">2.7</span> How to use the computer labs</h2>
+<p>The labs are located in the <code>labs/</code> folder and are designed to open directly in Google Colab. Each lab follows the same independent-study structure:</p>
+<ol type="1">
+<li><strong>Background before programming.</strong> The lab explains the core mathematical idea before code appears.</li>
+<li><strong>Small transparent data.</strong> Students work with short corpora or toy examples before moving to larger settings.</li>
+<li><strong>Guided implementation.</strong> Important formulas are translated into Python step by step.</li>
+<li><strong>Diagnostics.</strong> Students inspect intermediate objects such as vocabularies, matrices, probabilities, hidden states, attention weights, or retrieval rankings.</li>
+<li><strong>Exercises.</strong> Each lab contains tasks that require modification, experimentation, and interpretation.</li>
+<li><strong>Mini-project.</strong> Each lab ends with an open-ended extension suitable for independent study.</li>
+<li><strong>AI-assisted reflection.</strong> Students are encouraged to use AI tools to explain, critique, and test their reasoning, but not to replace their own mathematical work.</li>
+</ol>
+<p>A productive workflow is:</p>
+<pre class="text"><code>read the chapter
+  -&gt; open the corresponding Colab lab
+  -&gt; run every cell
+  -&gt; change the toy data
+  -&gt; answer the exercises
+  -&gt; write a short reflection
+  -&gt; connect the result back to the formulas</code></pre>
+</section>
+<section id="responsible-use-of-ai-tools" class="level2" data-number="2.8">
+<h2 data-number="2.8" class="anchored" data-anchor-id="responsible-use-of-ai-tools"><span class="header-section-number">2.8</span> Responsible use of AI tools</h2>
+<p>Because NLP is closely connected to modern generative AI, this book treats AI tools as objects of study and as possible learning assistants. Students may use AI systems to ask for explanations, generate test examples, or compare interpretations. However, they should verify all claims through computation, derivation, or source checking.</p>
+<p>A useful rule is:</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Use AI to ask better questions, not to avoid mathematical reasoning.</p>
+</div>
+</div>
+<p>For each AI-assisted prompt in the labs, students should record:</p>
+<ul>
+<li>the question they asked;</li>
+<li>the answer they received;</li>
+<li>what they verified independently;</li>
+<li>what was unclear, incomplete, or incorrect;</li>
+<li>how the result connects to the mathematical model.</li>
+</ul>
+<p>This habit is especially important in later chapters on evaluation, retrieval-augmented generation, fairness, and responsibility.</p>
+</section>
+<section id="chapter-roadmap" class="level2" data-number="2.9">
+<h2 data-number="2.9" class="anchored" data-anchor-id="chapter-roadmap"><span class="header-section-number">2.9</span> Chapter roadmap</h2>
+<p>The book has seven parts.</p>
+<section id="part-i.-language-as-data" class="level3" data-number="2.9.1">
+<h3 data-number="2.9.1" class="anchored" data-anchor-id="part-i.-language-as-data"><span class="header-section-number">2.9.1</span> Part I. Language as Data</h3>
+<p>Chapters 1–3 introduce text as data. Students learn what NLP studies, how text becomes tokens and vocabularies, and how documents become vectors. These chapters establish the finite-set and vector-space foundations of the book.</p>
+</section>
+<section id="part-ii.-probability-models-for-language" class="level3" data-number="2.9.2">
+<h3 data-number="2.9.2" class="anchored" data-anchor-id="part-ii.-probability-models-for-language"><span class="header-section-number">2.9.2</span> Part II. Probability Models for Language</h3>
+<p>Chapters 4–6 develop probability models. Students study empirical distributions, likelihood, entropy, n-gram language models, smoothing, and Naive Bayes classification. These chapters show how language modeling begins with conditional probability.</p>
+</section>
+<section id="part-iii.-linear-algebra-of-language" class="level3" data-number="2.9.3">
+<h3 data-number="2.9.3" class="anchored" data-anchor-id="part-iii.-linear-algebra-of-language"><span class="header-section-number">2.9.3</span> Part III. Linear Algebra of Language</h3>
+<p>Chapters 7–9 develop vector space methods, embeddings, and geometry. Students study document-term matrices, TF-IDF, SVD, word embeddings, cosine similarity, anisotropy, hubness, clustering, and semantic directions.</p>
+</section>
+<section id="part-iv.-neural-networks-for-sequences" class="level3" data-number="2.9.4">
+<h3 data-number="2.9.4" class="anchored" data-anchor-id="part-iv.-neural-networks-for-sequences"><span class="header-section-number">2.9.4</span> Part IV. Neural Networks for Sequences</h3>
+<p>Chapters 10–12 introduce neural networks for text. Students study embedding lookup, pooling, recurrent neural networks, backpropagation through time, LSTM cells, GRU cells, and gated memory.</p>
+</section>
+<section id="part-v.-attention-and-transformers" class="level3" data-number="2.9.5">
+<h3 data-number="2.9.5" class="anchored" data-anchor-id="part-v.-attention-and-transformers"><span class="header-section-number">2.9.5</span> Part V. Attention and Transformers</h3>
+<p>Chapters 13–16 develop attention, self-attention, transformer blocks, and positional encoding. These chapters form the mathematical core of modern NLP architectures.</p>
+</section>
+<section id="part-vi.-large-language-models-and-retrieval" class="level3" data-number="2.9.6">
+<h3 data-number="2.9.6" class="anchored" data-anchor-id="part-vi.-large-language-models-and-retrieval"><span class="header-section-number">2.9.6</span> Part VI. Large Language Models and Retrieval</h3>
+<p>Chapters 17–20 study autoregressive language models, training objectives, retrieval, RAG, and evaluation. Students learn how next-token prediction, decoding, fine-tuning, retrieval, calibration, and uncertainty interact in modern systems.</p>
+</section>
+<section id="part-vii.-advanced-mathematical-perspectives" class="level3" data-number="2.9.7">
+<h3 data-number="2.9.7" class="anchored" data-anchor-id="part-vii.-advanced-mathematical-perspectives"><span class="header-section-number">2.9.7</span> Part VII. Advanced Mathematical Perspectives</h3>
+<p>Chapters 21–25 connect NLP to information theory, optimization, graphs, topology, geometry, ethics, bias, and responsibility. These chapters invite students to view NLP as part of a larger mathematical and social ecosystem.</p>
+</section>
+</section>
+<section id="learning-outcomes-by-mathematical-theme" class="level2" data-number="2.10">
+<h2 data-number="2.10" class="anchored" data-anchor-id="learning-outcomes-by-mathematical-theme"><span class="header-section-number">2.10</span> Learning outcomes by mathematical theme</h2>
+<p>The following table summarizes the mathematical themes of the book.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 40%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Theme</th>
+<th style="text-align: right;">Chapters</th>
+<th>What students learn</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>finite structures</td>
+<td style="text-align: right;">1–3</td>
+<td>tokens, vocabularies, documents, indexing</td>
+</tr>
+<tr class="even">
+<td>probability</td>
+<td style="text-align: right;">4–6, 17–21</td>
+<td>likelihood, entropy, language modeling, calibration</td>
+</tr>
+<tr class="odd">
+<td>linear algebra</td>
+<td style="text-align: right;">3, 7–9, 13–16</td>
+<td>matrices, similarity, SVD, embeddings, attention</td>
+</tr>
+<tr class="even">
+<td>optimization</td>
+<td style="text-align: right;">10–12, 18, 22</td>
+<td>losses, gradients, SGD, AdamW, clipping, regularization</td>
+</tr>
+<tr class="odd">
+<td>geometry</td>
+<td style="text-align: right;">8–9, 16, 24</td>
+<td>distances, neighborhoods, directions, intrinsic structure</td>
+</tr>
+<tr class="even">
+<td>graphs</td>
+<td style="text-align: right;">19, 23</td>
+<td>co-occurrence graphs, knowledge graphs, random walks, message passing</td>
+</tr>
+<tr class="odd">
+<td>evaluation</td>
+<td style="text-align: right;">20, 25</td>
+<td>metrics, uncertainty, subgroup analysis, audits</td>
+</tr>
+<tr class="even">
+<td>responsibility</td>
+<td style="text-align: right;">20, 25</td>
+<td>fairness, bias, factuality, privacy, human impact</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="suggested-study-questions" class="level2" data-number="2.11">
+<h2 data-number="2.11" class="anchored" data-anchor-id="suggested-study-questions"><span class="header-section-number">2.11</span> Suggested study questions</h2>
+<p>Students should return to these questions throughout the course:</p>
+<ol type="1">
+<li>What is the sample space?</li>
+<li>What information is preserved by the representation?</li>
+<li>What information is lost?</li>
+<li>What probability distribution is being estimated or optimized?</li>
+<li>What geometry does the representation create?</li>
+<li>What loss function defines success during training?</li>
+<li>What metric defines success during evaluation?</li>
+<li>What kinds of examples are likely to fail?</li>
+<li>Who is affected by the errors?</li>
+<li>What evidence supports the final conclusion?</li>
+</ol>
+<p>These questions help connect early chapters on tokens and vectors with later chapters on transformers, retrieval, and responsible AI.</p>
+</section>
+<section id="a-first-example-language-as-counting-and-prediction" class="level2" data-number="2.12">
+<h2 data-number="2.12" class="anchored" data-anchor-id="a-first-example-language-as-counting-and-prediction"><span class="header-section-number">2.12</span> A first example: language as counting and prediction</h2>
+<p>Consider a tiny corpus:</p>
+<pre class="text"><code>language models learn from text
+language models predict text
+retrieval systems use text</code></pre>
+<p>From this corpus, we can construct a vocabulary</p>
+<p><span class="math display">\[
+V = \{\text{from}, \text{language}, \text{learn}, \text{models}, \text{predict}, \text{retrieval}, \text{systems}, \text{text}, \text{use}\}.
+\]</span></p>
+<p>Each document can be represented as a vector in <span class="math inline">\(\mathbb R^{|V|}\)</span>. A language model can estimate probabilities such as</p>
+<p><span class="math display">\[
+p(\text{text} \mid \text{predict}).
+\]</span></p>
+<p>A retrieval system can compare a query vector with document vectors. A neural model can learn dense embeddings for the same tokens. An attention model can compute which earlier words influence a later prediction.</p>
+<p>Thus a simple corpus already contains the central mathematical objects of the book: sets, vectors, matrices, probabilities, optimization problems, and evaluation criteria.</p>
+</section>
+<section id="what-this-book-is-not" class="level2" data-number="2.13">
+<h2 data-number="2.13" class="anchored" data-anchor-id="what-this-book-is-not"><span class="header-section-number">2.13</span> What this book is not</h2>
+<p>This book is not a catalog of every NLP library or a survey of every current model. Modern NLP changes quickly, and software APIs change even faster. Instead, this book focuses on durable mathematical principles. Students who understand these principles will be better prepared to learn new architectures, evaluate new systems, and use future tools responsibly.</p>
+</section>
+<section id="final-perspective" class="level2" data-number="2.14">
+<h2 data-number="2.14" class="anchored" data-anchor-id="final-perspective"><span class="header-section-number">2.14</span> Final perspective</h2>
+<p>Natural language is human, contextual, and social. Mathematical models of language are useful because they simplify language into structures that can be computed with. But every simplification has consequences. A responsible mathematical approach therefore asks both technical and critical questions:</p>
+<ul>
+<li>What is the model?</li>
+<li>What does the model optimize?</li>
+<li>What does the model ignore?</li>
+<li>How do we know whether it works?</li>
+<li>What happens when it fails?</li>
+</ul>
+<p>The purpose of this book is to give students the mathematical and computational tools to answer these questions carefully.</p>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/wanghemath\.github\.io\/Book-NLP-Math\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./index.html" class="pagination-link" aria-label="Mathematical Foundations of Natural Language Processing">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Mathematical Foundations of Natural Language Processing</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./roadmap.html" class="pagination-link" aria-label="Learning Roadmap">
+        <span class="nav-page-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Learning Roadmap</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "Introduction"</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "Why Natural Language Processing Is a Mathematical Subject"</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>::: {.hero-box}</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>Natural language processing is often introduced through applications: search engines, translation systems, chatbots, summarizers, speech interfaces, and large language models. This book takes a different but complementary route. It asks: **what mathematical objects are being manipulated when a machine processes language?**</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>The answer is richer than a single method or model. Language can be represented as strings, finite sets, sequences, sparse vectors, probability distributions, matrices, graphs, geometric point clouds, and learned nonlinear maps. Modern NLP is powerful because these representations can be connected: tokens become vectors, vectors become probability models, probability models become neural networks, neural networks become attention-based sequence operators, and these operators become components of retrieval and generation systems.</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>This book develops NLP through that mathematical chain.</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="fu">## Goals of the book</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>The main goal is to help students understand NLP as a mathematical discipline, not only as a collection of software tools. By the end of the book, students should be able to:</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>represent text using tokens, vocabularies, vectors, matrices, and probability distributions;</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>derive and implement basic probabilistic language models;</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>understand text classification through Bayes rules, likelihoods, and decision boundaries;</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>explain document-term matrices, TF-IDF, cosine similarity, SVD, and embedding geometry;</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>implement the core computations behind attention and transformer blocks;</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>interpret autoregressive language modeling through conditional probability and cross-entropy;</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a><span class="ss">7. </span>build small retrieval and retrieval-augmented generation systems;</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="ss">8. </span>evaluate NLP systems using metrics, uncertainty, calibration, and subgroup analysis;</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a><span class="ss">9. </span>connect NLP to information theory, optimization, graphs, geometry, topology, and ethics.</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>The book is intentionally mathematical, but it is also computational. Each major idea is paired with a transparent Python implementation, usually on a small corpus that students can inspect directly.</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why a mathematical approach?</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>Many NLP systems are large, but their core ideas can be studied on small examples. A sentence such as</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a><span class="at">&gt; language models learn patterns from text</span></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>can already illustrate much of the mathematical structure of NLP.</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>It can be treated as:</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Viewpoint <span class="pp">|</span> Mathematical object <span class="pp">|</span> Example question <span class="pp">|</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---|---|</span></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> string processing <span class="pp">|</span> sequence of characters <span class="pp">|</span> How should text be normalized? <span class="pp">|</span></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> tokenization <span class="pp">|</span> finite sequence from a vocabulary <span class="pp">|</span> What counts as a word or subword? <span class="pp">|</span></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> vectorization <span class="pp">|</span> vector in $\mathbb R^d$ <span class="pp">|</span> Which coordinates represent the document? <span class="pp">|</span></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> probability <span class="pp">|</span> empirical or learned distribution <span class="pp">|</span> How surprising is the next token? <span class="pp">|</span></span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> geometry <span class="pp">|</span> point in a metric or inner product space <span class="pp">|</span> Which texts are similar? <span class="pp">|</span></span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> neural modeling <span class="pp">|</span> parameterized nonlinear map <span class="pp">|</span> How are features learned from data? <span class="pp">|</span></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> attention <span class="pp">|</span> weighted averaging operator <span class="pp">|</span> Which tokens should influence each other? <span class="pp">|</span></span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> evaluation <span class="pp">|</span> statistical estimator <span class="pp">|</span> How reliable is the measured performance? <span class="pp">|</span></span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> responsibility <span class="pp">|</span> decision under social constraints <span class="pp">|</span> Who is harmed by errors or bias? <span class="pp">|</span></span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a>A mathematical perspective helps students see common structure across many models. For example, cosine similarity in TF-IDF retrieval, nearest-neighbor search in embedding space, attention scores in transformers, and reranking in retrieval-augmented generation all involve comparing representations. Cross-entropy appears in language modeling, classification, calibration, and preference learning. Matrix factorization appears in latent semantic analysis, embedding learning, low-rank adaptation, and representation diagnostics.</span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a><span class="fu">## The central pipeline</span></span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a>A simplified NLP pipeline is:</span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a><span class="in">raw text</span></span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; tokens</span></span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; vocabulary indices</span></span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; vectors or embeddings</span></span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; model scores</span></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; probability distributions</span></span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; predictions, retrieved documents, or generated text</span></span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; evaluation and auditing</span></span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a>Each arrow hides mathematical choices. Tokenization determines the sample space. Vectorization determines what information is preserved. The model class determines which dependencies can be learned. The loss function determines what the system is optimized to do. The evaluation protocol determines what failures are visible.</span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>One guiding theme of the book is therefore:</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>::: {.callout-note}</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>Every NLP system is a sequence of mathematical modeling decisions. Good NLP requires understanding those decisions, not merely running the final model.</span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a><span class="fu">## Prerequisites</span></span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>The book is written for advanced undergraduate students, master's students, or beginning PhD students in applied mathematics, statistics, data science, computer science, computational linguistics, or related fields.</span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a>Useful background includes:</span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**linear algebra:** vectors, matrices, inner products, norms, projections, eigenvalues, and singular value decomposition;</span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**probability:** conditional probability, likelihood, expectation, entropy, Bayes rule, and random variables;</span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**statistics and machine learning:** classification, validation, loss functions, empirical risk, and basic evaluation metrics;</span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**calculus and optimization:** gradients, gradient descent, stochastic gradients, and regularization;</span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>**Python:** basic programming with lists, dictionaries, NumPy arrays, pandas data frames, and matplotlib plots.</span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a>Students do not need prior NLP experience. The computer labs are designed for independent study and introduce the needed background before programming begins.</span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a><span class="fu">## Notation</span></span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a>The following notation is used throughout the book.</span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Symbol <span class="pp">|</span> Meaning <span class="pp">|</span></span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---|</span></span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $V$ <span class="pp">|</span> vocabulary set <span class="pp">|</span></span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $<span class="pp">|</span>V<span class="pp">|</span>$ <span class="pp">|</span> vocabulary size <span class="pp">|</span></span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $x_1, x_2, \ldots, x_T$ <span class="pp">|</span> token sequence of length $T$ <span class="pp">|</span></span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $d$ <span class="pp">|</span> embedding dimension or feature dimension <span class="pp">|</span></span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $X \in \mathbb R^{n \times d}$ <span class="pp">|</span> data matrix with $n$ examples and $d$ features <span class="pp">|</span></span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $p(x)$ <span class="pp">|</span> probability of token, document, or event $x$ <span class="pp">|</span></span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $p(x_t \mid x_{&lt;t})$ <span class="pp">|</span> autoregressive next-token probability <span class="pp">|</span></span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $\theta$ <span class="pp">|</span> model parameters <span class="pp">|</span></span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $\ell(\theta)$ <span class="pp">|</span> loss function or objective <span class="pp">|</span></span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $q, k, v$ <span class="pp">|</span> query, key, and value vectors in attention <span class="pp">|</span></span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $Q, K, V$ <span class="pp">|</span> query, key, and value matrices <span class="pp">|</span></span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> $A$ <span class="pp">|</span> attention weight matrix or adjacency matrix, depending on context <span class="pp">|</span></span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a>For a probability distribution $p$ over a finite set $V$, entropy is written as</span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a>H(p) = -\sum_{x \in V} p(x) \log p(x).</span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a>For two distributions $p$ and $q$, cross-entropy is</span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a>H(p,q) = -\sum_{x \in V} p(x) \log q(x),</span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a>and KL divergence is</span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a>D_{\mathrm{KL}}(p \Vert q) = \sum_{x \in V} p(x) \log \frac{p(x)}{q(x)}.</span>
+<span id="cb4-126"><a href="#cb4-126" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-127"><a href="#cb4-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-128"><a href="#cb4-128" aria-hidden="true" tabindex="-1"></a>For vectors $u,v \in \mathbb R^d$, cosine similarity is</span>
+<span id="cb4-129"><a href="#cb4-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-130"><a href="#cb4-130" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-131"><a href="#cb4-131" aria-hidden="true" tabindex="-1"></a>\operatorname{cos}(u,v) = \frac{u \cdot v}{<span class="sc">\|</span>u<span class="sc">\|</span>\,<span class="sc">\|</span>v<span class="sc">\|</span>}.</span>
+<span id="cb4-132"><a href="#cb4-132" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-133"><a href="#cb4-133" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-134"><a href="#cb4-134" aria-hidden="true" tabindex="-1"></a>The attention operation is usually written as</span>
+<span id="cb4-135"><a href="#cb4-135" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-136"><a href="#cb4-136" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-137"><a href="#cb4-137" aria-hidden="true" tabindex="-1"></a>\operatorname{Attention}(Q,K,V) = \operatorname{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V.</span>
+<span id="cb4-138"><a href="#cb4-138" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-139"><a href="#cb4-139" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-140"><a href="#cb4-140" aria-hidden="true" tabindex="-1"></a>These formulas will appear repeatedly in different contexts.</span>
+<span id="cb4-141"><a href="#cb4-141" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-142"><a href="#cb4-142" aria-hidden="true" tabindex="-1"></a><span class="fu">## Computational philosophy</span></span>
+<span id="cb4-143"><a href="#cb4-143" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-144"><a href="#cb4-144" aria-hidden="true" tabindex="-1"></a>The labs avoid treating NLP models as black boxes. Instead, students are asked to build small versions of the main algorithms. The goal is not to compete with industrial-scale models. The goal is to understand the computations well enough to inspect, modify, and evaluate them.</span>
+<span id="cb4-145"><a href="#cb4-145" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-146"><a href="#cb4-146" aria-hidden="true" tabindex="-1"></a>For example, students will implement:</span>
+<span id="cb4-147"><a href="#cb4-147" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-148"><a href="#cb4-148" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>tokenization and vocabulary construction;</span>
+<span id="cb4-149"><a href="#cb4-149" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>document-term matrices and TF-IDF;</span>
+<span id="cb4-150"><a href="#cb4-150" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>n-gram language models and smoothing;</span>
+<span id="cb4-151"><a href="#cb4-151" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>Naive Bayes classification;</span>
+<span id="cb4-152"><a href="#cb4-152" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>cosine retrieval and SVD-based latent spaces;</span>
+<span id="cb4-153"><a href="#cb4-153" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>word embeddings from co-occurrence statistics;</span>
+<span id="cb4-154"><a href="#cb4-154" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>attention and self-attention from matrix operations;</span>
+<span id="cb4-155"><a href="#cb4-155" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>transformer-style blocks;</span>
+<span id="cb4-156"><a href="#cb4-156" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>autoregressive decoding methods;</span>
+<span id="cb4-157"><a href="#cb4-157" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>retrieval metrics and transparent RAG pipelines;</span>
+<span id="cb4-158"><a href="#cb4-158" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>fairness, calibration, and bias diagnostics.</span>
+<span id="cb4-159"><a href="#cb4-159" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-160"><a href="#cb4-160" aria-hidden="true" tabindex="-1"></a>Whenever possible, the book uses small datasets created inside the notebook. This makes the mathematical structure visible. Students can print the vocabulary, inspect the matrix entries, compute probabilities by hand, and compare manual calculations with Python output.</span>
+<span id="cb4-161"><a href="#cb4-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-162"><a href="#cb4-162" aria-hidden="true" tabindex="-1"></a><span class="fu">## How to use the computer labs</span></span>
+<span id="cb4-163"><a href="#cb4-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-164"><a href="#cb4-164" aria-hidden="true" tabindex="-1"></a>The labs are located in the <span class="in">`labs/`</span> folder and are designed to open directly in Google Colab. Each lab follows the same independent-study structure:</span>
+<span id="cb4-165"><a href="#cb4-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-166"><a href="#cb4-166" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>**Background before programming.** The lab explains the core mathematical idea before code appears.</span>
+<span id="cb4-167"><a href="#cb4-167" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>**Small transparent data.** Students work with short corpora or toy examples before moving to larger settings.</span>
+<span id="cb4-168"><a href="#cb4-168" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>**Guided implementation.** Important formulas are translated into Python step by step.</span>
+<span id="cb4-169"><a href="#cb4-169" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>**Diagnostics.** Students inspect intermediate objects such as vocabularies, matrices, probabilities, hidden states, attention weights, or retrieval rankings.</span>
+<span id="cb4-170"><a href="#cb4-170" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>**Exercises.** Each lab contains tasks that require modification, experimentation, and interpretation.</span>
+<span id="cb4-171"><a href="#cb4-171" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>**Mini-project.** Each lab ends with an open-ended extension suitable for independent study.</span>
+<span id="cb4-172"><a href="#cb4-172" aria-hidden="true" tabindex="-1"></a><span class="ss">7. </span>**AI-assisted reflection.** Students are encouraged to use AI tools to explain, critique, and test their reasoning, but not to replace their own mathematical work.</span>
+<span id="cb4-173"><a href="#cb4-173" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-174"><a href="#cb4-174" aria-hidden="true" tabindex="-1"></a>A productive workflow is:</span>
+<span id="cb4-175"><a href="#cb4-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-176"><a href="#cb4-176" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb4-177"><a href="#cb4-177" aria-hidden="true" tabindex="-1"></a><span class="in">read the chapter</span></span>
+<span id="cb4-178"><a href="#cb4-178" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; open the corresponding Colab lab</span></span>
+<span id="cb4-179"><a href="#cb4-179" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; run every cell</span></span>
+<span id="cb4-180"><a href="#cb4-180" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; change the toy data</span></span>
+<span id="cb4-181"><a href="#cb4-181" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; answer the exercises</span></span>
+<span id="cb4-182"><a href="#cb4-182" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; write a short reflection</span></span>
+<span id="cb4-183"><a href="#cb4-183" aria-hidden="true" tabindex="-1"></a><span class="in">  -&gt; connect the result back to the formulas</span></span>
+<span id="cb4-184"><a href="#cb4-184" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-185"><a href="#cb4-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-186"><a href="#cb4-186" aria-hidden="true" tabindex="-1"></a><span class="fu">## Responsible use of AI tools</span></span>
+<span id="cb4-187"><a href="#cb4-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-188"><a href="#cb4-188" aria-hidden="true" tabindex="-1"></a>Because NLP is closely connected to modern generative AI, this book treats AI tools as objects of study and as possible learning assistants. Students may use AI systems to ask for explanations, generate test examples, or compare interpretations. However, they should verify all claims through computation, derivation, or source checking.</span>
+<span id="cb4-189"><a href="#cb4-189" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-190"><a href="#cb4-190" aria-hidden="true" tabindex="-1"></a>A useful rule is:</span>
+<span id="cb4-191"><a href="#cb4-191" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-192"><a href="#cb4-192" aria-hidden="true" tabindex="-1"></a>::: {.callout-important}</span>
+<span id="cb4-193"><a href="#cb4-193" aria-hidden="true" tabindex="-1"></a>Use AI to ask better questions, not to avoid mathematical reasoning.</span>
+<span id="cb4-194"><a href="#cb4-194" aria-hidden="true" tabindex="-1"></a>:::</span>
+<span id="cb4-195"><a href="#cb4-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-196"><a href="#cb4-196" aria-hidden="true" tabindex="-1"></a>For each AI-assisted prompt in the labs, students should record:</span>
+<span id="cb4-197"><a href="#cb4-197" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-198"><a href="#cb4-198" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>the question they asked;</span>
+<span id="cb4-199"><a href="#cb4-199" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>the answer they received;</span>
+<span id="cb4-200"><a href="#cb4-200" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>what they verified independently;</span>
+<span id="cb4-201"><a href="#cb4-201" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>what was unclear, incomplete, or incorrect;</span>
+<span id="cb4-202"><a href="#cb4-202" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>how the result connects to the mathematical model.</span>
+<span id="cb4-203"><a href="#cb4-203" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-204"><a href="#cb4-204" aria-hidden="true" tabindex="-1"></a>This habit is especially important in later chapters on evaluation, retrieval-augmented generation, fairness, and responsibility.</span>
+<span id="cb4-205"><a href="#cb4-205" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-206"><a href="#cb4-206" aria-hidden="true" tabindex="-1"></a><span class="fu">## Chapter roadmap</span></span>
+<span id="cb4-207"><a href="#cb4-207" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-208"><a href="#cb4-208" aria-hidden="true" tabindex="-1"></a>The book has seven parts.</span>
+<span id="cb4-209"><a href="#cb4-209" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-210"><a href="#cb4-210" aria-hidden="true" tabindex="-1"></a><span class="fu">### Part I. Language as Data</span></span>
+<span id="cb4-211"><a href="#cb4-211" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-212"><a href="#cb4-212" aria-hidden="true" tabindex="-1"></a>Chapters 1--3 introduce text as data. Students learn what NLP studies, how text becomes tokens and vocabularies, and how documents become vectors. These chapters establish the finite-set and vector-space foundations of the book.</span>
+<span id="cb4-213"><a href="#cb4-213" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-214"><a href="#cb4-214" aria-hidden="true" tabindex="-1"></a><span class="fu">### Part II. Probability Models for Language</span></span>
+<span id="cb4-215"><a href="#cb4-215" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-216"><a href="#cb4-216" aria-hidden="true" tabindex="-1"></a>Chapters 4--6 develop probability models. Students study empirical distributions, likelihood, entropy, n-gram language models, smoothing, and Naive Bayes classification. These chapters show how language modeling begins with conditional probability.</span>
+<span id="cb4-217"><a href="#cb4-217" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-218"><a href="#cb4-218" aria-hidden="true" tabindex="-1"></a><span class="fu">### Part III. Linear Algebra of Language</span></span>
+<span id="cb4-219"><a href="#cb4-219" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-220"><a href="#cb4-220" aria-hidden="true" tabindex="-1"></a>Chapters 7--9 develop vector space methods, embeddings, and geometry. Students study document-term matrices, TF-IDF, SVD, word embeddings, cosine similarity, anisotropy, hubness, clustering, and semantic directions.</span>
+<span id="cb4-221"><a href="#cb4-221" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-222"><a href="#cb4-222" aria-hidden="true" tabindex="-1"></a><span class="fu">### Part IV. Neural Networks for Sequences</span></span>
+<span id="cb4-223"><a href="#cb4-223" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-224"><a href="#cb4-224" aria-hidden="true" tabindex="-1"></a>Chapters 10--12 introduce neural networks for text. Students study embedding lookup, pooling, recurrent neural networks, backpropagation through time, LSTM cells, GRU cells, and gated memory.</span>
+<span id="cb4-225"><a href="#cb4-225" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-226"><a href="#cb4-226" aria-hidden="true" tabindex="-1"></a><span class="fu">### Part V. Attention and Transformers</span></span>
+<span id="cb4-227"><a href="#cb4-227" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-228"><a href="#cb4-228" aria-hidden="true" tabindex="-1"></a>Chapters 13--16 develop attention, self-attention, transformer blocks, and positional encoding. These chapters form the mathematical core of modern NLP architectures.</span>
+<span id="cb4-229"><a href="#cb4-229" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-230"><a href="#cb4-230" aria-hidden="true" tabindex="-1"></a><span class="fu">### Part VI. Large Language Models and Retrieval</span></span>
+<span id="cb4-231"><a href="#cb4-231" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-232"><a href="#cb4-232" aria-hidden="true" tabindex="-1"></a>Chapters 17--20 study autoregressive language models, training objectives, retrieval, RAG, and evaluation. Students learn how next-token prediction, decoding, fine-tuning, retrieval, calibration, and uncertainty interact in modern systems.</span>
+<span id="cb4-233"><a href="#cb4-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-234"><a href="#cb4-234" aria-hidden="true" tabindex="-1"></a><span class="fu">### Part VII. Advanced Mathematical Perspectives</span></span>
+<span id="cb4-235"><a href="#cb4-235" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-236"><a href="#cb4-236" aria-hidden="true" tabindex="-1"></a>Chapters 21--25 connect NLP to information theory, optimization, graphs, topology, geometry, ethics, bias, and responsibility. These chapters invite students to view NLP as part of a larger mathematical and social ecosystem.</span>
+<span id="cb4-237"><a href="#cb4-237" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-238"><a href="#cb4-238" aria-hidden="true" tabindex="-1"></a><span class="fu">## Learning outcomes by mathematical theme</span></span>
+<span id="cb4-239"><a href="#cb4-239" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-240"><a href="#cb4-240" aria-hidden="true" tabindex="-1"></a>The following table summarizes the mathematical themes of the book.</span>
+<span id="cb4-241"><a href="#cb4-241" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-242"><a href="#cb4-242" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> Theme <span class="pp">|</span> Chapters <span class="pp">|</span> What students learn <span class="pp">|</span></span>
+<span id="cb4-243"><a href="#cb4-243" aria-hidden="true" tabindex="-1"></a><span class="pp">|---|---:|---|</span></span>
+<span id="cb4-244"><a href="#cb4-244" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> finite structures <span class="pp">|</span> 1--3 <span class="pp">|</span> tokens, vocabularies, documents, indexing <span class="pp">|</span></span>
+<span id="cb4-245"><a href="#cb4-245" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> probability <span class="pp">|</span> 4--6, 17--21 <span class="pp">|</span> likelihood, entropy, language modeling, calibration <span class="pp">|</span></span>
+<span id="cb4-246"><a href="#cb4-246" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> linear algebra <span class="pp">|</span> 3, 7--9, 13--16 <span class="pp">|</span> matrices, similarity, SVD, embeddings, attention <span class="pp">|</span></span>
+<span id="cb4-247"><a href="#cb4-247" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> optimization <span class="pp">|</span> 10--12, 18, 22 <span class="pp">|</span> losses, gradients, SGD, AdamW, clipping, regularization <span class="pp">|</span></span>
+<span id="cb4-248"><a href="#cb4-248" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> geometry <span class="pp">|</span> 8--9, 16, 24 <span class="pp">|</span> distances, neighborhoods, directions, intrinsic structure <span class="pp">|</span></span>
+<span id="cb4-249"><a href="#cb4-249" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> graphs <span class="pp">|</span> 19, 23 <span class="pp">|</span> co-occurrence graphs, knowledge graphs, random walks, message passing <span class="pp">|</span></span>
+<span id="cb4-250"><a href="#cb4-250" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> evaluation <span class="pp">|</span> 20, 25 <span class="pp">|</span> metrics, uncertainty, subgroup analysis, audits <span class="pp">|</span></span>
+<span id="cb4-251"><a href="#cb4-251" aria-hidden="true" tabindex="-1"></a><span class="pp">|</span> responsibility <span class="pp">|</span> 20, 25 <span class="pp">|</span> fairness, bias, factuality, privacy, human impact <span class="pp">|</span></span>
+<span id="cb4-252"><a href="#cb4-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-253"><a href="#cb4-253" aria-hidden="true" tabindex="-1"></a><span class="fu">## Suggested study questions</span></span>
+<span id="cb4-254"><a href="#cb4-254" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-255"><a href="#cb4-255" aria-hidden="true" tabindex="-1"></a>Students should return to these questions throughout the course:</span>
+<span id="cb4-256"><a href="#cb4-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-257"><a href="#cb4-257" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>What is the sample space?</span>
+<span id="cb4-258"><a href="#cb4-258" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>What information is preserved by the representation?</span>
+<span id="cb4-259"><a href="#cb4-259" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>What information is lost?</span>
+<span id="cb4-260"><a href="#cb4-260" aria-hidden="true" tabindex="-1"></a><span class="ss">4. </span>What probability distribution is being estimated or optimized?</span>
+<span id="cb4-261"><a href="#cb4-261" aria-hidden="true" tabindex="-1"></a><span class="ss">5. </span>What geometry does the representation create?</span>
+<span id="cb4-262"><a href="#cb4-262" aria-hidden="true" tabindex="-1"></a><span class="ss">6. </span>What loss function defines success during training?</span>
+<span id="cb4-263"><a href="#cb4-263" aria-hidden="true" tabindex="-1"></a><span class="ss">7. </span>What metric defines success during evaluation?</span>
+<span id="cb4-264"><a href="#cb4-264" aria-hidden="true" tabindex="-1"></a><span class="ss">8. </span>What kinds of examples are likely to fail?</span>
+<span id="cb4-265"><a href="#cb4-265" aria-hidden="true" tabindex="-1"></a><span class="ss">9. </span>Who is affected by the errors?</span>
+<span id="cb4-266"><a href="#cb4-266" aria-hidden="true" tabindex="-1"></a><span class="ss">10. </span>What evidence supports the final conclusion?</span>
+<span id="cb4-267"><a href="#cb4-267" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-268"><a href="#cb4-268" aria-hidden="true" tabindex="-1"></a>These questions help connect early chapters on tokens and vectors with later chapters on transformers, retrieval, and responsible AI.</span>
+<span id="cb4-269"><a href="#cb4-269" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-270"><a href="#cb4-270" aria-hidden="true" tabindex="-1"></a><span class="fu">## A first example: language as counting and prediction</span></span>
+<span id="cb4-271"><a href="#cb4-271" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-272"><a href="#cb4-272" aria-hidden="true" tabindex="-1"></a>Consider a tiny corpus:</span>
+<span id="cb4-273"><a href="#cb4-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-274"><a href="#cb4-274" aria-hidden="true" tabindex="-1"></a><span class="in">```text</span></span>
+<span id="cb4-275"><a href="#cb4-275" aria-hidden="true" tabindex="-1"></a><span class="in">language models learn from text</span></span>
+<span id="cb4-276"><a href="#cb4-276" aria-hidden="true" tabindex="-1"></a><span class="in">language models predict text</span></span>
+<span id="cb4-277"><a href="#cb4-277" aria-hidden="true" tabindex="-1"></a><span class="in">retrieval systems use text</span></span>
+<span id="cb4-278"><a href="#cb4-278" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb4-279"><a href="#cb4-279" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-280"><a href="#cb4-280" aria-hidden="true" tabindex="-1"></a>From this corpus, we can construct a vocabulary</span>
+<span id="cb4-281"><a href="#cb4-281" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-282"><a href="#cb4-282" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-283"><a href="#cb4-283" aria-hidden="true" tabindex="-1"></a>V = <span class="sc">\{</span>\text{from}, \text{language}, \text{learn}, \text{models}, \text{predict}, \text{retrieval}, \text{systems}, \text{text}, \text{use}<span class="sc">\}</span>.</span>
+<span id="cb4-284"><a href="#cb4-284" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-285"><a href="#cb4-285" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-286"><a href="#cb4-286" aria-hidden="true" tabindex="-1"></a>Each document can be represented as a vector in $\mathbb R^{|V|}$. A language model can estimate probabilities such as</span>
+<span id="cb4-287"><a href="#cb4-287" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-288"><a href="#cb4-288" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-289"><a href="#cb4-289" aria-hidden="true" tabindex="-1"></a>p(\text{text} \mid \text{predict}).</span>
+<span id="cb4-290"><a href="#cb4-290" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb4-291"><a href="#cb4-291" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-292"><a href="#cb4-292" aria-hidden="true" tabindex="-1"></a>A retrieval system can compare a query vector with document vectors. A neural model can learn dense embeddings for the same tokens. An attention model can compute which earlier words influence a later prediction.</span>
+<span id="cb4-293"><a href="#cb4-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-294"><a href="#cb4-294" aria-hidden="true" tabindex="-1"></a>Thus a simple corpus already contains the central mathematical objects of the book: sets, vectors, matrices, probabilities, optimization problems, and evaluation criteria.</span>
+<span id="cb4-295"><a href="#cb4-295" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-296"><a href="#cb4-296" aria-hidden="true" tabindex="-1"></a><span class="fu">## What this book is not</span></span>
+<span id="cb4-297"><a href="#cb4-297" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-298"><a href="#cb4-298" aria-hidden="true" tabindex="-1"></a>This book is not a catalog of every NLP library or a survey of every current model. Modern NLP changes quickly, and software APIs change even faster. Instead, this book focuses on durable mathematical principles. Students who understand these principles will be better prepared to learn new architectures, evaluate new systems, and use future tools responsibly.</span>
+<span id="cb4-299"><a href="#cb4-299" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-300"><a href="#cb4-300" aria-hidden="true" tabindex="-1"></a><span class="fu">## Final perspective</span></span>
+<span id="cb4-301"><a href="#cb4-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-302"><a href="#cb4-302" aria-hidden="true" tabindex="-1"></a>Natural language is human, contextual, and social. Mathematical models of language are useful because they simplify language into structures that can be computed with. But every simplification has consequences. A responsible mathematical approach therefore asks both technical and critical questions:</span>
+<span id="cb4-303"><a href="#cb4-303" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-304"><a href="#cb4-304" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>What is the model?</span>
+<span id="cb4-305"><a href="#cb4-305" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>What does the model optimize?</span>
+<span id="cb4-306"><a href="#cb4-306" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>What does the model ignore?</span>
+<span id="cb4-307"><a href="#cb4-307" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>How do we know whether it works?</span>
+<span id="cb4-308"><a href="#cb4-308" aria-hidden="true" tabindex="-1"></a><span class="ss">- </span>What happens when it fails?</span>
+<span id="cb4-309"><a href="#cb4-309" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-310"><a href="#cb4-310" aria-hidden="true" tabindex="-1"></a>The purpose of this book is to give students the mathematical and computational tools to answer these questions carefully.</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

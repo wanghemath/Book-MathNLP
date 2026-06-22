@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>36&nbsp; References and Further Reading – Mathematical Foundations of Natural Language Processing</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./python-reference.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-5ccb035bea26c1e21f80f44cf7c27909.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script>
+(function() {
+  if (window.Plotly || document.querySelector('script[data-local-plotly="true"]')) return;
+  var script = document.createElement('script');
+  var inChapters = window.location.pathname.indexOf('/chapters/') !== -1;
+  script.src = (inChapters ? '../' : '') + 'assets/plotly.min.js';
+  script.async = true;
+  script.setAttribute('data-local-plotly', 'true');
+  document.head.appendChild(script);
+})();
+</script>
+
+
+<link rel="stylesheet" href="styles.scss">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./references.html"><span class="chapter-number">36</span>&nbsp; <span class="chapter-title">References and Further Reading</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">Mathematical Foundations of Natural Language Processing</a> 
+        <div class="sidebar-tools-main">
+    <a href="https://github.com/wanghemath/Book-NLP-Math" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Mathematical Foundations of Natural Language Processing</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./introduction.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Introduction</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./roadmap.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Learning Roadmap</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./notation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Notation and Core Notions</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./math-background.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Mathematical Background</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part I. Language as Data</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-01-what-is-nlp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">What Is Natural Language Processing?</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-02-text-tokens-vocabularies.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Text, Tokens, and Vocabularies</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-03-documents-as-vectors.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Documents as Vectors</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part II. Probability Models for Language</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-04-probability-and-language.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Probability and Language</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-05-ngram-language-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">N-Gram Language Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-06-naive-bayes-text-classification.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Naive Bayes and Text Classification</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part III. Linear Algebra of Language</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-07-vector-space-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Vector Space Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-08-word-embeddings.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Word Embeddings</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-09-geometry-of-embeddings.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Geometry of Embedding Spaces</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part IV. Neural Networks for Sequences</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-10-neural-networks-for-text.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Neural Networks for Text</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-11-recurrent-neural-networks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">16</span>&nbsp; <span class="chapter-title">Recurrent Neural Networks</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-12-lstm-gru-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">17</span>&nbsp; <span class="chapter-title">LSTM and GRU Models</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part V. Attention and Transformers</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-13-attention-mechanisms.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">18</span>&nbsp; <span class="chapter-title">Attention Mechanisms</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-14-self-attention.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">19</span>&nbsp; <span class="chapter-title">Self-Attention</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-15-transformers.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">20</span>&nbsp; <span class="chapter-title">The Transformer Architecture</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-16-positional-encoding.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">21</span>&nbsp; <span class="chapter-title">Positional Encoding and Sequence Geometry</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part VI. Large Language Models and Retrieval</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-6" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-6" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-17-autoregressive-language-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">22</span>&nbsp; <span class="chapter-title">Autoregressive Language Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-18-training-large-language-models.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">23</span>&nbsp; <span class="chapter-title">Training Large Language Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-19-embeddings-retrieval-rag.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">24</span>&nbsp; <span class="chapter-title">Chapter 19. Embeddings, Retrieval, and RAG</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-20-evaluation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">25</span>&nbsp; <span class="chapter-title">Chapter 20. Evaluation of Language Models</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true">
+ <span class="menu-text">Part VII. Advanced Mathematical Perspectives</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-7" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-7" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-21-information-theory.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">26</span>&nbsp; <span class="chapter-title">Chapter 21. Information Theory and Language</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-22-optimization-for-nlp.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">27</span>&nbsp; <span class="chapter-title">Optimization for NLP</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-23-graphs-and-language.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">28</span>&nbsp; <span class="chapter-title">Graphs and Language</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-24-topology-geometry-language.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">29</span>&nbsp; <span class="chapter-title">Topology and Geometry of Language Representations</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./chapters/chapter-25-ethics-bias-responsibility.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">30</span>&nbsp; <span class="chapter-title">Ethics, Bias, and Mathematical Responsibility</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./labs-summary.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">31</span>&nbsp; <span class="chapter-title">Computer Labs</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./interactive-htmls.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">32</span>&nbsp; <span class="chapter-title">Interactive HTML Modules</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./interactive-diagnostics.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">33</span>&nbsp; <span class="chapter-title">Interactive Diagnostics</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./final-projects.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">34</span>&nbsp; <span class="chapter-title">Final Projects</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./python-reference.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">35</span>&nbsp; <span class="chapter-title">Python Reference</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./references.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">36</span>&nbsp; <span class="chapter-title">References and Further Reading</span></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#core-nlp-references" id="toc-core-nlp-references" class="nav-link active" data-scroll-target="#core-nlp-references"><span class="header-section-number">36.1</span> Core NLP references</a></li>
+  <li><a href="#probability-and-information-theory" id="toc-probability-and-information-theory" class="nav-link" data-scroll-target="#probability-and-information-theory"><span class="header-section-number">36.2</span> Probability and information theory</a></li>
+  <li><a href="#vector-spaces-retrieval-and-document-geometry" id="toc-vector-spaces-retrieval-and-document-geometry" class="nav-link" data-scroll-target="#vector-spaces-retrieval-and-document-geometry"><span class="header-section-number">36.3</span> Vector spaces, retrieval, and document geometry</a></li>
+  <li><a href="#tokenization-and-word-embeddings" id="toc-tokenization-and-word-embeddings" class="nav-link" data-scroll-target="#tokenization-and-word-embeddings"><span class="header-section-number">36.4</span> Tokenization and word embeddings</a></li>
+  <li><a href="#sequence-models-attention-and-transformers" id="toc-sequence-models-attention-and-transformers" class="nav-link" data-scroll-target="#sequence-models-attention-and-transformers"><span class="header-section-number">36.5</span> Sequence models, attention, and transformers</a></li>
+  <li><a href="#retrieval-augmented-generation-and-semantic-search" id="toc-retrieval-augmented-generation-and-semantic-search" class="nav-link" data-scroll-target="#retrieval-augmented-generation-and-semantic-search"><span class="header-section-number">36.6</span> Retrieval-augmented generation and semantic search</a></li>
+  <li><a href="#optimization-and-training" id="toc-optimization-and-training" class="nav-link" data-scroll-target="#optimization-and-training"><span class="header-section-number">36.7</span> Optimization and training</a></li>
+  <li><a href="#evaluation-and-calibration" id="toc-evaluation-and-calibration" class="nav-link" data-scroll-target="#evaluation-and-calibration"><span class="header-section-number">36.8</span> Evaluation and calibration</a></li>
+  <li><a href="#graphs-and-topology" id="toc-graphs-and-topology" class="nav-link" data-scroll-target="#graphs-and-topology"><span class="header-section-number">36.9</span> Graphs and topology</a></li>
+  <li><a href="#ethics-bias-and-responsibility" id="toc-ethics-bias-and-responsibility" class="nav-link" data-scroll-target="#ethics-bias-and-responsibility"><span class="header-section-number">36.10</span> Ethics, bias, and responsibility</a></li>
+  <li><a href="#bibliography" id="toc-bibliography" class="nav-link" data-scroll-target="#bibliography"><span class="header-section-number">36.11</span> Bibliography</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span class="chapter-number">36</span>&nbsp; <span class="chapter-title">References and Further Reading</span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This page collects the main references used throughout <em>Mathematical Foundations of Natural Language Processing</em>. The list is intentionally broad: it includes classical NLP, probability and information theory, linear algebra and retrieval, neural language models, attention and transformers, retrieval-augmented generation, evaluation, optimization, graph methods, topology, and responsible NLP.</p>
+<section id="core-nlp-references" class="level2" data-number="36.1">
+<h2 data-number="36.1" class="anchored" data-anchor-id="core-nlp-references"><span class="header-section-number">36.1</span> Core NLP references</h2>
+<p>For a broad introduction to natural language processing, the most useful starting points are the classical statistical treatment of Manning and Schuetze, the modern textbook by Jurafsky and Martin, the mathematically clear introduction by Eisenstein, and the neural NLP text by Goldberg <span class="citation" data-cites="manning_schuetze_1999 jurafsky_martin_slp3 eisenstein_2019 goldberg_2017">(<a href="#ref-manning_schuetze_1999" role="doc-biblioref">Manning and Schuetze 1999</a>; <a href="#ref-jurafsky_martin_slp3" role="doc-biblioref">Jurafsky and Martin 2024</a>; <a href="#ref-eisenstein_2019" role="doc-biblioref">Eisenstein 2019</a>; <a href="#ref-goldberg_2017" role="doc-biblioref">Goldberg 2017</a>)</span>.</p>
+</section>
+<section id="probability-and-information-theory" class="level2" data-number="36.2">
+<h2 data-number="36.2" class="anchored" data-anchor-id="probability-and-information-theory"><span class="header-section-number">36.2</span> Probability and information theory</h2>
+<p>The probability, likelihood, entropy, cross-entropy, KL divergence, and perplexity ideas used throughout the book are rooted in Shannon’s communication theory and standard information-theory treatments <span class="citation" data-cites="shannon_1948 cover_thomas_2006 mackay_2003">(<a href="#ref-shannon_1948" role="doc-biblioref">Shannon 1948</a>; <a href="#ref-cover_thomas_2006" role="doc-biblioref">Cover and Thomas 2006</a>; <a href="#ref-mackay_2003" role="doc-biblioref">MacKay 2003</a>)</span>. For probabilistic modeling and statistical learning background, see Bishop, Murphy, and Hastie–Tibshirani–Friedman <span class="citation" data-cites="bishop_prml_2006 murphy_probabilistic_2022 hastie_tibshirani_friedman_2009">(<a href="#ref-bishop_prml_2006" role="doc-biblioref">Bishop 2006a</a>; <a href="#ref-murphy_probabilistic_2022" role="doc-biblioref">Murphy 2022</a>; <a href="#ref-hastie_tibshirani_friedman_2009" role="doc-biblioref">Hastie et al. 2009</a>)</span>.</p>
+</section>
+<section id="vector-spaces-retrieval-and-document-geometry" class="level2" data-number="36.3">
+<h2 data-number="36.3" class="anchored" data-anchor-id="vector-spaces-retrieval-and-document-geometry"><span class="header-section-number">36.3</span> Vector spaces, retrieval, and document geometry</h2>
+<p>The document-vector view of language connects vector-space indexing, latent semantic analysis, and probabilistic retrieval <span class="citation" data-cites="salton_wong_yang_1975 deerwester_lsa_1990 landauer_dumais_1997 robertson_zaragoza_2009 manning_ir_2008">(<a href="#ref-salton_wong_yang_1975" role="doc-biblioref">Salton et al. 1975</a>; <a href="#ref-deerwester_lsa_1990" role="doc-biblioref">Deerwester et al. 1990</a>; <a href="#ref-landauer_dumais_1997" role="doc-biblioref">Landauer and Dumais 1997</a>; <a href="#ref-robertson_zaragoza_2009" role="doc-biblioref">Robertson and Zaragoza 2009</a>; <a href="#ref-manning_ir_2008" role="doc-biblioref">Manning et al. 2008</a>)</span>. These sources support the chapters on document-term matrices, TF-IDF, cosine similarity, low-rank approximation, and retrieval.</p>
+</section>
+<section id="tokenization-and-word-embeddings" class="level2" data-number="36.4">
+<h2 data-number="36.4" class="anchored" data-anchor-id="tokenization-and-word-embeddings"><span class="header-section-number">36.4</span> Tokenization and word embeddings</h2>
+<p>Subword tokenization is central to modern NLP systems <span class="citation" data-cites="sennrich_bpe_2016 kudo_sentencepiece_2018">(<a href="#ref-sennrich_bpe_2016" role="doc-biblioref">Sennrich et al. 2016</a>; <a href="#ref-kudo_sentencepiece_2018" role="doc-biblioref">Kudo and Richardson 2018</a>)</span>. Word representations connect neural prediction, matrix factorization, and distributional semantics <span class="citation" data-cites="bengio_neural_2003 mikolov_word2vec_2013 mikolov_distributed_2013 pennington_glove_2014 levy_neural_2014">(<a href="#ref-bengio_neural_2003" role="doc-biblioref">Bengio et al. 2003</a>; <a href="#ref-mikolov_word2vec_2013" role="doc-biblioref">Mikolov, Chen, et al. 2013</a>; <a href="#ref-mikolov_distributed_2013" role="doc-biblioref">Mikolov, Sutskever, et al. 2013</a>; <a href="#ref-pennington_glove_2014" role="doc-biblioref">Pennington et al. 2014</a>; <a href="#ref-levy_neural_2014" role="doc-biblioref">Levy and Goldberg 2014</a>)</span>.</p>
+</section>
+<section id="sequence-models-attention-and-transformers" class="level2" data-number="36.5">
+<h2 data-number="36.5" class="anchored" data-anchor-id="sequence-models-attention-and-transformers"><span class="header-section-number">36.5</span> Sequence models, attention, and transformers</h2>
+<p>The sequence-modeling arc begins with recurrent networks, LSTM/GRU memory mechanisms, and attention-based encoder-decoder models <span class="citation" data-cites="elman_1990 hochreiter_lstm_1997 cho_gru_2014 bahdanau_attention_2015 luong_attention_2015">(<a href="#ref-elman_1990" role="doc-biblioref">Elman 1990</a>; <a href="#ref-hochreiter_lstm_1997" role="doc-biblioref">Hochreiter and Schmidhuber 1997</a>; <a href="#ref-cho_gru_2014" role="doc-biblioref">Cho et al. 2014</a>; <a href="#ref-bahdanau_attention_2015" role="doc-biblioref">Bahdanau et al. 2015</a>; <a href="#ref-luong_attention_2015" role="doc-biblioref">Luong et al. 2015</a>)</span>. Transformers and large language models build on self-attention, positional structure, pretraining, scaling, and instruction tuning <span class="citation" data-cites="vaswani_attention_2017 devlin_bert_2019 radford_gpt2_2019 brown_gpt3_2020 kaplan_scaling_2020 ouyang_instructgpt_2022">(<a href="#ref-vaswani_attention_2017" role="doc-biblioref">Vaswani et al. 2017</a>; <a href="#ref-devlin_bert_2019" role="doc-biblioref">Devlin et al. 2019</a>; <a href="#ref-radford_gpt2_2019" role="doc-biblioref">Radford et al. 2019</a>; <a href="#ref-brown_gpt3_2020" role="doc-biblioref"><span class="nocase">Brown et al.</span> 2020</a>; <a href="#ref-kaplan_scaling_2020" role="doc-biblioref">Kaplan et al. 2020</a>; <a href="#ref-ouyang_instructgpt_2022" role="doc-biblioref"><span class="nocase">Ouyang et al.</span> 2022a</a>)</span>.</p>
+</section>
+<section id="retrieval-augmented-generation-and-semantic-search" class="level2" data-number="36.6">
+<h2 data-number="36.6" class="anchored" data-anchor-id="retrieval-augmented-generation-and-semantic-search"><span class="header-section-number">36.6</span> Retrieval-augmented generation and semantic search</h2>
+<p>The retrieval and RAG chapters use ideas from sentence embeddings, dense retrieval, late interaction, large-scale similarity search, and retrieval-augmented generation <span class="citation" data-cites="reimers_sentencebert_2019 karpukhin_dpr_2020 khattab_colbert_2020 johnson_faiss_2019 lewis_rag_2020">(<a href="#ref-reimers_sentencebert_2019" role="doc-biblioref">Reimers and Gurevych 2019</a>; <a href="#ref-karpukhin_dpr_2020" role="doc-biblioref">Karpukhin et al. 2020</a>; <a href="#ref-khattab_colbert_2020" role="doc-biblioref">Khattab and Zaharia 2020</a>; <a href="#ref-johnson_faiss_2019" role="doc-biblioref">Johnson et al. 2019</a>; <a href="#ref-lewis_rag_2020" role="doc-biblioref"><span class="nocase">Lewis et al.</span> 2020</a>)</span>.</p>
+</section>
+<section id="optimization-and-training" class="level2" data-number="36.7">
+<h2 data-number="36.7" class="anchored" data-anchor-id="optimization-and-training"><span class="header-section-number">36.7</span> Optimization and training</h2>
+<p>Gradient-based training, stochastic optimization, recurrent-gradient pathologies, Adam, AdamW, and preference-based fine-tuning are supported by the following sources <span class="citation" data-cites="goodfellow_deep_learning_2016 boyd_vandenberghe_2004 pascanu_gradient_2013 kingma_adam_2015 loshchilov_adamw_2019 christiano_preferences_2017 rafailov_dpo_2023">(<a href="#ref-goodfellow_deep_learning_2016" role="doc-biblioref">Goodfellow et al. 2016a</a>; <a href="#ref-boyd_vandenberghe_2004" role="doc-biblioref">Boyd and Vandenberghe 2004</a>; <a href="#ref-pascanu_gradient_2013" role="doc-biblioref">Pascanu et al. 2013</a>; <a href="#ref-kingma_adam_2015" role="doc-biblioref">Kingma and Ba 2015a</a>; <a href="#ref-loshchilov_adamw_2019" role="doc-biblioref">Loshchilov and Hutter 2019a</a>; <a href="#ref-christiano_preferences_2017" role="doc-biblioref">Christiano et al. 2017</a>; <a href="#ref-rafailov_dpo_2023" role="doc-biblioref">Rafailov et al. 2023a</a>)</span>.</p>
+</section>
+<section id="evaluation-and-calibration" class="level2" data-number="36.8">
+<h2 data-number="36.8" class="anchored" data-anchor-id="evaluation-and-calibration"><span class="header-section-number">36.8</span> Evaluation and calibration</h2>
+<p>The evaluation chapter uses classical overlap metrics, probabilistic scoring, calibration diagnostics, and modern model comparison ideas <span class="citation" data-cites="papineni_bleu_2002 lin_rouge_2004 brier_1950 guo_calibration_2017">(<a href="#ref-papineni_bleu_2002" role="doc-biblioref">Papineni et al. 2002</a>; <a href="#ref-lin_rouge_2004" role="doc-biblioref">Lin 2004</a>; <a href="#ref-brier_1950" role="doc-biblioref">Brier 1950</a>; <a href="#ref-guo_calibration_2017" role="doc-biblioref">Guo et al. 2017</a>)</span>. These references are not a substitute for task-specific human evaluation, but they provide a mathematical starting point.</p>
+</section>
+<section id="graphs-and-topology" class="level2" data-number="36.9">
+<h2 data-number="36.9" class="anchored" data-anchor-id="graphs-and-topology"><span class="header-section-number">36.9</span> Graphs and topology</h2>
+<p>Graph-based language models, PageRank, graph neural networks, and graph attention are connected to matrix operators on graphs <span class="citation" data-cites="page_pagerank_1999 kipf_gcn_2017 hamilton_graphsage_2017 velickovic_gat_2018">(<a href="#ref-page_pagerank_1999" role="doc-biblioref">Page et al. 1999</a>; <a href="#ref-kipf_gcn_2017" role="doc-biblioref">Kipf and Welling 2017a</a>; <a href="#ref-hamilton_graphsage_2017" role="doc-biblioref">Hamilton et al. 2017</a>; <a href="#ref-velickovic_gat_2018" role="doc-biblioref">Velickovic et al. 2018</a>)</span>. The topological viewpoint uses computational topology, persistent homology, and Mapper-style summaries <span class="citation" data-cites="edelsbrunner_harer_2010 carlsson_topology_2009 ghrist_barcodes_2008 singh_mapper_2007">(<a href="#ref-edelsbrunner_harer_2010" role="doc-biblioref">Edelsbrunner and Harer 2010</a>; <a href="#ref-carlsson_topology_2009" role="doc-biblioref">Carlsson 2009</a>; <a href="#ref-ghrist_barcodes_2008" role="doc-biblioref">Ghrist 2008</a>; <a href="#ref-singh_mapper_2007" role="doc-biblioref">Singh et al. 2007</a>)</span>.</p>
+</section>
+<section id="ethics-bias-and-responsibility" class="level2" data-number="36.10">
+<h2 data-number="36.10" class="anchored" data-anchor-id="ethics-bias-and-responsibility"><span class="header-section-number">36.10</span> Ethics, bias, and responsibility</h2>
+<p>The final chapter connects technical NLP modeling with fairness, bias measurement, documentation, and responsible deployment <span class="citation" data-cites="barocas_fairness_2019 dwork_fairness_2012 hardt_equality_2016 bolukbasi_debiasing_2016 caliskan_semantics_2017 blodgett_bias_2020 bender_stochastic_2021 gebru_datasheets_2021 mitchell_modelcards_2019">(<a href="#ref-barocas_fairness_2019" role="doc-biblioref">Barocas et al. 2019a</a>; <a href="#ref-dwork_fairness_2012" role="doc-biblioref">Dwork et al. 2012</a>; <a href="#ref-hardt_equality_2016" role="doc-biblioref">Hardt et al. 2016a</a>; <a href="#ref-bolukbasi_debiasing_2016" role="doc-biblioref">Bolukbasi, Chang, Zou, Saligrama, and Adam T. Kalai 2016</a>; <a href="#ref-caliskan_semantics_2017" role="doc-biblioref">Caliskan et al. 2017</a>; <a href="#ref-blodgett_bias_2020" role="doc-biblioref">Blodgett et al. 2020</a>; <a href="#ref-bender_stochastic_2021" role="doc-biblioref">Bender et al. 2021a</a>; <a href="#ref-gebru_datasheets_2021" role="doc-biblioref">Gebru et al. 2021</a>; <a href="#ref-mitchell_modelcards_2019" role="doc-biblioref">Mitchell et al. 2019</a>)</span>.</p>
+</section>
+<section id="bibliography" class="level2" data-number="36.11">
+<h2 data-number="36.11" class="anchored" data-anchor-id="bibliography"><span class="header-section-number">36.11</span> Bibliography</h2>
+<div id="refs" class="references csl-bib-body hanging-indent" role="list">
+<div id="ref-bahdanau_attention_2015" class="csl-entry" role="listitem">
+Bahdanau, Dzmitry, Kyunghyun Cho, and Yoshua Bengio. 2015. <span>“Neural Machine Translation by Jointly Learning to Align and Translate.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-barocas_fairness_2019" class="csl-entry" role="listitem">
+Barocas, Solon, Moritz Hardt, and Arvind Narayanan. 2019a. <em>Fairness and Machine Learning: Limitations and Opportunities</em>. Fairmlbook.org.
+</div>
+<div id="ref-barocas_hardt_narayanan_2019" class="csl-entry" role="listitem">
+Barocas, Solon, Moritz Hardt, and Arvind Narayanan. 2019b. <em>Fairness and Machine Learning: Limitations and Opportunities</em>. Fairmlbook.org.
+</div>
+<div id="ref-bender_stochastic_2021" class="csl-entry" role="listitem">
+Bender, Emily M., Timnit Gebru, Angelina McMillan-Major, and Shmargaret Shmitchell. 2021a. <span>“On the Dangers of Stochastic Parrots: Can Language Models Be Too Big?”</span> <em>Proceedings of FAccT</em>, 610–23.
+</div>
+<div id="ref-bender_stochastic_parrots_2021" class="csl-entry" role="listitem">
+Bender, Emily M., Timnit Gebru, Angelina McMillan-Major, and Shmargaret Shmitchell. 2021b. <span>“On the Dangers of Stochastic Parrots: Can Language Models Be Too Big?”</span> <em>Proceedings of FAccT</em>, 610–23.
+</div>
+<div id="ref-bengio_neural_2003" class="csl-entry" role="listitem">
+Bengio, Yoshua, Rejean Ducharme, Pascal Vincent, and Christian Janvin. 2003. <span>“A Neural Probabilistic Language Model.”</span> <em>Journal of Machine Learning Research</em> 3: 1137–55.
+</div>
+<div id="ref-bishop_prml_2006" class="csl-entry" role="listitem">
+Bishop, Christopher M. 2006a. <em>Pattern Recognition and Machine Learning</em>. Springer.
+</div>
+<div id="ref-bishop_2006" class="csl-entry" role="listitem">
+Bishop, Christopher M. 2006b. <em>Pattern Recognition and Machine Learning</em>. Springer.
+</div>
+<div id="ref-blodgett_bias_2020" class="csl-entry" role="listitem">
+Blodgett, Su Lin, Solon Barocas, Hal Daume III, and Hanna Wallach. 2020. <span>“Language (Technology) Is Power: A Critical Survey of Bias in NLP.”</span> <em>Proceedings of ACL</em>, 5454–76.
+</div>
+<div id="ref-bolukbasi_debiasing_2016" class="csl-entry" role="listitem">
+Bolukbasi, Tolga, Kai-Wei Chang, James Y. Zou, Venkatesh Saligrama, and Adam T. Kalai. 2016. <span>“Man Is to Computer Programmer as Woman Is to Homemaker? Debiasing Word Embeddings.”</span> <em>Advances in Neural Information Processing Systems</em> 29.
+</div>
+<div id="ref-bolukbasi_man_is_2016" class="csl-entry" role="listitem">
+Bolukbasi, Tolga, Kai-Wei Chang, James Y. Zou, Venkatesh Saligrama, and Adam Tauman Kalai. 2016. <span>“Man Is to Computer Programmer as Woman Is to Homemaker? Debiasing Word Embeddings.”</span> <em>Advances in Neural Information Processing Systems</em> 29.
+</div>
+<div id="ref-boyd_vandenberghe_2004" class="csl-entry" role="listitem">
+Boyd, Stephen, and Lieven Vandenberghe. 2004. <em>Convex Optimization</em>. Cambridge University Press.
+</div>
+<div id="ref-brier_1950" class="csl-entry" role="listitem">
+Brier, Glenn W. 1950. <span>“Verification of Forecasts Expressed in Terms of Probability.”</span> <em>Monthly Weather Review</em> 78 (1): 1–3.
+</div>
+<div id="ref-brin_page_1998" class="csl-entry" role="listitem">
+Brin, Sergey, and Lawrence Page. 1998. <span>“The Anatomy of a Large-Scale Hypertextual Web Search Engine.”</span> <em>Computer Networks and ISDN Systems</em> 30 (1–7): 107–17.
+</div>
+<div id="ref-brown_gpt3_2020" class="csl-entry" role="listitem">
+<span class="nocase">Brown, Tom B., Benjamin Mann, Nick Ryder, et al.</span> 2020. <span>“Language Models Are Few-Shot Learners.”</span> <em>Advances in Neural Information Processing Systems</em> 33: 1877–901.
+</div>
+<div id="ref-buolamwini_gebru_2018" class="csl-entry" role="listitem">
+Buolamwini, Joy, and Timnit Gebru. 2018. <span>“Gender Shades: Intersectional Accuracy Disparities in Commercial Gender Classification.”</span> <em>Proceedings of the Conference on Fairness, Accountability and Transparency</em>, Proceedings of machine learning research, vol. 81: 77–91.
+</div>
+<div id="ref-caliskan_semantics_2017" class="csl-entry" role="listitem">
+Caliskan, Aylin, Joanna J. Bryson, and Arvind Narayanan. 2017. <span>“Semantics Derived Automatically from Language Corpora Contain Human-Like Biases.”</span> <em>Science</em> 356 (6334): 183–86.
+</div>
+<div id="ref-carlsson_topology_2009" class="csl-entry" role="listitem">
+Carlsson, Gunnar. 2009. <span>“Topology and Data.”</span> <em>Bulletin of the American Mathematical Society</em> 46 (2): 255–308.
+</div>
+<div id="ref-cho_gru_2014" class="csl-entry" role="listitem">
+Cho, Kyunghyun, Bart van Merrienboer, Caglar Gulcehre, et al. 2014. <span>“Learning Phrase Representations Using RNN Encoder-Decoder for Statistical Machine Translation.”</span> <em>Proceedings of EMNLP</em>, 1724–34.
+</div>
+<div id="ref-christiano_preferences_2017" class="csl-entry" role="listitem">
+Christiano, Paul F., Jan Leike, Tom B. Brown, Miljan Martic, Shane Legg, and Dario Amodei. 2017. <span>“Deep Reinforcement Learning from Human Preferences.”</span> <em>Advances in Neural Information Processing Systems</em> 30.
+</div>
+<div id="ref-chung_spectral_graph_1997" class="csl-entry" role="listitem">
+Chung, Fan R. K. 1997. <em>Spectral Graph Theory</em>. Vol. 92. CBMS Regional Conference Series in Mathematics. American Mathematical Society.
+</div>
+<div id="ref-collobert_nlp_2011" class="csl-entry" role="listitem">
+Collobert, Ronan, Jason Weston, Leon Bottou, Michael Karlen, Koray Kavukcuoglu, and Pavel Kuksa. 2011. <span>“Natural Language Processing Almost from Scratch.”</span> <em>Journal of Machine Learning Research</em> 12: 2493–537.
+</div>
+<div id="ref-cover_thomas_2006" class="csl-entry" role="listitem">
+Cover, Thomas M., and Joy A. Thomas. 2006. <em>Elements of Information Theory</em>. 2nd ed. Wiley.
+</div>
+<div id="ref-deerwester_lsa_1990" class="csl-entry" role="listitem">
+Deerwester, Scott, Susan T. Dumais, George W. Furnas, Thomas K. Landauer, and Richard Harshman. 1990. <span>“Indexing by Latent Semantic Analysis.”</span> <em>Journal of the American Society for Information Science</em> 41 (6): 391–407.
+</div>
+<div id="ref-devlin_bert_2019" class="csl-entry" role="listitem">
+Devlin, Jacob, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. <span>“BERT: Pre-Training of Deep Bidirectional Transformers for Language Understanding.”</span> <em>Proceedings of NAACL-HLT</em>, 4171–86.
+</div>
+<div id="ref-dwork_fairness_2012" class="csl-entry" role="listitem">
+Dwork, Cynthia, Moritz Hardt, Toniann Pitassi, Omer Reingold, and Richard Zemel. 2012. <span>“Fairness Through Awareness.”</span> <em>Proceedings of ITCS</em>, 214–26.
+</div>
+<div id="ref-dwork_roth_2014" class="csl-entry" role="listitem">
+Dwork, Cynthia, and Aaron Roth. 2014. <em>The Algorithmic Foundations of Differential Privacy</em>. Foundations and Trends in Theoretical Computer Science. Now Publishers.
+</div>
+<div id="ref-edelsbrunner_harer_2010" class="csl-entry" role="listitem">
+Edelsbrunner, Herbert, and John Harer. 2010. <em>Computational Topology: An Introduction</em>. American Mathematical Society.
+</div>
+<div id="ref-eisenstein_2019" class="csl-entry" role="listitem">
+Eisenstein, Jacob. 2019. <em>Introduction to Natural Language Processing</em>. MIT Press.
+</div>
+<div id="ref-elman_1990" class="csl-entry" role="listitem">
+Elman, Jeffrey L. 1990. <span>“Finding Structure in Time.”</span> <em>Cognitive Science</em> 14 (2): 179–211.
+</div>
+<div id="ref-gebru_datasheets_2021" class="csl-entry" role="listitem">
+Gebru, Timnit, Jamie Morgenstern, Briana Vecchione, et al. 2021. <span>“Datasheets for Datasets.”</span> <em>Communications of the ACM</em> 64 (12): 86–92.
+</div>
+<div id="ref-ghrist_barcodes_2008" class="csl-entry" role="listitem">
+Ghrist, Robert. 2008. <span>“Barcodes: The Persistent Topology of Data.”</span> <em>Bulletin of the American Mathematical Society</em> 45 (1): 61–75.
+</div>
+<div id="ref-goldberg_2017" class="csl-entry" role="listitem">
+Goldberg, Yoav. 2017. <em>Neural Network Methods for Natural Language Processing</em>. Morgan; Claypool.
+</div>
+<div id="ref-goodfellow_deep_learning_2016" class="csl-entry" role="listitem">
+Goodfellow, Ian, Yoshua Bengio, and Aaron Courville. 2016a. <em>Deep Learning</em>. MIT Press.
+</div>
+<div id="ref-goodfellow_bengio_courville_2016" class="csl-entry" role="listitem">
+Goodfellow, Ian, Yoshua Bengio, and Aaron Courville. 2016b. <em>Deep Learning</em>. MIT Press.
+</div>
+<div id="ref-guo_calibration_2017" class="csl-entry" role="listitem">
+Guo, Chuan, Geoff Pleiss, Yu Sun, and Kilian Q. Weinberger. 2017. <span>“On Calibration of Modern Neural Networks.”</span> <em>Proceedings of ICML</em>, 1321–30.
+</div>
+<div id="ref-hamilton_graphsage_2017" class="csl-entry" role="listitem">
+Hamilton, William L., Rex Ying, and Jure Leskovec. 2017. <span>“Inductive Representation Learning on Large Graphs.”</span> <em>Advances in Neural Information Processing Systems</em> 30.
+</div>
+<div id="ref-hardt_equality_2016" class="csl-entry" role="listitem">
+Hardt, Moritz, Eric Price, and Nathan Srebro. 2016a. <span>“Equality of Opportunity in Supervised Learning.”</span> <em>Advances in Neural Information Processing Systems</em> 29.
+</div>
+<div id="ref-hardt_price_srebro_2016" class="csl-entry" role="listitem">
+Hardt, Moritz, Eric Price, and Nathan Srebro. 2016b. <span>“Equality of Opportunity in Supervised Learning.”</span> <em>Advances in Neural Information Processing Systems</em> 29.
+</div>
+<div id="ref-hastie_tibshirani_friedman_2009" class="csl-entry" role="listitem">
+Hastie, Trevor, Robert Tibshirani, and Jerome Friedman. 2009. <em>The Elements of Statistical Learning</em>. 2nd ed. Springer.
+</div>
+<div id="ref-hochreiter_lstm_1997" class="csl-entry" role="listitem">
+Hochreiter, Sepp, and Juergen Schmidhuber. 1997. <span>“Long Short-Term Memory.”</span> <em>Neural Computation</em> 9 (8): 1735–80.
+</div>
+<div id="ref-johnson_faiss_2019" class="csl-entry" role="listitem">
+Johnson, Jeff, Matthijs Douze, and Herve Jegou. 2019. <span>“Billion-Scale Similarity Search with GPUs.”</span> <em>IEEE Transactions on Big Data</em> 7 (3): 535–47.
+</div>
+<div id="ref-jurafsky_martin_slp3" class="csl-entry" role="listitem">
+Jurafsky, Dan, and James H. Martin. 2024. <em>Speech and Language Processing</em>. <a href="https://web.stanford.edu/~jurafsky/slp3/">https://web.stanford.edu/~jurafsky/slp3/</a>.
+</div>
+<div id="ref-kaplan_scaling_2020" class="csl-entry" role="listitem">
+Kaplan, Jared, Sam McCandlish, Tom Henighan, et al. 2020. <span>“Scaling Laws for Neural Language Models.”</span> <em>arXiv Preprint arXiv:2001.08361</em>.
+</div>
+<div id="ref-karpukhin_dpr_2020" class="csl-entry" role="listitem">
+Karpukhin, Vladimir, Barlas Oguz, Sewon Min, et al. 2020. <span>“Dense Passage Retrieval for Open-Domain Question Answering.”</span> <em>Proceedings of EMNLP</em>, 6769–81.
+</div>
+<div id="ref-khattab_colbert_2020" class="csl-entry" role="listitem">
+Khattab, Omar, and Matei Zaharia. 2020. <span>“ColBERT: Efficient and Effective Passage Search via Contextualized Late Interaction over BERT.”</span> <em>Proceedings of SIGIR</em>, 39–48.
+</div>
+<div id="ref-kingma_adam_2015" class="csl-entry" role="listitem">
+Kingma, Diederik P., and Jimmy Ba. 2015a. <span>“Adam: A Method for Stochastic Optimization.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-kingma_ba_2015" class="csl-entry" role="listitem">
+Kingma, Diederik P., and Jimmy Ba. 2015b. <span>“Adam: A Method for Stochastic Optimization.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-kipf_gcn_2017" class="csl-entry" role="listitem">
+Kipf, Thomas N., and Max Welling. 2017a. <span>“Semi-Supervised Classification with Graph Convolutional Networks.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-kipf_welling_2017" class="csl-entry" role="listitem">
+Kipf, Thomas N., and Max Welling. 2017b. <span>“Semi-Supervised Classification with Graph Convolutional Networks.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-kudo_sentencepiece_2018" class="csl-entry" role="listitem">
+Kudo, Taku, and John Richardson. 2018. <span>“SentencePiece: A Simple and Language Independent Subword Tokenizer and Detokenizer for Neural Text Processing.”</span> <em>Proceedings of EMNLP: System Demonstrations</em>, 66–71.
+</div>
+<div id="ref-landauer_dumais_1997" class="csl-entry" role="listitem">
+Landauer, Thomas K., and Susan T. Dumais. 1997. <span>“A Solution to Plato’s Problem: The Latent Semantic Analysis Theory of Acquisition, Induction, and Representation of Knowledge.”</span> <em>Psychological Review</em> 104 (2): 211–40.
+</div>
+<div id="ref-levy_neural_2014" class="csl-entry" role="listitem">
+Levy, Omer, and Yoav Goldberg. 2014. <span>“Neural Word Embedding as Implicit Matrix Factorization.”</span> <em>Advances in Neural Information Processing Systems</em> 27.
+</div>
+<div id="ref-lewis_rag_2020" class="csl-entry" role="listitem">
+<span class="nocase">Lewis, Patrick, Ethan Perez, Aleksandra Piktus, et al.</span> 2020. <span>“Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks.”</span> <em>Advances in Neural Information Processing Systems</em> 33: 9459–74.
+</div>
+<div id="ref-lin_rouge_2004" class="csl-entry" role="listitem">
+Lin, Chin-Yew. 2004. <span>“ROUGE: A Package for Automatic Evaluation of Summaries.”</span> <em>Text Summarization Branches Out</em>, 74–81.
+</div>
+<div id="ref-loshchilov_adamw_2019" class="csl-entry" role="listitem">
+Loshchilov, Ilya, and Frank Hutter. 2019a. <span>“Decoupled Weight Decay Regularization.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-loshchilov_hutter_2019" class="csl-entry" role="listitem">
+Loshchilov, Ilya, and Frank Hutter. 2019b. <span>“Decoupled Weight Decay Regularization.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-luong_attention_2015" class="csl-entry" role="listitem">
+Luong, Minh-Thang, Hieu Pham, and Christopher D. Manning. 2015. <span>“Effective Approaches to Attention-Based Neural Machine Translation.”</span> <em>Proceedings of EMNLP</em>, 1412–21.
+</div>
+<div id="ref-mackay_2003" class="csl-entry" role="listitem">
+MacKay, David J. C. 2003. <em>Information Theory, Inference, and Learning Algorithms</em>. Cambridge University Press.
+</div>
+<div id="ref-manning_ir_2008" class="csl-entry" role="listitem">
+Manning, Christopher D., Prabhakar Raghavan, and Hinrich Schuetze. 2008. <em>Introduction to Information Retrieval</em>. Cambridge University Press.
+</div>
+<div id="ref-manning_schuetze_1999" class="csl-entry" role="listitem">
+Manning, Christopher D., and Hinrich Schuetze. 1999. <em>Foundations of Statistical Natural Language Processing</em>. MIT Press.
+</div>
+<div id="ref-mikolov_word2vec_2013" class="csl-entry" role="listitem">
+Mikolov, Tomas, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. <span>“Efficient Estimation of Word Representations in Vector Space.”</span> <em>International Conference on Learning Representations Workshop</em>.
+</div>
+<div id="ref-mikolov_distributed_2013" class="csl-entry" role="listitem">
+Mikolov, Tomas, Ilya Sutskever, Kai Chen, Greg Corrado, and Jeffrey Dean. 2013. <span>“Distributed Representations of Words and Phrases and Their Compositionality.”</span> <em>Advances in Neural Information Processing Systems</em> 26.
+</div>
+<div id="ref-mitchell_modelcards_2019" class="csl-entry" role="listitem">
+Mitchell, Margaret, Simone Wu, Andrew Zaldivar, et al. 2019. <span>“Model Cards for Model Reporting.”</span> <em>Proceedings of FAccT</em>, 220–29.
+</div>
+<div id="ref-murphy_probabilistic_2022" class="csl-entry" role="listitem">
+Murphy, Kevin P. 2022. <em>Probabilistic Machine Learning: An Introduction</em>. MIT Press.
+</div>
+<div id="ref-nocedal_wright_2006" class="csl-entry" role="listitem">
+Nocedal, Jorge, and Stephen J. Wright. 2006. <em>Numerical Optimization</em>. 2nd ed. Springer.
+</div>
+<div id="ref-ouyang_instructgpt_2022" class="csl-entry" role="listitem">
+<span class="nocase">Ouyang, Long, Jeffrey Wu, Xu Jiang, et al.</span> 2022a. <span>“Training Language Models to Follow Instructions with Human Feedback.”</span> <em>Advances in Neural Information Processing Systems</em> 35: 27730–44.
+</div>
+<div id="ref-ouyang_2022_training" class="csl-entry" role="listitem">
+<span class="nocase">Ouyang, Long, Jeffrey Wu, Xu Jiang, et al.</span> 2022b. <span>“Training Language Models to Follow Instructions with Human Feedback.”</span> <em>Advances in Neural Information Processing Systems</em> 35: 27730–44.
+</div>
+<div id="ref-page_pagerank_1999" class="csl-entry" role="listitem">
+Page, Lawrence, Sergey Brin, Rajeev Motwani, and Terry Winograd. 1999. <span>“The PageRank Citation Ranking: Bringing Order to the Web.”</span> <em>Technical Report, Stanford InfoLab</em>.
+</div>
+<div id="ref-papineni_bleu_2002" class="csl-entry" role="listitem">
+Papineni, Kishore, Salim Roukos, Todd Ward, and Wei-Jing Zhu. 2002. <span>“BLEU: A Method for Automatic Evaluation of Machine Translation.”</span> <em>Proceedings of ACL</em>, 311–18.
+</div>
+<div id="ref-pascanu_gradient_2013" class="csl-entry" role="listitem">
+Pascanu, Razvan, Tomas Mikolov, and Yoshua Bengio. 2013. <span>“On the Difficulty of Training Recurrent Neural Networks.”</span> <em>Proceedings of ICML</em>, 1310–18.
+</div>
+<div id="ref-pennington_glove_2014" class="csl-entry" role="listitem">
+Pennington, Jeffrey, Richard Socher, and Christopher D. Manning. 2014. <span>“GloVe: Global Vectors for Word Representation.”</span> <em>Proceedings of EMNLP</em>, 1532–43.
+</div>
+<div id="ref-radford_gpt2_2019" class="csl-entry" role="listitem">
+Radford, Alec, Jeffrey Wu, Rewon Child, David Luan, Dario Amodei, and Ilya Sutskever. 2019. <span>“Language Models Are Unsupervised Multitask Learners.”</span> <em>OpenAI Technical Report</em>.
+</div>
+<div id="ref-rafailov_dpo_2023" class="csl-entry" role="listitem">
+Rafailov, Rafael, Archit Sharma, Eric Mitchell, Christopher D. Manning, Stefano Ermon, and Chelsea Finn. 2023a. <span>“Direct Preference Optimization: Your Language Model Is Secretly a Reward Model.”</span> <em>arXiv Preprint arXiv:2305.18290</em>.
+</div>
+<div id="ref-rafailov_2023_dpo" class="csl-entry" role="listitem">
+Rafailov, Rafael, Archit Sharma, Eric Mitchell, Christopher D. Manning, Stefano Ermon, and Chelsea Finn. 2023b. <span>“Direct Preference Optimization: Your Language Model Is Secretly a Reward Model.”</span> <em>arXiv Preprint arXiv:2305.18290</em>.
+</div>
+<div id="ref-reimers_sentencebert_2019" class="csl-entry" role="listitem">
+Reimers, Nils, and Iryna Gurevych. 2019. <span>“Sentence-BERT: Sentence Embeddings Using Siamese BERT-Networks.”</span> <em>Proceedings of EMNLP-IJCNLP</em>, 3982–92.
+</div>
+<div id="ref-robertson_zaragoza_2009" class="csl-entry" role="listitem">
+Robertson, Stephen, and Hugo Zaragoza. 2009. <span>“The Probabilistic Relevance Framework: BM25 and Beyond.”</span> <em>Foundations and Trends in Information Retrieval</em> 3 (4): 333–89.
+</div>
+<div id="ref-salton_wong_yang_1975" class="csl-entry" role="listitem">
+Salton, Gerard, Anita Wong, and Chung-Shu Yang. 1975. <span>“A Vector Space Model for Automatic Indexing.”</span> <em>Communications of the ACM</em> 18 (11): 613–20.
+</div>
+<div id="ref-sennrich_bpe_2016" class="csl-entry" role="listitem">
+Sennrich, Rico, Barry Haddow, and Alexandra Birch. 2016. <span>“Neural Machine Translation of Rare Words with Subword Units.”</span> <em>Proceedings of ACL</em>, 1715–25.
+</div>
+<div id="ref-shannon_1948" class="csl-entry" role="listitem">
+Shannon, Claude E. 1948. <span>“A Mathematical Theory of Communication.”</span> <em>Bell System Technical Journal</em> 27 (3): 379–423.
+</div>
+<div id="ref-singh_mapper_2007" class="csl-entry" role="listitem">
+Singh, Gurjeet, Facundo Memoli, and Gunnar Carlsson. 2007. <span>“Topological Methods for the Analysis of High Dimensional Data Sets and 3D Object Recognition.”</span> <em>Eurographics Symposium on Point-Based Graphics</em>, 91–100.
+</div>
+<div id="ref-vaswani_attention_2017" class="csl-entry" role="listitem">
+Vaswani, Ashish, Noam Shazeer, Niki Parmar, et al. 2017. <span>“Attention Is All You Need.”</span> <em>Advances in Neural Information Processing Systems</em> 30.
+</div>
+<div id="ref-velickovic_gat_2018" class="csl-entry" role="listitem">
+Velickovic, Petar, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro Lio, and Yoshua Bengio. 2018. <span>“Graph Attention Networks.”</span> <em>International Conference on Learning Representations</em>.
+</div>
+<div id="ref-wang_kg_embedding_2017" class="csl-entry" role="listitem">
+Wang, Quan, Zhendong Mao, Bin Wang, and Li Guo. 2017. <span>“Knowledge Graph Embedding: A Survey of Approaches and Applications.”</span> <em>IEEE Transactions on Knowledge and Data Engineering</em> 29 (12): 2724–43.
+</div>
+</div>
+
+
+<!-- -->
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+    const viewSource = window.document.getElementById('quarto-view-source') ||
+                       window.document.getElementById('quarto-code-tools-source');
+    if (viewSource) {
+      const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+      viewSource.addEventListener("click", function(e) {
+        if (sourceUrl) {
+          // rstudio viewer pane
+          if (/\bcapabilities=\b/.test(window.location)) {
+            window.open(sourceUrl);
+          } else {
+            window.location.href = sourceUrl;
+          }
+        } else {
+          const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+          modal.show();
+        }
+        return false;
+      });
+    }
+    function toggleCodeHandler(show) {
+      return function(e) {
+        const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+        for (let i=0; i<detailsSrc.length; i++) {
+          const details = detailsSrc[i].parentElement;
+          if (show) {
+            details.open = true;
+          } else {
+            details.removeAttribute("open");
+          }
+        }
+        const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+        const fromCls = show ? "hidden" : "unhidden";
+        const toCls = show ? "unhidden" : "hidden";
+        for (let i=0; i<cellCodeDivs.length; i++) {
+          const codeDiv = cellCodeDivs[i];
+          if (codeDiv.classList.contains(fromCls)) {
+            codeDiv.classList.remove(fromCls);
+            codeDiv.classList.add(toCls);
+          } 
+        }
+        return false;
+      }
+    }
+    const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+    if (hideAllCode) {
+      hideAllCode.addEventListener("click", toggleCodeHandler(false));
+    }
+    const showAllCode = window.document.getElementById("quarto-show-all-code");
+    if (showAllCode) {
+      showAllCode.addEventListener("click", toggleCodeHandler(true));
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/wanghemath\.github\.io\/Book-NLP-Math\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./python-reference.html" class="pagination-link" aria-label="Python Reference">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">35</span>&nbsp; <span class="chapter-title">Python Reference</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "References and Further Reading"</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="an">bibliography:</span><span class="co"> references.bib</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="an">nocite:</span><span class="co"> |</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="co">  @*</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>This page collects the main references used throughout *Mathematical Foundations of Natural Language Processing*. The list is intentionally broad: it includes classical NLP, probability and information theory, linear algebra and retrieval, neural language models, attention and transformers, retrieval-augmented generation, evaluation, optimization, graph methods, topology, and responsible NLP.</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">## Core NLP references</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>For a broad introduction to natural language processing, the most useful starting points are the classical statistical treatment of Manning and Schuetze, the modern textbook by Jurafsky and Martin, the mathematically clear introduction by Eisenstein, and the neural NLP text by Goldberg <span class="co">[</span><span class="ot">@manning_schuetze_1999; @jurafsky_martin_slp3; @eisenstein_2019; @goldberg_2017</span><span class="co">]</span>.</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">## Probability and information theory</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>The probability, likelihood, entropy, cross-entropy, KL divergence, and perplexity ideas used throughout the book are rooted in Shannon's communication theory and standard information-theory treatments <span class="co">[</span><span class="ot">@shannon_1948; @cover_thomas_2006; @mackay_2003</span><span class="co">]</span>. For probabilistic modeling and statistical learning background, see Bishop, Murphy, and Hastie--Tibshirani--Friedman <span class="co">[</span><span class="ot">@bishop_prml_2006; @murphy_probabilistic_2022; @hastie_tibshirani_friedman_2009</span><span class="co">]</span>.</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="fu">## Vector spaces, retrieval, and document geometry</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>The document-vector view of language connects vector-space indexing, latent semantic analysis, and probabilistic retrieval <span class="co">[</span><span class="ot">@salton_wong_yang_1975; @deerwester_lsa_1990; @landauer_dumais_1997; @robertson_zaragoza_2009; @manning_ir_2008</span><span class="co">]</span>. These sources support the chapters on document-term matrices, TF-IDF, cosine similarity, low-rank approximation, and retrieval.</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="fu">## Tokenization and word embeddings</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>Subword tokenization is central to modern NLP systems <span class="co">[</span><span class="ot">@sennrich_bpe_2016; @kudo_sentencepiece_2018</span><span class="co">]</span>. Word representations connect neural prediction, matrix factorization, and distributional semantics <span class="co">[</span><span class="ot">@bengio_neural_2003; @mikolov_word2vec_2013; @mikolov_distributed_2013; @pennington_glove_2014; @levy_neural_2014</span><span class="co">]</span>.</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="fu">## Sequence models, attention, and transformers</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>The sequence-modeling arc begins with recurrent networks, LSTM/GRU memory mechanisms, and attention-based encoder-decoder models <span class="co">[</span><span class="ot">@elman_1990; @hochreiter_lstm_1997; @cho_gru_2014; @bahdanau_attention_2015; @luong_attention_2015</span><span class="co">]</span>. Transformers and large language models build on self-attention, positional structure, pretraining, scaling, and instruction tuning <span class="co">[</span><span class="ot">@vaswani_attention_2017; @devlin_bert_2019; @radford_gpt2_2019; @brown_gpt3_2020; @kaplan_scaling_2020; @ouyang_instructgpt_2022</span><span class="co">]</span>.</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="fu">## Retrieval-augmented generation and semantic search</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>The retrieval and RAG chapters use ideas from sentence embeddings, dense retrieval, late interaction, large-scale similarity search, and retrieval-augmented generation <span class="co">[</span><span class="ot">@reimers_sentencebert_2019; @karpukhin_dpr_2020; @khattab_colbert_2020; @johnson_faiss_2019; @lewis_rag_2020</span><span class="co">]</span>.</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="fu">## Optimization and training</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>Gradient-based training, stochastic optimization, recurrent-gradient pathologies, Adam, AdamW, and preference-based fine-tuning are supported by the following sources <span class="co">[</span><span class="ot">@goodfellow_deep_learning_2016; @boyd_vandenberghe_2004; @pascanu_gradient_2013; @kingma_adam_2015; @loshchilov_adamw_2019; @christiano_preferences_2017; @rafailov_dpo_2023</span><span class="co">]</span>.</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a><span class="fu">## Evaluation and calibration</span></span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>The evaluation chapter uses classical overlap metrics, probabilistic scoring, calibration diagnostics, and modern model comparison ideas <span class="co">[</span><span class="ot">@papineni_bleu_2002; @lin_rouge_2004; @brier_1950; @guo_calibration_2017</span><span class="co">]</span>. These references are not a substitute for task-specific human evaluation, but they provide a mathematical starting point.</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="fu">## Graphs and topology</span></span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>Graph-based language models, PageRank, graph neural networks, and graph attention are connected to matrix operators on graphs <span class="co">[</span><span class="ot">@page_pagerank_1999; @kipf_gcn_2017; @hamilton_graphsage_2017; @velickovic_gat_2018</span><span class="co">]</span>. The topological viewpoint uses computational topology, persistent homology, and Mapper-style summaries <span class="co">[</span><span class="ot">@edelsbrunner_harer_2010; @carlsson_topology_2009; @ghrist_barcodes_2008; @singh_mapper_2007</span><span class="co">]</span>.</span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="fu">## Ethics, bias, and responsibility</span></span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>The final chapter connects technical NLP modeling with fairness, bias measurement, documentation, and responsible deployment <span class="co">[</span><span class="ot">@barocas_fairness_2019; @dwork_fairness_2012; @hardt_equality_2016; @bolukbasi_debiasing_2016; @caliskan_semantics_2017; @blodgett_bias_2020; @bender_stochastic_2021; @gebru_datasheets_2021; @mitchell_modelcards_2019</span><span class="co">]</span>.</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a><span class="fu">## Bibliography</span></span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>::: {#refs}</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>:::</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

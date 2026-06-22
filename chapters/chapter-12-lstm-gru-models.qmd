@@ -1,0 +1,993 @@
+---
+title: "LSTM and GRU Models"
+subtitle: "Gated recurrences, memory paths, and long-range dependence"
+---
+
+::: {.chapter-opening}
+A vanilla recurrent neural network updates its hidden state by repeatedly applying the same nonlinear map.  This gives a clean dynamical-system model for sequences, but it also creates a mathematical difficulty: gradients must pass through long products of Jacobian matrices.  These products may shrink or explode.
+
+Long short-term memory networks and gated recurrent units modify the recurrence by adding **gates**.  A gate is a vector with coordinates between $0$ and $1$.  It controls how much information is kept, forgotten, written, or revealed.  From a mathematical point of view, gated recurrent models are controlled nonlinear dynamical systems with coordinatewise interpolation.  Their main purpose is to create more stable paths for information and gradients across long sequences.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. explain why vanilla RNNs have difficulty learning long-range dependencies;
+2. define sigmoid gates and interpret them as coordinatewise interpolation weights;
+3. write the LSTM equations and check all dimensions;
+4. interpret the LSTM cell state as a controlled memory variable;
+5. explain how forget gates create a direct memory path through time;
+6. write the GRU equations and compare them with LSTM equations;
+7. connect gate values to gradient flow and effective memory length;
+8. implement LSTM and GRU forward passes from scratch in Python;
+9. use an interactive visualization to compare ungated and gated memory.
+
+## 12.1 The limitation of a vanilla RNN
+
+In Chapter 11, a vanilla RNN was written as
+
+$$
+h_t = \phi(W_hh_{t-1}+W_xe_t+b_h),
+$$
+
+where $e_t$ is the embedding of token $x_t$ and $h_t$ is the hidden state.  This recurrence is mathematically natural, but it has a difficult optimization structure.
+
+To see the issue, consider a scalar linearized recurrence
+
+$$
+h_t = a h_{t-1} + b u_t.
+$$
+
+Starting from $h_0=0$, we have
+
+$$
+h_T = \sum_{s=1}^T a^{T-s}b u_s.
+$$
+
+The contribution of an earlier input $u_s$ to the final state $h_T$ is multiplied by $a^{T-s}$.  Therefore:
+
+- if $|a|<1$, old information decays exponentially;
+- if $|a|>1$, old information may explode;
+- if $|a|\approx 1$, old information may persist.
+
+The same idea appears in nonlinear vector RNNs.  Differentiating through time gives products of Jacobians.  A typical factor has the form
+
+$$
+J_t = \frac{\partial h_t}{\partial h_{t-1}}.
+$$
+
+The derivative from time $s$ to time $T$ contains a product
+
+$$
+\frac{\partial h_T}{\partial h_s}
+= J_TJ_{T-1}\cdots J_{s+1}.
+$$
+
+Long products of matrices are numerically delicate.  Their norms can become very small or very large.  This is the mathematical source of the vanishing and exploding gradient problem.
+
+::: {.math-card}
+**Core difficulty.**  A vanilla RNN asks one nonlinear state vector $h_t$ to do two jobs at once:
+
+1. represent the current useful summary of the prefix;
+2. carry information and gradients across many time steps.
+
+LSTM and GRU models separate these roles more carefully by using gates.
+:::
+
+## 12.2 Gates as coordinatewise control variables
+
+The basic mathematical object in an LSTM or GRU is a **gate**.  A gate is a vector
+
+$$
+g_t \in (0,1)^r
+$$
+
+computed from the current input and previous hidden state:
+
+$$
+g_t = \sigma(W_ge_t+U_gh_{t-1}+b_g).
+$$
+
+Here:
+
+- $e_t\in R^m$ is the input embedding;
+- $h_{t-1}\in R^r$ is the previous hidden state;
+- $W_g\in R^{r\times m}$;
+- $U_g\in R^{r\times r}$;
+- $b_g\in R^r$;
+- $\sigma$ is the logistic sigmoid function applied coordinatewise.
+
+The sigmoid function is
+
+$$
+\sigma(z)=\frac{1}{1+e^{-z}}.
+$$
+
+Thus every coordinate satisfies
+
+$$
+0 < (g_t)_j < 1.
+$$
+
+This makes a gate useful for interpolation.  For two vectors $a,b\in R^r$, the expression
+
+$$
+g_t\odot a + (1-g_t)\odot b
+$$
+
+is a coordinatewise convex combination of $a$ and $b$.  The symbol $\odot$ denotes coordinatewise multiplication.
+
+::: {.math-card}
+**Gate interpretation.**  In coordinate $j$,
+
+$$
+(g_t)_j a_j + (1-(g_t)_j)b_j
+$$
+
+lies between $a_j$ and $b_j$.  If $(g_t)_j\approx 1$, the coordinate mostly chooses $a_j$.  If $(g_t)_j\approx 0$, it mostly chooses $b_j$.
+:::
+
+This simple interpolation idea is the mathematical heart of gated recurrent networks.
+
+## 12.3 A minimal gated-memory recurrence
+
+Before writing the full LSTM, consider a simplified memory recurrence:
+
+$$
+c_t = f_t\odot c_{t-1} + i_t\odot \widetilde c_t.
+$$
+
+Here:
+
+- $c_t\in R^r$ is a memory state;
+- $f_t\in (0,1)^r$ is a forget gate;
+- $i_t\in (0,1)^r$ is an input gate;
+- $\widetilde c_t\in R^r$ is a candidate update.
+
+The recurrence has two terms:
+
+$$
+\text{old memory kept} = f_t\odot c_{t-1},
+$$
+
+$$
+\text{new information written} = i_t\odot \widetilde c_t.
+$$
+
+If a coordinate of $f_t$ is close to $1$, then the corresponding coordinate of $c_{t-1}$ is copied forward almost unchanged.  If it is close to $0$, that coordinate is mostly erased.
+
+Suppose for a moment that $f_t=f$ is a constant scalar and the candidate update is zero after time $s$.  Then the memory contribution from time $s$ to time $T$ is multiplied by
+
+$$
+f^{T-s}.
+$$
+
+This resembles the scalar RNN factor $a^{T-s}$, but with an important difference: the model learns the value of $f_t$ dynamically from the data.  It can choose long memory for some coordinates and short memory for others.
+
+More generally, the direct derivative of the cell state with respect to the previous cell state is approximately
+
+$$
+\frac{\partial c_t}{\partial c_{t-1}} \approx \operatorname{diag}(f_t),
+$$
+
+when we focus on the direct path and ignore indirect dependence of the gates on earlier states.  Therefore the memory path from time $s$ to time $T$ contains factors
+
+$$
+\operatorname{diag}(f_T)\operatorname{diag}(f_{T-1})\cdots \operatorname{diag}(f_{s+1}).
+$$
+
+Coordinatewise, this is a product of forget-gate values.  This is much easier to interpret than a product of arbitrary recurrent Jacobian matrices.
+
+## 12.4 The LSTM equations
+
+An LSTM has two state vectors:
+
+$$
+h_t\in R^r,
+\qquad
+c_t\in R^r.
+$$
+
+The vector $h_t$ is the hidden state exposed to the output layer.  The vector $c_t$ is the memory cell state.
+
+Given input embedding $e_t\in R^m$, previous hidden state $h_{t-1}\in R^r$, and previous cell state $c_{t-1}\in R^r$, the LSTM computes
+
+$$
+f_t = \sigma(W_fe_t+U_fh_{t-1}+b_f),
+$$
+
+$$
+i_t = \sigma(W_ie_t+U_ih_{t-1}+b_i),
+$$
+
+$$
+o_t = \sigma(W_oe_t+U_oh_{t-1}+b_o),
+$$
+
+$$
+\widetilde c_t = \tanh(W_ce_t+U_ch_{t-1}+b_c).
+$$
+
+Then it updates
+
+$$
+c_t = f_t\odot c_{t-1} + i_t\odot \widetilde c_t,
+$$
+
+and exposes
+
+$$
+h_t = o_t\odot \tanh(c_t).
+$$
+
+The three gates have standard names:
+
+| Gate | Formula | Main role |
+|---|---|---|
+| forget gate | $f_t$ | how much previous memory to keep |
+| input gate | $i_t$ | how much new candidate memory to write |
+| output gate | $o_t$ | how much memory to reveal as hidden state |
+
+The candidate $\widetilde c_t$ proposes new content.  The input gate decides how much of that content enters memory.
+
+## 12.5 Dimension check for LSTM
+
+Let:
+
+$$
+e_t\in R^m,
+\qquad
+h_t,c_t\in R^r.
+$$
+
+For each gate $g\in\{f,i,o\}$, the parameters satisfy
+
+$$
+W_g\in R^{r\times m},
+\qquad
+U_g\in R^{r\times r},
+\qquad
+b_g\in R^r.
+$$
+
+For the candidate memory,
+
+$$
+W_c\in R^{r\times m},
+\qquad
+U_c\in R^{r\times r},
+\qquad
+b_c\in R^r.
+$$
+
+Therefore
+
+$$
+W_ge_t+U_gh_{t-1}+b_g\in R^r,
+$$
+
+so each gate is in $R^r$.  The update
+
+$$
+c_t = f_t\odot c_{t-1}+i_t\odot \widetilde c_t
+$$
+
+is a sum of two vectors in $R^r$.  Hence $c_t\in R^r$.  Finally,
+
+$$
+h_t=o_t\odot \tanh(c_t)\in R^r.
+$$
+
+::: {.math-card}
+**Parameter count.**  Each of the four affine maps has $rm+r^2+r$ parameters.  Therefore one LSTM layer has
+
+$$
+4(rm+r^2+r)
+$$
+
+recurrent parameters, not counting the token embedding matrix and output layer.
+:::
+
+## 12.6 Why the LSTM helps gradient flow
+
+The important mathematical feature is the additive cell-state update
+
+$$
+c_t = f_t\odot c_{t-1}+i_t\odot \widetilde c_t.
+$$
+
+This creates a direct path from $c_{t-1}$ to $c_t$.  Along this path, the derivative is governed by the forget gate:
+
+$$
+\frac{\partial c_t}{\partial c_{t-1}} \approx \operatorname{diag}(f_t).
+$$
+
+Therefore, for coordinate $j$, the direct memory derivative from time $s$ to time $T$ is approximately
+
+$$
+\prod_{t=s+1}^T (f_t)_j.
+$$
+
+This formula gives a clean interpretation of memory length.
+
+If $(f_t)_j\approx 0.5$, then memory decays quickly:
+
+$$
+0.5^{20}\approx 9.5\times 10^{-7}.
+$$
+
+If $(f_t)_j\approx 0.95$, then memory decays slowly:
+
+$$
+0.95^{20}\approx 0.36.
+$$
+
+So a gate coordinate near $1$ can preserve information over many steps.  A gate coordinate near $0$ can deliberately forget.
+
+::: {.math-card}
+**Effective memory length.**  If the forget gate is approximately constant with value $f\in(0,1)$, then the contribution after $k$ steps is roughly $f^k$.  The half-life $k_{1/2}$ solves
+
+$$
+f^{k_{1/2}}=\frac12.
+$$
+
+Thus
+
+$$
+k_{1/2}=\frac{\log(1/2)}{\log f}.
+$$
+
+For $f=0.9$, the half-life is about $6.58$ steps.  For $f=0.99$, it is about $68.97$ steps.
+:::
+
+## 12.7 Statistical view: adaptive state-space modeling
+
+A gated recurrent model can be viewed as a parameterized state-space model for sequences.  At time $t$, it computes latent states
+
+$$
+(h_t,c_t)=F_\theta(h_{t-1},c_{t-1},e_t).
+$$
+
+For classification, it defines
+
+$$
+\widehat p_\theta(y\mid x_1,\ldots,x_T)
+=\operatorname{softmax}(W_yh_T+b_y).
+$$
+
+For language modeling, it defines
+
+$$
+\widehat p_\theta(x_{t+1}\mid x_1,
+\ldots,x_t)
+=\operatorname{softmax}(W_yh_t+b_y).
+$$
+
+Given a training set
+
+$$
+D=\{(x^{(n)},y^{(n)})\}_{n=1}^N,
+$$
+
+a sequence classifier is usually trained by minimizing empirical cross-entropy:
+
+$$
+\widehat R(\theta)
+=\frac1N\sum_{n=1}^N
+\left[-\log \widehat p_\theta(y^{(n)}\mid x^{(n)})\right].
+$$
+
+For language modeling, the negative log-likelihood is
+
+$$
+L(\theta)
+= -\sum_{n=1}^N\sum_{t=1}^{T_n}
+\log \widehat p_\theta(x_t^{(n)}\mid x_1^{(n)},\ldots,x_{t-1}^{(n)}).
+$$
+
+Thus LSTM and GRU models are not mysterious from a statistical point of view.  They are flexible parameterized conditional probability models.  The gates are part of the parameterized representation map.
+
+## 12.8 The GRU equations
+
+A gated recurrent unit is a simpler gated model.  It uses one state vector $h_t\in R^r$ rather than separate hidden and cell states.
+
+Given input embedding $e_t\in R^m$ and previous state $h_{t-1}\in R^r$, a GRU computes
+
+$$
+z_t = \sigma(W_ze_t+U_zh_{t-1}+b_z),
+$$
+
+$$
+r_t = \sigma(W_re_t+U_rh_{t-1}+b_r),
+$$
+
+$$
+\widetilde h_t = \tanh(W_he_t+U_h(r_t\odot h_{t-1})+b_h).
+$$
+
+Then it updates
+
+$$
+h_t = (1-z_t)\odot h_{t-1}+z_t\odot \widetilde h_t.
+$$
+
+The two gates are:
+
+| Gate | Formula | Main role |
+|---|---|---|
+| update gate | $z_t$ | controls interpolation between old state and candidate state |
+| reset gate | $r_t$ | controls how much old state is used in the candidate |
+
+The update gate $z_t$ is especially important.  If $(z_t)_j\approx 0$, then
+
+$$
+(h_t)_j\approx (h_{t-1})_j.
+$$
+
+If $(z_t)_j\approx 1$, then
+
+$$
+(h_t)_j\approx (\widetilde h_t)_j.
+$$
+
+Thus the GRU also creates a direct copying path through time.
+
+## 12.9 LSTM versus GRU
+
+The LSTM has a separate memory cell $c_t$ and hidden state $h_t$.  The GRU combines memory and hidden state into one vector $h_t$.
+
+| Model | States | Gates | Main memory path |
+|---|---:|---:|---|
+| vanilla RNN | $h_t$ | none | nonlinear recurrence |
+| LSTM | $h_t,c_t$ | forget, input, output | cell-state update $c_t=f_t\odot c_{t-1}+i_t\odot\widetilde c_t$ |
+| GRU | $h_t$ | update, reset | interpolation $h_t=(1-z_t)\odot h_{t-1}+z_t\odot\widetilde h_t$ |
+
+There is no universal rule that one is always better.  The LSTM is more expressive and exposes a separate memory state.  The GRU has fewer gates and often fewer parameters, which can make it easier to train on smaller data.  Both are mathematically designed to improve long-range credit assignment relative to a vanilla RNN.
+
+## 12.10 Worked example: memory half-life
+
+Suppose a scalar LSTM memory coordinate follows
+
+$$
+c_t=f c_{t-1}
+$$
+
+with no new input after time $0$.  If $c_0=1$, then
+
+$$
+c_t=f^t.
+$$
+
+The half-life is the number of steps until $c_t=1/2$:
+
+$$
+f^t=\frac12.
+$$
+
+Taking logs gives
+
+$$
+t=\frac{\log(1/2)}{\log f}.
+$$
+
+For $f=0.8$,
+
+$$
+t\approx \frac{-0.6931}{-0.2231}\approx 3.11.
+$$
+
+For $f=0.95$,
+
+$$
+t\approx \frac{-0.6931}{-0.0513}\approx 13.51.
+$$
+
+For $f=0.99$,
+
+$$
+t\approx \frac{-0.6931}{-0.01005}\approx 68.97.
+$$
+
+This calculation gives an intuitive numerical meaning to the forget gate.
+
+## 12.11 Interactive: gated memory versus vanilla recurrence
+
+The following interactive compares a scalar vanilla recurrence with a simplified scalar LSTM memory recurrence.
+
+Vanilla recurrence:
+
+$$
+h_t=\tanh(a h_{t-1}+b u_t).
+$$
+
+Gated memory recurrence:
+
+$$
+c_t=f c_{t-1}+i\tanh(bu_t),
+\qquad
+h_t=o\tanh(c_t).
+$$
+
+Move the sliders to see how the forget gate $f$ controls memory persistence.
+
+::: {.content-visible when-format="html"}
+<div class="interactive-card">
+  <h3>Interactive: Gated memory and long-range dependence</h3>
+  <p class="text-muted">Compare an ungated scalar RNN with a simplified scalar LSTM memory cell.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0.8rem;align-items:end;">
+    <label>
+      vanilla recurrent weight a
+      <input id="ch12-a" type="range" min="0" max="1.4" step="0.02" value="0.75" style="width:100%;">
+      <span id="ch12-a-val">0.75</span>
+    </label>
+    <label>
+      forget gate f
+      <input id="ch12-f" type="range" min="0" max="0.995" step="0.005" value="0.92" style="width:100%;">
+      <span id="ch12-f-val">0.92</span>
+    </label>
+    <label>
+      input gate i
+      <input id="ch12-i" type="range" min="0" max="1" step="0.02" value="0.80" style="width:100%;">
+      <span id="ch12-i-val">0.80</span>
+    </label>
+    <label>
+      output gate o
+      <input id="ch12-o" type="range" min="0" max="1" step="0.02" value="1.00" style="width:100%;">
+      <span id="ch12-o-val">1.00</span>
+    </label>
+  </div>
+
+  <div id="ch12-gated-status" class="plotly-status">Loading interactive figure...</div>
+  <div id="ch12-gated-plot" class="plotly-demo"></div>
+</div>
+
+<script>
+(function() {
+  function setStatus(message) {
+    var status = document.getElementById('ch12-gated-status');
+    if (status) status.textContent = message;
+  }
+
+  function loadPlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    var existing = document.querySelector('script[data-local-plotly="true"]');
+    if (existing) {
+      existing.addEventListener('load', callback);
+      existing.addEventListener('error', function() {
+        setStatus('Plotly.js was not available, so the interactive figure could not be drawn.');
+      });
+      return;
+    }
+    var script = document.createElement('script');
+    script.src = '../assets/plotly.min.js';
+    script.async = true;
+    script.setAttribute('data-local-plotly', 'true');
+    script.onload = callback;
+    script.onerror = function() {
+      setStatus('Plotly.js was not available, so the interactive figure could not be drawn.');
+    };
+    document.head.appendChild(script);
+  }
+
+  function simulate(a, f, inputGate, outputGate) {
+    var T = 70;
+    var time = [];
+    var input = [];
+    var vanilla = [];
+    var cell = [];
+    var gatedHidden = [];
+    var memoryWeight = [];
+    var h = 0;
+    var c = 0;
+    for (var t = 0; t < T; t++) {
+      var u = 0;
+      if (t === 5) u = 1.0;
+      if (t === 6) u = 0.7;
+      if (t === 7) u = 0.4;
+      if (t > 35 && t < 43) u = 0.25 * Math.sin(0.8 * t);
+      h = Math.tanh(a * h + u);
+      c = f * c + inputGate * Math.tanh(u);
+      var gh = outputGate * Math.tanh(c);
+      time.push(t + 1);
+      input.push(u);
+      vanilla.push(h);
+      cell.push(c);
+      gatedHidden.push(gh);
+      memoryWeight.push(Math.pow(f, Math.max(0, t - 5)));
+    }
+    return {time: time, input: input, vanilla: vanilla, cell: cell, gatedHidden: gatedHidden, memoryWeight: memoryWeight};
+  }
+
+  function halfLife(f) {
+    if (f <= 0) return '0';
+    if (f >= 0.999) return 'very long';
+    return (Math.log(0.5) / Math.log(f)).toFixed(1);
+  }
+
+  function init() {
+    var plot = document.getElementById('ch12-gated-plot');
+    var aSlider = document.getElementById('ch12-a');
+    var fSlider = document.getElementById('ch12-f');
+    var iSlider = document.getElementById('ch12-i');
+    var oSlider = document.getElementById('ch12-o');
+    var aVal = document.getElementById('ch12-a-val');
+    var fVal = document.getElementById('ch12-f-val');
+    var iVal = document.getElementById('ch12-i-val');
+    var oVal = document.getElementById('ch12-o-val');
+
+    if (!plot || !aSlider || !fSlider || !iSlider || !oSlider || !window.Plotly) {
+      setStatus('The interactive controls were not found.');
+      return;
+    }
+
+    function draw() {
+      var a = parseFloat(aSlider.value);
+      var f = parseFloat(fSlider.value);
+      var inputGate = parseFloat(iSlider.value);
+      var outputGate = parseFloat(oSlider.value);
+      var sim = simulate(a, f, inputGate, outputGate);
+      aVal.textContent = a.toFixed(2);
+      fVal.textContent = f.toFixed(3);
+      iVal.textContent = inputGate.toFixed(2);
+      oVal.textContent = outputGate.toFixed(2);
+
+      var traces = [
+        {x: sim.time, y: sim.input, mode: 'lines+markers', name: 'input u_t'},
+        {x: sim.time, y: sim.vanilla, mode: 'lines', name: 'vanilla state h_t'},
+        {x: sim.time, y: sim.cell, mode: 'lines', name: 'LSTM cell c_t'},
+        {x: sim.time, y: sim.gatedHidden, mode: 'lines', name: 'gated hidden state'},
+        {x: sim.time, y: sim.memoryWeight, mode: 'lines', name: 'memory weight f^k', yaxis: 'y2'}
+      ];
+
+      var layout = {
+        title: 'Gated memory compared with a vanilla recurrence',
+        xaxis: {title: 'time t'},
+        yaxis: {title: 'state/input'},
+        yaxis2: {title: 'memory weight', overlaying: 'y', side: 'right', range: [0, 1.05]},
+        margin: {l: 55, r: 65, t: 45, b: 50},
+        legend: {orientation: 'h'},
+        annotations: [{
+          xref: 'paper', yref: 'paper', x: 0, y: -0.26,
+          showarrow: false, align: 'left',
+          text: 'Forget gate half-life: about ' + halfLife(f) + ' steps. Larger f preserves earlier information longer.'
+        }]
+      };
+
+      Plotly.react(plot, traces, layout, {responsive: true, displayModeBar: true});
+      setStatus('');
+    }
+
+    [aSlider, fSlider, iSlider, oSlider].forEach(function(slider) {
+      slider.addEventListener('input', draw);
+    });
+    draw();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { loadPlotly(init); });
+  } else {
+    loadPlotly(init);
+  }
+})();
+</script>
+:::
+
+::: {.content-visible when-format="pdf"}
+The HTML version of this chapter contains an interactive Plotly visualization comparing a scalar vanilla recurrence with a simplified scalar LSTM memory cell.
+:::
+
+## 12.12 Python example: LSTM forward pass from scratch
+
+The following NumPy example implements one LSTM layer for a short token sequence.  The goal is not to build a production model.  The goal is to make every matrix and vector visible.
+
+```{python}
+#| label: ch12-lstm-forward
+#| message: false
+#| warning: false
+import numpy as np
+
+rng = np.random.default_rng(7243)
+
+vocab = {"the": 0, "movie": 1, "was": 2, "not": 3, "very": 4, "good": 5}
+sequence = ["the", "movie", "was", "not", "very", "good"]
+x = np.array([vocab[w] for w in sequence])
+
+# Dimensions
+d = len(vocab)   # vocabulary size
+m = 4            # embedding dimension
+r = 5            # hidden/cell dimension
+
+# Embedding matrix
+E = rng.normal(scale=0.2, size=(d, m))
+
+# LSTM parameters
+W_f = rng.normal(scale=0.3, size=(r, m))
+U_f = rng.normal(scale=0.3, size=(r, r))
+b_f = np.ones(r) * 0.5       # positive forget bias encourages memory early in training
+
+W_i = rng.normal(scale=0.3, size=(r, m))
+U_i = rng.normal(scale=0.3, size=(r, r))
+b_i = np.zeros(r)
+
+W_o = rng.normal(scale=0.3, size=(r, m))
+U_o = rng.normal(scale=0.3, size=(r, r))
+b_o = np.zeros(r)
+
+W_c = rng.normal(scale=0.3, size=(r, m))
+U_c = rng.normal(scale=0.3, size=(r, r))
+b_c = np.zeros(r)
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+def lstm_step(e_t, h_prev, c_prev):
+    f_t = sigmoid(W_f @ e_t + U_f @ h_prev + b_f)
+    i_t = sigmoid(W_i @ e_t + U_i @ h_prev + b_i)
+    o_t = sigmoid(W_o @ e_t + U_o @ h_prev + b_o)
+    c_tilde = np.tanh(W_c @ e_t + U_c @ h_prev + b_c)
+    c_t = f_t * c_prev + i_t * c_tilde
+    h_t = o_t * np.tanh(c_t)
+    cache = {"f": f_t, "i": i_t, "o": o_t, "c_tilde": c_tilde, "c": c_t, "h": h_t}
+    return h_t, c_t, cache
+
+h = np.zeros(r)
+c = np.zeros(r)
+history = []
+
+for token_id in x:
+    e_t = E[token_id]
+    h, c, cache = lstm_step(e_t, h, c)
+    history.append(cache)
+
+print("Sequence:", sequence)
+print("Final hidden state shape:", h.shape)
+print("Final cell state shape:", c.shape)
+print("Final hidden state:", np.round(h, 3))
+print("Final forget gate:", np.round(history[-1]["f"], 3))
+
+# Save the final LSTM states for later examples.
+h_lstm = h.copy()
+c_lstm = c.copy()
+```
+
+The forget bias was initialized to a positive value.  This is common because at the beginning of training it encourages the model not to erase memory too aggressively.
+
+## 12.13 Python example: gate products and effective memory
+
+The direct LSTM memory path is controlled by products of forget gates.  The following example simulates several constant forget-gate values and plots the decay curves.
+
+```{python}
+#| label: ch12-forget-products
+#| message: false
+#| warning: false
+import numpy as np
+import matplotlib.pyplot as plt
+
+T = 80
+steps = np.arange(T + 1)
+forget_values = [0.70, 0.85, 0.95, 0.99]
+
+plt.figure(figsize=(7, 4))
+for f in forget_values:
+    weights = f ** steps
+    half_life = np.log(0.5) / np.log(f)
+    plt.plot(steps, weights, label=f"f={f}, half-life={half_life:.1f}")
+
+plt.axhline(0.5, linestyle="--", linewidth=1)
+plt.xlabel("number of steps k")
+plt.ylabel("memory weight f^k")
+plt.title("Direct memory decay controlled by the forget gate")
+plt.legend()
+plt.show()
+```
+
+This plot gives a concrete mathematical interpretation of gate values.  A change from $0.95$ to $0.99$ has a large effect on long-range memory.
+
+## 12.14 Python example: GRU forward pass from scratch
+
+The GRU is similar in spirit but uses fewer state variables.  The following code implements a GRU forward pass.
+
+```{python}
+#| label: ch12-gru-forward
+#| message: false
+#| warning: false
+import numpy as np
+
+rng = np.random.default_rng(7339)
+
+vocab = {"language": 0, "models": 1, "need": 2, "long": 3, "memory": 4}
+sequence = ["language", "models", "need", "long", "memory"]
+x = np.array([vocab[w] for w in sequence])
+
+# Dimensions
+d = len(vocab)
+m = 4
+r = 5
+
+E = rng.normal(scale=0.2, size=(d, m))
+
+W_z = rng.normal(scale=0.3, size=(r, m))
+U_z = rng.normal(scale=0.3, size=(r, r))
+b_z = np.zeros(r)
+
+W_r = rng.normal(scale=0.3, size=(r, m))
+U_r = rng.normal(scale=0.3, size=(r, r))
+b_r = np.zeros(r)
+
+W_h = rng.normal(scale=0.3, size=(r, m))
+U_h = rng.normal(scale=0.3, size=(r, r))
+b_h = np.zeros(r)
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+def gru_step(e_t, h_prev):
+    z_t = sigmoid(W_z @ e_t + U_z @ h_prev + b_z)
+    r_t = sigmoid(W_r @ e_t + U_r @ h_prev + b_r)
+    h_tilde = np.tanh(W_h @ e_t + U_h @ (r_t * h_prev) + b_h)
+    h_t = (1 - z_t) * h_prev + z_t * h_tilde
+    cache = {"z": z_t, "r": r_t, "h_tilde": h_tilde, "h": h_t}
+    return h_t, cache
+
+h = np.zeros(r)
+states = []
+gates = []
+for token_id in x:
+    e_t = E[token_id]
+    h, cache = gru_step(e_t, h)
+    states.append(h.copy())
+    gates.append(cache)
+
+states = np.array(states)
+print("Sequence:", sequence)
+print("Hidden-state trajectory shape:", states.shape)
+print("Final update gate:", np.round(gates[-1]["z"], 3))
+print("Final reset gate:", np.round(gates[-1]["r"], 3))
+```
+
+The update gate $z_t$ controls how much the state changes.  Small update-gate values preserve the old hidden state, while large values overwrite it with the candidate state.
+
+## 12.15 Python example: LSTM output layer for classification
+
+After reading a full sequence, an LSTM can feed $h_T$ into a classifier:
+
+$$
+z = W_yh_T+b_y,
+\qquad
+p=\operatorname{softmax}(z).
+$$
+
+The following code uses the final LSTM hidden state saved from the earlier forward pass and computes class probabilities.
+
+```{python}
+#| label: ch12-lstm-classifier-head
+#| message: false
+#| warning: false
+import numpy as np
+
+K = 2
+hidden_dim = h_lstm.shape[0]
+W_y = rng.normal(scale=0.3, size=(K, hidden_dim))
+b_y = np.zeros(K)
+
+def softmax(z):
+    z = z - np.max(z)
+    exp_z = np.exp(z)
+    return exp_z / exp_z.sum()
+
+logits = W_y @ h_lstm + b_y
+probs = softmax(logits)
+y_true = 1
+loss = -np.log(probs[y_true])
+
+print("Logits:", np.round(logits, 3))
+print("Class probabilities:", np.round(probs, 3))
+print("Cross-entropy loss:", round(float(loss), 3))
+```
+
+The recurrent layer constructs the representation.  The softmax layer converts the representation into a conditional probability distribution.
+
+## 12.16 AI-assisted learning component
+
+Use an AI assistant as a mathematical critic, not as a replacement for derivation.  The following prompts are useful after you have written the equations yourself.
+
+::: {.callout-tip}
+## Prompt 1: Dimension audit
+
+I wrote the following LSTM equations.  Check every vector and matrix dimension.  Identify any inconsistent notation.  Do not simplify the model; only audit the mathematics.
+:::
+
+::: {.callout-tip}
+## Prompt 2: Gate interpretation
+
+Explain the forget gate, input gate, and output gate of an LSTM using coordinatewise convex combinations.  Give a small scalar example and connect it to memory half-life.
+:::
+
+::: {.callout-tip}
+## Prompt 3: Compare models
+
+Compare a vanilla RNN, an LSTM, and a GRU from the point of view of Jacobian products and gradient flow.  Avoid vague statements such as "LSTMs remember better" unless they are connected to equations.
+:::
+
+::: {.callout-warning}
+## AI caution
+
+AI-generated explanations of LSTMs often describe gates only verbally.  For this course, a correct explanation must include the equations, the dimensions, and the memory-path product controlled by forget or update gates.
+:::
+
+## 12.17 What to remember
+
+1. A gate is a vector in $(0,1)^r$ computed by a sigmoid affine map.
+2. Gates create coordinatewise interpolation between old information and new information.
+3. The LSTM cell state follows
+
+$$
+c_t=f_t\odot c_{t-1}+i_t\odot\widetilde c_t.
+$$
+
+4. The direct LSTM memory path is governed by products of forget-gate coordinates.
+5. A GRU uses an update gate to interpolate between the old hidden state and a candidate hidden state.
+6. LSTM and GRU models are conditional probability models trained by cross-entropy or negative log-likelihood.
+7. The mathematical advantage of gates is not magic memory; it is a more stable differentiable path through time.
+
+## 12.18 Exercises
+
+1. **Gate range.**  Prove that every coordinate of $g_t=\sigma(W_ge_t+U_gh_{t-1}+b_g)$ lies strictly between $0$ and $1$.
+
+2. **Dimension check.**  Suppose $e_t\in R^{20}$ and $h_t,c_t\in R^{64}$.  Give the dimensions of all LSTM matrices $W_f,U_f,W_i,U_i,W_o,U_o,W_c,U_c$ and all biases.
+
+3. **Parameter count.**  For $m=100$ and $r=256$, compute the number of recurrent parameters in one LSTM layer.  Do the same for one GRU layer.
+
+4. **Memory half-life.**  Compute the memory half-life for $f=0.8$, $0.9$, $0.95$, and $0.99$.  Interpret the result.
+
+5. **Scalar LSTM.**  Let $c_t=0.9c_{t-1}+0.5\tanh(u_t)$ and $h_t=\tanh(c_t)$.  Compute $c_1,c_2,c_3$ for $c_0=0$ and inputs $u_1=1$, $u_2=0$, $u_3=0$.
+
+6. **GRU interpolation.**  For scalar $h_t=(1-z)h_{t-1}+z\widetilde h_t$, show that $h_t$ lies between $h_{t-1}$ and $\widetilde h_t$ whenever $0\le z\le 1$.
+
+7. **Gradient path.**  For constant scalar forget gate $f$, derive $\partial c_T/\partial c_s=f^{T-s}$.
+
+8. **Model comparison.**  Explain why the LSTM has more parameters than the GRU for the same input and hidden dimensions.
+
+9. **Language modeling.**  Write the negative log-likelihood for an LSTM language model on a corpus of variable-length token sequences.
+
+10. **Critical thinking.**  Give one situation in which a gated RNN might still fail to capture long-range structure.  Explain whether the issue is representation, optimization, data, or evaluation.
+
+## 12.19 Mini-project
+
+Build a small NumPy experiment comparing a scalar vanilla recurrence and a scalar gated memory recurrence on a delayed-signal task.
+
+A possible task is:
+
+1. Generate sequences of length $T$.
+2. Put a binary signal at time $1$.
+3. Ask the model to predict the signal at time $T$.
+4. Compare how the memory weight changes with $a$ in the vanilla recurrence and $f$ in the gated recurrence.
+5. Plot the final memory strength as a function of $T$.
+
+The goal is not to train a large neural network.  The goal is to understand how recurrence parameters control memory mathematically.
+
+## 12.20 Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-12-lstm-gru-models.ipynb
+```
+
+The lab should be written for independent study and should include:
+
+- background on sigmoid, tanh, and coordinatewise multiplication;
+- a from-scratch LSTM forward pass;
+- a from-scratch GRU forward pass;
+- memory half-life experiments;
+- a small sequence classification example;
+- optional comparison with a deep learning library implementation.
+
+## Notes and references
+
+The LSTM was introduced by Hochreiter and Schmidhuber, and the GRU was introduced as a simpler gated recurrent architecture in neural machine translation research.  This chapter emphasizes the mathematical structure of gated recurrence: coordinatewise gates, additive memory updates, and gradient paths.  For broader NLP context, see @jurafsky_martin_slp3 and @goldberg_2017.  For deep learning background, see @goodfellow_bengio_courville_2016.

@@ -1,0 +1,974 @@
+---
+title: "What Is Natural Language Processing?"
+subtitle: "Language tasks as mathematical maps"
+---
+
+::: {.chapter-opening}
+Natural language processing studies how to represent, analyze, predict, and generate human language using mathematical and computational models.  This chapter introduces NLP from a clean mathematical point of view.  The goal is not to begin with software tools, but to identify the mathematical objects behind those tools: sets, sequences, functions, probability distributions, vector spaces, loss functions, and estimators.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+- describe text data as finite sequences over a vocabulary;
+- distinguish representation, model, loss, training, and evaluation;
+- express common NLP tasks as mathematical maps;
+- explain the difference between rule-based, statistical, and neural approaches;
+- identify the main mathematical objects used throughout the book.
+
+## 1.1 Why NLP needs mathematics
+
+Human language is not naturally numerical.  A sentence such as
+
+> The model predicts the next token.
+
+contains words, order, meaning, context, and grammar.  A computer model cannot directly operate on this sentence until we choose a mathematical representation.  This choice is the first modeling decision in NLP.
+
+At the most basic level, NLP converts language into objects that can be studied using mathematics.  For example:
+
+| Language object | Mathematical object |
+|---|---|
+| word | element of a finite set |
+| sentence | finite sequence |
+| document | sequence, vector, or probability distribution |
+| corpus | finite sample of documents |
+| meaning | representation in a vector space or probability model |
+| classification | function from texts to labels |
+| generation | sampling from a conditional distribution |
+| translation | map between sequence spaces |
+| retrieval | nearest-neighbor problem in a metric space |
+
+The point of this book is that modern NLP is not a collection of disconnected algorithms.  It is a sequence of mathematical constructions.
+
+::: {.callout-note}
+## Central viewpoint
+
+Before naming an NLP algorithm, identify the mathematical object:
+
+- What is the input space?
+- What is the output space?
+- Is the model a function, a probability distribution, an estimator, or an optimization problem?
+- What loss function measures success?
+- What data are used to estimate the unknown parameters?
+:::
+
+For MA Applied Mathematics and MS Statistics students, this viewpoint should feel natural.  In statistics, we ask what is observed, what is random, what is estimated, and what criterion defines a good estimate.  In applied mathematics, we ask what map is being constructed, what space it acts on, and what structure is preserved or lost.  NLP uses both habits.
+
+## 1.2 Text as discrete structured data
+
+Let $V$ be a vocabulary, meaning a finite set of allowed tokens.  A token may be a word, character, subword unit, punctuation mark, or special symbol.  A sentence of length $T$ is represented as a finite sequence
+
+$$
+x = (w_1,w_2,\ldots,w_T), \qquad w_t \in V.
+$$
+
+The length $T$ may vary from one sentence to another.  If $V$ has size $d$, then each token belongs to a set with $d$ possible values.  The space of all token sequences of length $T$ is
+
+$$
+V^T = \{(w_1,\ldots,w_T): w_t \in V \text{ for } t=1,\ldots,T\}.
+$$
+
+The space of all finite token sequences is
+
+$$
+V^* = \bigcup_{T \geq 0} V^T.
+$$
+
+Here $V^*$ is not a vector space.  It is a discrete sequence space.  This is one reason NLP is mathematically interesting: language begins as symbolic, variable-length, discrete data, while most learning algorithms require fixed-dimensional numerical inputs.
+
+::: {.callout-important}
+## Important distinction
+
+A sentence is not automatically a vector.  It becomes a vector only after we choose a representation map.
+:::
+
+A representation map has the form
+
+$$
+\phi: V^* \longrightarrow R^d,
+$$
+
+where $R^d$ is a numerical feature space.  The map $\phi$ might count words, compute TF-IDF weights, average word embeddings, or use a transformer to produce a contextual embedding.  Different choices of $\phi$ preserve different information.
+
+## 1.3 Corpus, sample, and data-generating process
+
+A corpus is a finite collection of texts:
+
+$$
+D = \{x_1,x_2,\ldots,x_n\}, \qquad x_i \in V^*.
+$$
+
+In supervised NLP, each text may also have a label:
+
+$$
+D = \{(x_i,y_i)\}_{i=1}^n,
+$$
+
+where $y_i$ may represent sentiment, topic, spam/not spam, author, language, or another response variable.
+
+From a statistical point of view, we often imagine that the observed data are samples from an unknown distribution.  For supervised learning, one writes
+
+$$
+(X,Y) \sim P,
+$$
+
+where $X$ is a random text and $Y$ is a random label.  The training set is then idealized as
+
+$$
+(X_1,Y_1),\ldots,(X_n,Y_n) \overset{\text{iid}}{\sim} P.
+$$
+
+This iid assumption is useful but often imperfect.  Real text corpora may contain duplicated documents, time trends, domain shifts, author dependence, and sampling bias.  Nevertheless, the notation helps clarify what machine learning is trying to do: construct a model from finite data that performs well on future examples.
+
+### Empirical distribution of a corpus
+
+Given a corpus $D=\{x_1,\ldots,x_n\}$, the empirical distribution assigns probability mass
+
+$$
+\widehat P_D(x)=\frac{1}{n}\sum_{i=1}^n 1\{x_i=x\}.
+$$
+
+In large language modeling, the data distribution is usually not directly a distribution over whole documents only.  It is also used to produce many local prediction problems.  For example, a sentence
+
+$$
+(w_1,w_2,\ldots,w_T)
+$$
+
+can be turned into training examples of the form
+
+$$
+(w_1,\ldots,w_{t-1}) \mapsto w_t.
+$$
+
+This is the next-token prediction view that will appear repeatedly in later chapters.
+
+## 1.4 NLP tasks as mathematical maps
+
+A clean way to understand an NLP task is to write down its input space and output space.
+
+### Text classification
+
+In text classification, the input is a text sequence and the output is a label.  If $C$ is a finite set of classes, then a classifier is a map
+
+$$
+f: V^* \longrightarrow C.
+$$
+
+For binary sentiment classification, one may use
+
+$$
+C = \{0,1\},
+$$
+
+where $0$ means negative and $1$ means positive.  A probabilistic classifier instead estimates
+
+$$
+p_\theta(y \mid x), \qquad y \in C.
+$$
+
+The predicted class is often
+
+$$
+\widehat y = \arg\max_{y\in C} p_\theta(y\mid x).
+$$
+
+Thus classification is either a function problem or a conditional probability estimation problem.
+
+### Sequence labeling
+
+In sequence labeling, each input token receives a label.  If
+
+$$
+x=(w_1,\ldots,w_T),
+$$
+
+then the output is another sequence
+
+$$
+y=(y_1,\ldots,y_T), \qquad y_t \in L,
+$$
+
+where $L$ is a label set.  Examples include part-of-speech tagging and named entity recognition.  The task is a map
+
+$$
+f: V^T \longrightarrow L^T.
+$$
+
+The key mathematical feature is that the output has the same length as the input.
+
+### Language modeling
+
+A language model assigns probabilities to token sequences.  For a sentence $x=(w_1,\ldots,w_T)$, a language model aims to estimate
+
+$$
+P(w_1,\ldots,w_T).
+$$
+
+Using the chain rule of probability,
+
+$$
+P(w_1,\ldots,w_T)
+=
+\prod_{t=1}^T P(w_t \mid w_1,\ldots,w_{t-1}).
+$$
+
+This identity is exact.  A model becomes necessary because the true conditional probabilities are unknown and the number of possible histories is enormous.
+
+### Machine translation
+
+Machine translation maps a sequence in one language to a sequence in another.  Let $V_S$ be the source vocabulary and $V_T$ the target vocabulary.  A translation system may be written as
+
+$$
+f: V_S^* \longrightarrow V_T^*.
+$$
+
+A probabilistic translation model estimates
+
+$$
+p_\theta(y\mid x), \qquad x\in V_S^*,\quad y\in V_T^*.
+$$
+
+The predicted translation is often idealized as
+
+$$
+\widehat y = \arg\max_{y\in V_T^*} p_\theta(y\mid x).
+$$
+
+In practice this maximization is approximate because the output space is huge.
+
+### Information retrieval and semantic search
+
+In retrieval, the input is a query $q$ and a collection of documents $D=\{d_1,\ldots,d_n\}$.  The goal is to rank documents by relevance.  A simple mathematical form is a scoring function
+
+$$
+s: V^* \times V^* \longrightarrow R,
+$$
+
+where $s(q,d_i)$ measures how relevant document $d_i$ is to query $q$.  A retrieval system returns documents ordered by
+
+$$
+s(q,d_i).
+$$
+
+In vector search, one first embeds queries and documents into $R^k$:
+
+$$
+\phi(q), \phi(d_i) \in R^k,
+$$
+
+and then ranks documents by inner product, cosine similarity, or distance.
+
+## 1.5 Representation, model, loss, and evaluation
+
+A common source of confusion is to mix together representation, model, training, and evaluation.  They are different mathematical components.
+
+### Representation
+
+A representation is a map
+
+$$
+\phi: V^* \longrightarrow R^d.
+$$
+
+For example, the bag-of-words representation maps a document to a count vector.  If the vocabulary is
+
+$$
+V = \{v_1,\ldots,v_d\},
+$$
+
+then the $j$th component of $\phi(x)$ may be
+
+$$
+\phi_j(x) = \#\{t: w_t=v_j\}.
+$$
+
+This representation ignores word order.  The sentence
+
+> dogs chase cats
+
+and the sentence
+
+> cats chase dogs
+
+have the same bag-of-words vector if they use the same words once each.  The representation is simple and useful, but it loses syntactic structure.
+
+### Model
+
+A model is a parameterized family of functions or distributions.  For classification, one may use
+
+$$
+f_\theta: R^d \longrightarrow C.
+$$
+
+Combined with a representation $\phi$, the complete classifier is
+
+$$
+x \mapsto f_\theta(\phi(x)).
+$$
+
+A probabilistic classifier may instead use
+
+$$
+p_\theta(y\mid \phi(x)).
+$$
+
+The parameter $\theta$ is estimated from training data.
+
+### Loss function
+
+A loss function measures error.  For supervised learning, a typical loss has the form
+
+$$
+\ell(f_\theta(\phi(x)),y).
+$$
+
+The empirical risk is
+
+$$
+\widehat R_n(\theta)
+=
+\frac{1}{n}\sum_{i=1}^n \ell(f_\theta(\phi(x_i)),y_i).
+$$
+
+Training often means solving the optimization problem
+
+$$
+\widehat\theta
+\in
+\arg\min_{\theta} \widehat R_n(\theta).
+$$
+
+For probabilistic models, a common choice is the negative log-likelihood loss:
+
+$$
+\ell(\theta;x,y)=-\log p_\theta(y\mid x).
+$$
+
+### Evaluation
+
+Evaluation measures performance on data not used for training.  If $(X,Y)$ is a future example from the target distribution, the population risk is
+
+$$
+R(\theta)=E[\ell(f_\theta(\phi(X)),Y)].
+$$
+
+Since $P$ is unknown, we estimate performance using validation or test data.  This connects NLP directly to statistical estimation.
+
+::: {.callout-tip}
+## A four-part checklist
+
+For any NLP system, ask:
+
+1. What is the representation $\phi$?
+2. What is the model $f_\theta$ or $p_\theta$?
+3. What loss function is minimized?
+4. What evaluation metric is reported?
+:::
+
+## 1.6 Three historical approaches
+
+NLP methods are often grouped into rule-based, statistical, and neural approaches.  These are not mutually exclusive.  Many modern systems combine all three.
+
+### Rule-based NLP
+
+Rule-based NLP uses explicit linguistic or symbolic rules.  A simple rule for detecting a question might be:
+
+$$
+f(x)=
+\begin{cases}
+1, & \text{if the final token is ?},\\
+0, & \text{otherwise.}
+\end{cases}
+$$
+
+Rule-based systems can be interpretable, but they may be brittle.  They often fail when language is ambiguous, informal, noisy, or domain-specific.
+
+### Statistical NLP
+
+Statistical NLP treats language as random data.  Instead of writing all rules by hand, one estimates probabilities or parameters from a corpus.  A bigram language model, for example, approximates
+
+$$
+P(w_t\mid w_1,\ldots,w_{t-1})
+\approx
+P(w_t\mid w_{t-1}).
+$$
+
+The conditional probability can be estimated by counts:
+
+$$
+\widehat P(b\mid a)
+=
+\frac{\#(a,b)}{\#(a)},
+$$
+
+where $\#(a,b)$ is the number of times token $a$ is followed by token $b$ in the corpus.  This is a maximum likelihood estimate under a Markov assumption.
+
+Classical statistical NLP is developed in detail in texts such as @manning_schuetze_1999 and @jurafsky_martin_slp3.
+
+### Neural NLP
+
+Neural NLP represents tokens and texts by vectors and learns nonlinear maps from data.  A simplified neural classifier can be written as
+
+$$
+p_\theta(y\mid x)
+=
+\operatorname{softmax}(W h_\theta(x)+b),
+$$
+
+where $h_\theta(x)$ is a learned representation of the input text.  In transformer models, $h_\theta(x)$ is produced by repeated attention and feedforward layers.
+
+The important mathematical shift is that feature construction is no longer entirely hand-designed.  The representation itself becomes part of the learned model.
+
+## 1.7 A small running example
+
+Consider the tiny corpus
+
+$$
+D = \{x_1,x_2,x_3\},
+$$
+
+where
+
+$$
+\begin{aligned}
+x_1 &= \text{machine learning models learn from data},\\
+x_2 &= \text{language models predict the next token},\\
+x_3 &= \text{statistics studies data uncertainty and models}.
+\end{aligned}
+$$
+
+After tokenization, one possible vocabulary is
+
+$$
+V = \{\text{and},\text{data},\text{from},\text{language},\text{learn},\text{learning},\text{machine},\text{models},\text{next},\text{predict},\text{statistics},\text{studies},\text{the},\text{token},\text{uncertainty}\}.
+$$
+
+The vocabulary size is $d=15$.  Each document can be represented by a count vector in $R^{15}$.
+
+For example, if the vocabulary is ordered as above, then $x_1$ has count vector
+
+$$
+\phi(x_1)
+= (0,1,1,0,1,1,1,1,0,0,0,0,0,0,0)^T.
+$$
+
+The word `models` appears in all three documents, while `machine` appears only in the first.  Thus the count representation already gives a simple numerical view of the corpus.
+
+The term-document matrix is
+
+$$
+X =
+\begin{bmatrix}
+| & | & | \\
+\phi(x_1) & \phi(x_2) & \phi(x_3) \\
+| & | & |
+\end{bmatrix}
+\in R^{15\times 3}.
+$$
+
+This matrix is the beginning of linear algebraic NLP.  Search, clustering, latent semantic analysis, and embeddings can all be introduced as ways to analyze or transform this matrix.
+
+### A short Python check
+
+The following code is not needed for the mathematical definition, but it confirms the construction of the vocabulary and count vectors.
+
+```{python}
+#| label: ch01-count-vectors
+#| echo: true
+
+corpus = [
+    "machine learning models learn from data",
+    "language models predict the next token",
+    "statistics studies data uncertainty and models",
+]
+
+tokenized = [doc.split() for doc in corpus]
+vocab = sorted(set(token for doc in tokenized for token in doc))
+
+count_vectors = []
+for doc in tokenized:
+    count_vectors.append([doc.count(token) for token in vocab])
+
+print("Vocabulary size:", len(vocab))
+print("Vocabulary:", vocab)
+print("Count vectors:")
+for vector in count_vectors:
+    print(vector)
+```
+
+The code implements exactly the map
+
+$$
+\phi_j(x)=\#\{t:w_t=v_j\}.
+$$
+
+Later chapters will replace this simple count map by TF-IDF, low-rank embeddings, neural embeddings, and transformer representations.
+
+## 1.8 What makes language mathematically difficult?
+
+NLP is difficult not because text cannot be turned into numbers, but because the numerical representation must preserve useful structure.  Several mathematical difficulties appear immediately.
+
+### Variable length
+
+Texts have different lengths.  One sentence may contain five tokens, while another may contain five hundred.  Many mathematical models expect fixed-dimensional vectors.  Therefore we need maps that handle variable-length inputs:
+
+$$
+\phi: V^* \longrightarrow R^d.
+$$
+
+Bag-of-words does this by ignoring order.  Recurrent networks do this by updating hidden states.  Transformers do this by operating on token sequences and producing contextual vectors.
+
+### Discreteness
+
+Tokens are discrete.  There is no natural meaning to arithmetic such as
+
+$$
+\text{cat} + \text{the}.
+$$
+
+Embedding methods introduce a learned map
+
+$$
+e: V \longrightarrow R^k,
+$$
+
+so that tokens become vectors.  Once tokens are embedded, we can use inner products, distances, projections, and optimization.
+
+### Context dependence
+
+The meaning of a word depends on context.  For example, the word `model` may refer to a mathematical model, a machine learning model, or a physical object.  A fixed word embedding assigns one vector to each token type:
+
+$$
+e(\text{model}) \in R^k.
+$$
+
+A contextual embedding assigns a vector to a token occurrence inside a sequence:
+
+$$
+h_t = h_t(w_1,\ldots,w_T) \in R^k.
+$$
+
+Thus the same token can receive different vectors in different sentences.
+
+### Combinatorial explosion
+
+If the vocabulary has size $d$, then the number of possible sequences of length $T$ is
+
+$$
+|V^T| = d^T.
+$$
+
+Even for moderate $d$ and $T$, this number is enormous.  This is why language modeling cannot simply store probabilities for every possible sentence.  A model must share statistical strength across related contexts.
+
+### Ambiguity
+
+Language is ambiguous at many levels.  A sentence can have multiple possible meanings, labels, or continuations.  Probability is therefore natural.  Instead of predicting one continuation with certainty, a language model estimates
+
+$$
+p_\theta(w_t\mid w_1,\ldots,w_{t-1}).
+$$
+
+Generation then samples from this distribution or chooses tokens according to a decoding rule.
+
+## 1.9 The mathematical pipeline of NLP
+
+A typical NLP system can be written as the composition
+
+$$
+V^*
+\xrightarrow{\phi}
+R^d
+\xrightarrow{f_\theta}
+Y.
+$$
+
+Here:
+
+- $V^*$ is the symbolic input space;
+- $\phi$ is a representation map;
+- $R^d$ is a numerical feature or embedding space;
+- $f_\theta$ is a learned model;
+- $Y$ is the output space.
+
+For a probabilistic system, the output may be a distribution rather than a single prediction:
+
+$$
+V^*
+\xrightarrow{\phi}
+R^d
+\xrightarrow{p_\theta}
+\Delta(Y),
+$$
+
+where $\Delta(Y)$ denotes the set of probability distributions on $Y$.
+
+If $Y$ is finite with $K$ classes, then
+
+$$
+\Delta(Y)=\left\{p\in R^K: p_j\geq 0,\ \sum_{j=1}^K p_j=1\right\}.
+$$
+
+This simplex will appear often because classification and next-token prediction both output probability vectors.
+
+## 1.10 A first view of next-token prediction
+
+Modern large language models are often trained by next-token prediction.  Given a context
+
+$$
+c_t=(w_1,\ldots,w_{t-1}),
+$$
+
+the model outputs a probability distribution over the next token:
+
+$$
+p_\theta(\cdot\mid c_t) \in \Delta(V).
+$$
+
+If the true next token is $w_t$, the negative log-likelihood loss is
+
+$$
+\ell_t(\theta) = -\log p_\theta(w_t\mid w_1,\ldots,w_{t-1}).
+$$
+
+For a sequence $(w_1,\ldots,w_T)$, the total loss is
+
+$$
+L(\theta)
+=
+-\sum_{t=1}^T \log p_\theta(w_t\mid w_1,\ldots,w_{t-1}).
+$$
+
+For a corpus, we sum this quantity over all training sequences.  This is simply maximum likelihood estimation for a conditional probability model.
+
+::: {.callout-note}
+## Statistical interpretation
+
+Next-token prediction is not magic.  It is conditional probability estimation on a very large discrete space, using a high-dimensional nonlinear parameterization.
+:::
+
+This perspective connects language models to classical statistics.  The novelty is not that the objective is unfamiliar.  The novelty is the scale of the data, the dimension of the parameter space, and the expressiveness of the model class.
+
+## 1.11 Example: sentiment classification as empirical risk minimization
+
+Suppose we have labeled texts
+
+$$
+D = \{(x_i,y_i)\}_{i=1}^n,
+$$
+
+where $y_i\in\{0,1\}$.  Choose a representation
+
+$$
+\phi: V^* \to R^d.
+$$
+
+A logistic text classifier has the form
+
+$$
+p_\theta(Y=1\mid x)
+=
+\sigma(\beta_0 + \beta^T\phi(x)),
+$$
+
+where
+
+$$
+\sigma(z)=\frac{1}{1+e^{-z}}
+$$
+
+and $\theta=(\beta_0,\beta)$.  The negative log-likelihood is
+
+$$
+\widehat R_n(\theta)
+=
+-
+\frac{1}{n}
+\sum_{i=1}^n
+\left[
+ y_i\log p_\theta(Y=1\mid x_i)
++
+(1-y_i)\log(1-p_\theta(Y=1\mid x_i))
+\right].
+$$
+
+Training the classifier means solving
+
+$$
+\widehat\theta
+\in
+\arg\min_\theta \widehat R_n(\theta).
+$$
+
+This example shows the basic structure of many NLP models:
+
+$$
+\text{text}
+\longrightarrow
+\text{features}
+\longrightarrow
+\text{probability}
+\longrightarrow
+\text{loss}
+\longrightarrow
+\text{optimization}.
+$$
+
+The later neural models are more complicated, but they still follow this structure.
+
+
+## 1.12 Interactive HTML: representation and a linear classifier
+
+The following HTML component illustrates the simplest version of the NLP pipeline
+
+$$
+\text{text}\longrightarrow \phi(x)\longrightarrow \beta_0+\beta^T\phi(x)\longrightarrow \sigma(\beta_0+\beta^T\phi(x)).
+$$
+
+Here the representation has only two coordinates: the count of a positive token and the count of a negative token.  This is intentionally small so that the geometry is visible.
+
+::: {.content-visible when-format="html"}
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: A two-feature text classifier</h3>
+  <p>
+    Adjust the feature counts and linear coefficients. The plot shows how the logit
+    <code>z = beta0 + beta_good x_good + beta_bad x_bad</code> changes the predicted probability
+    <code>sigma(z)</code>.
+  </p>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.75rem;">
+    <label>count(good): <span id="ch01-good-value">2</span><br>
+      <input id="ch01-good" type="range" min="0" max="8" value="2" step="1" style="width: 100%;">
+    </label>
+    <label>count(bad): <span id="ch01-bad-value">1</span><br>
+      <input id="ch01-bad" type="range" min="0" max="8" value="1" step="1" style="width: 100%;">
+    </label>
+    <label>beta_good: <span id="ch01-bg-value">1.00</span><br>
+      <input id="ch01-bg" type="range" min="-2" max="2" value="1" step="0.05" style="width: 100%;">
+    </label>
+    <label>beta_bad: <span id="ch01-bb-value">-1.00</span><br>
+      <input id="ch01-bb" type="range" min="-2" max="2" value="-1" step="0.05" style="width: 100%;">
+    </label>
+    <label>intercept beta0: <span id="ch01-b0-value">0.00</span><br>
+      <input id="ch01-b0" type="range" min="-4" max="4" value="0" step="0.05" style="width: 100%;">
+    </label>
+  </div>
+
+  <div id="ch01-classifier-plot" class="plotly-demo"></div>
+  <div id="ch01-classifier-summary" style="font-family: system-ui, sans-serif; margin-top: 0.75rem;"></div>
+</div>
+
+<script>
+(function() {
+  function runWhenReady(callback) {
+    if (window.Plotly) {
+      callback();
+    } else {
+      setTimeout(function() { runWhenReady(callback); }, 100);
+    }
+  }
+
+  function sigmoid(z) {
+    return 1 / (1 + Math.exp(-z));
+  }
+
+  function number(id) {
+    return Number(document.getElementById(id).value);
+  }
+
+  function update() {
+    const xGood = number("ch01-good");
+    const xBad = number("ch01-bad");
+    const betaGood = number("ch01-bg");
+    const betaBad = number("ch01-bb");
+    const beta0 = number("ch01-b0");
+
+    document.getElementById("ch01-good-value").textContent = xGood.toFixed(0);
+    document.getElementById("ch01-bad-value").textContent = xBad.toFixed(0);
+    document.getElementById("ch01-bg-value").textContent = betaGood.toFixed(2);
+    document.getElementById("ch01-bb-value").textContent = betaBad.toFixed(2);
+    document.getElementById("ch01-b0-value").textContent = beta0.toFixed(2);
+
+    const xs = [];
+    const ys = [];
+    for (let z = -8; z <= 8.001; z += 0.1) {
+      xs.push(z);
+      ys.push(sigmoid(z));
+    }
+
+    const logit = beta0 + betaGood * xGood + betaBad * xBad;
+    const prob = sigmoid(logit);
+
+    const curve = {
+      x: xs,
+      y: ys,
+      type: "scatter",
+      mode: "lines",
+      name: "sigma(z)",
+      hovertemplate: "z=%{x:.2f}<br>sigma(z)=%{y:.3f}<extra></extra>"
+    };
+
+    const point = {
+      x: [logit],
+      y: [prob],
+      type: "scatter",
+      mode: "markers",
+      name: "current document",
+      marker: {size: 12},
+      hovertemplate: "current z=%{x:.2f}<br>probability=%{y:.3f}<extra></extra>"
+    };
+
+    Plotly.react("ch01-classifier-plot", [curve, point], {
+      title: "Logistic classifier probability from a two-coordinate representation",
+      xaxis: {title: "logit z = beta0 + beta^T phi(x)", range: [-8, 8]},
+      yaxis: {title: "predicted probability sigma(z)", range: [0, 1]},
+      margin: {t: 55, r: 20, b: 60, l: 65}
+    }, {responsive: true, displayModeBar: true});
+
+    const label = prob >= 0.5 ? "positive" : "negative";
+    document.getElementById("ch01-classifier-summary").innerHTML =
+      "Representation: phi(x) = (" + xGood + ", " + xBad + "). " +
+      "Logit z = " + logit.toFixed(3) + ". " +
+      "Predicted probability = " + prob.toFixed(3) + ". " +
+      "Decision at threshold 0.5: <strong>" + label + "</strong>.";
+  }
+
+  function initialize() {
+    ["ch01-good", "ch01-bad", "ch01-bg", "ch01-bb", "ch01-b0"].forEach(function(id) {
+      document.getElementById(id).addEventListener("input", update);
+    });
+    update();
+  }
+
+  runWhenReady(initialize);
+})();
+</script>
+```
+:::
+
+::: {.content-visible unless-format="html"}
+The HTML version of this chapter contains an interactive Plotly.js component that lets the reader adjust feature counts and linear classifier coefficients.  In PDF output, the same idea is studied through the logistic-classifier formulas and Python lab.
+:::
+
+
+## 1.13 What this book emphasizes
+
+This book is designed for students who already have or are building mathematical maturity.  It therefore emphasizes five principles.
+
+### Principle 1: Start from the space
+
+Always identify the space of objects being modeled.  Are we working with $V$, $V^T$, $V^*$, $R^d$, a probability simplex, or a space of matrices?
+
+### Principle 2: Track dimensions
+
+Dimension checking prevents many conceptual and programming errors.  For example, in attention,
+
+$$
+QK^T
+$$
+
+is meaningful only when the matrix dimensions agree.  Later chapters will carefully track the shapes of query, key, and value matrices.
+
+### Principle 3: Separate representation from prediction
+
+The representation map $\phi$ and the prediction function $f_\theta$ play different roles.  A linear classifier on a powerful representation may outperform a nonlinear classifier on a weak representation.
+
+### Principle 4: Interpret probabilities conditionally
+
+Language models are conditional probability models.  The conditioning information matters.  The expressions
+
+$$
+P(w_t), \qquad P(w_t\mid w_{t-1}), \qquad P(w_t\mid w_1,\ldots,w_{t-1})
+$$
+
+represent different assumptions.
+
+### Principle 5: Understand loss functions
+
+A model is trained to do what its loss function rewards.  If the loss is next-token cross-entropy, the model is optimized for next-token prediction.  Other capabilities may emerge, but the training objective remains central.
+
+## 1.14 Chapter summary
+
+Natural language processing begins with symbolic, variable-length sequences and turns them into mathematical objects.  The most important objects in this chapter are:
+
+| Concept | Mathematical form |
+|---|---|
+| vocabulary | finite set $V$ |
+| sentence | sequence $(w_1,\ldots,w_T)\in V^T$ |
+| all finite texts | sequence space $V^*$ |
+| corpus | finite sample $D=\{x_1,\ldots,x_n\}$ |
+| representation | map $\phi:V^*\to R^d$ |
+| classifier | map $f:V^*\to C$ |
+| probabilistic classifier | conditional distribution $p_\theta(y\mid x)$ |
+| language model | distribution $P(w_1,\ldots,w_T)$ |
+| next-token model | $p_\theta(w_t\mid w_1,\ldots,w_{t-1})$ |
+| training | empirical risk minimization |
+| evaluation | estimation of out-of-sample performance |
+
+The central lesson is simple: an NLP system is a mathematical pipeline.  Once the pipeline is written clearly, the role of linear algebra, probability, statistics, optimization, and geometry becomes visible.
+
+## 1.15 Exercises
+
+### Conceptual exercises
+
+1. Let $V=\{a,b,c\}$.  List all elements of $V^2$.  How many elements are in $V^T$ for general $T$?
+
+2. Explain why $V^*$ is not naturally a vector space.  What extra structure is needed before linear algebra can be used?
+
+3. For each task below, identify the input space and output space.
+   - spam classification;
+   - named entity recognition;
+   - machine translation;
+   - document retrieval;
+   - next-token prediction.
+
+4. Give an example of two sentences with the same bag-of-words representation but different meanings.
+
+5. Explain the difference between a representation map $\phi$ and a prediction model $f_\theta$.
+
+### Mathematical exercises
+
+6. Suppose $|V|=10{,}000$.  How many possible sequences of length $5$ are there?  Why does this create difficulty for direct probability estimation?
+
+7. Let $C=\{1,2,3\}$.  Write the probability simplex $\Delta(C)$ explicitly as a subset of $R^3$.
+
+8. Let $D=\{x_1,x_2,x_3,x_4\}$ be a corpus.  Write the empirical distribution $\widehat P_D$.  What probability does it assign to a document that does not appear in the corpus?
+
+9. Consider a binary classifier with predicted probability $p_\theta(Y=1\mid x)=0.8$.  Compute the negative log-likelihood loss when $y=1$ and when $y=0$.
+
+10. Let $x=(w_1,w_2,w_3,w_4)$.  Use the chain rule to factor $P(w_1,w_2,w_3,w_4)$ into conditional probabilities.
+
+### Applied exercises
+
+11. Choose a short paragraph from a textbook.  Define a vocabulary and construct its bag-of-words vector by hand.
+
+12. Consider the task of helping students find university resources from official documents.  Write this as a retrieval problem.  What is the query space?  What is the document space?  What is the scoring function?
+
+13. For a sentiment classification system, list one possible representation, one possible model, one possible loss function, and one possible evaluation metric.
+
+14. Find a case where word order matters.  Explain why a bag-of-words model would fail to distinguish the meanings.
+
+15. Describe one way in which a corpus may fail to be an iid sample from the target distribution.
+
+## 1.16 Python lab connection
+
+The associated lab for this chapter is planned as:
+
+```text
+labs/chapter-01-what-is-nlp.ipynb
+```
+
+The lab should be designed for independent study.  It should include:
+
+- text as raw strings;
+- tokenization by simple splitting;
+- vocabulary construction;
+- count-vector representation;
+- a small term-document matrix;
+- examples showing what information is lost by bag-of-words;
+- a final reflection connecting representation choices to modeling assumptions.
+
+## 1.17 Notes and references
+
+This chapter gives a mathematical orientation to NLP rather than a historical survey.  Classical statistical NLP is treated extensively in @manning_schuetze_1999.  A broad modern introduction is given in @jurafsky_martin_slp3.  Vector space models and retrieval are closely connected to information retrieval; see @manning_ir_2008.  Neural language modeling begins with ideas such as @bengio_neural_2003 and leads eventually to attention-based architectures such as @vaswani_attention_2017.

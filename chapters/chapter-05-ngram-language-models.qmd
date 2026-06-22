@@ -1,0 +1,1047 @@
+---
+title: "N-Gram Language Models"
+subtitle: "Markov assumptions, conditional probability tables, smoothing, generation, and perplexity"
+---
+
+::: {.chapter-opening}
+An $n$-gram language model is one of the simplest mathematical models of language.  It predicts the next token using only the previous $n-1$ tokens.  Although modern transformer language models are much more powerful, $n$-gram models remain an essential starting point because their assumptions, estimators, failures, and evaluation metrics can be written down exactly.  In this chapter we study $n$-gram models as finite-state conditional probability models estimated from counts.
+:::
+
+## Learning goals
+
+After studying this chapter, you should be able to:
+
+1. define unigrams, bigrams, trigrams, and general $n$-grams;
+2. explain the Markov approximation behind an $n$-gram language model;
+3. estimate $n$-gram probabilities by maximum likelihood from corpus counts;
+4. represent an $n$-gram model as a conditional probability table over contexts;
+5. explain why zero counts create zero probabilities for unseen sentences;
+6. derive and implement add-$\alpha$ smoothing;
+7. compute sentence log-probability, average negative log-likelihood, cross-entropy, and perplexity;
+8. sample text from a fitted $n$-gram model;
+9. compare unigram, bigram, and trigram models mathematically and computationally;
+10. use AI tools to critique a language model's assumptions without outsourcing the reasoning.
+
+## Why study $n$-gram models?
+
+An $n$-gram model is not a modern state-of-the-art NLP model.  However, it is mathematically transparent.  Nearly every important idea in language modeling appears in a simple form:
+
+- language as a probability distribution on token sequences;
+- conditioning on previous context;
+- maximum likelihood estimation;
+- sparse data and overfitting;
+- smoothing and regularization;
+- evaluation by cross-entropy and perplexity;
+- generation by sequential sampling.
+
+Modern neural language models replace explicit count tables with high-dimensional nonlinear functions, but they still model conditional probabilities of the form
+
+$$
+p_\theta(w_t \mid w_1,\ldots,w_{t-1}).
+$$
+
+The $n$-gram model is the finite-table version of the same idea.
+
+::: {.math-card}
+**Central idea.**  An $n$-gram model approximates
+
+$$
+P(W_t=w_t \mid W_1=w_1,\ldots,W_{t-1}=w_{t-1})
+$$
+
+by conditioning only on the most recent $n-1$ tokens:
+
+$$
+P(W_t=w_t \mid W_{t-n+1}=w_{t-n+1},\ldots,W_{t-1}=w_{t-1}).
+$$
+:::
+
+This is a mathematical simplification: the entire past is compressed into a short context.
+
+## Tokens, contexts, and $n$-grams
+
+Let
+
+$$
+V=\{v_1,v_2,\ldots,v_d\}
+$$
+
+be a finite vocabulary.  A token sequence is
+
+$$
+w_{1:T}=(w_1,w_2,\ldots,w_T), \qquad w_t\in V.
+$$
+
+An $n$-gram is a consecutive block of $n$ tokens:
+
+$$
+(w_t,w_{t+1},\ldots,w_{t+n-1}).
+$$
+
+Common cases are:
+
+| Model | Unit | Example from `language models learn probability` |
+|---|---|---|
+| unigram | one token | `language`, `models`, `learn`, `probability` |
+| bigram | two tokens | `language models`, `models learn`, `learn probability` |
+| trigram | three tokens | `language models learn`, `models learn probability` |
+
+For prediction, it is useful to split an $n$-gram into a context and a next token.  For an $n$-gram model, the context length is $n-1$:
+
+$$
+h_t=(w_{t-n+1},\ldots,w_{t-1}), \qquad \text{next token } w_t.
+$$
+
+The model estimates
+
+$$
+p(w_t\mid h_t).
+$$
+
+For a bigram model, the context is one token.  For a trigram model, the context is two tokens.
+
+## The chain rule and the Markov approximation
+
+From Chapter 4, the chain rule gives the exact factorization
+
+$$
+P(W_{1:T}=w_{1:T})
+=
+\prod_{t=1}^{T}P(W_t=w_t\mid W_1=w_1,\ldots,W_{t-1}=w_{t-1}).
+$$
+
+This formula is exact but not directly useful for estimation when $T$ is large.  The number of possible histories grows explosively.  The $n$-gram approximation assumes that the conditional distribution depends only on the most recent $n-1$ tokens:
+
+$$
+P(W_t=w_t\mid W_1=w_1,\ldots,W_{t-1}=w_{t-1})
+\approx
+P(W_t=w_t\mid W_{t-n+1}=w_{t-n+1},\ldots,W_{t-1}=w_{t-1}).
+$$
+
+Therefore,
+
+$$
+P(w_{1:T})
+\approx
+\prod_{t=1}^{T}P(w_t\mid w_{t-n+1:t-1}).
+$$
+
+Here $w_{a:b}$ denotes the subsequence $(w_a,w_{a+1},\ldots,w_b)$.
+
+::: {.math-card}
+**Markov viewpoint.**  A bigram model is a first-order Markov chain on the vocabulary:
+
+$$
+P(W_t=w_t\mid W_1,\ldots,W_{t-1})
+\approx
+P(W_t=w_t\mid W_{t-1}).
+$$
+
+A trigram model is a second-order Markov model because it conditions on the previous two tokens.
+:::
+
+This does not mean language truly has such short memory.  It means we choose a tractable approximation.
+
+## Boundary tokens
+
+A practical language model needs to represent the beginning and end of a sentence.  We usually add special tokens such as
+
+$$
+\langle s\rangle, \qquad \langle/ s\rangle.
+$$
+
+For a bigram model, the sentence
+
+```text
+language models learn
+```
+
+is transformed into
+
+```text
+<s> language models learn </s>
+```
+
+and contributes the bigrams
+
+```text
+(<s>, language), (language, models), (models, learn), (learn, </s>)
+```
+
+For a trigram model, we often add two start tokens:
+
+```text
+<s> <s> language models learn </s>
+```
+
+so that the first real word can be predicted from a two-token context.
+
+Mathematically, boundary tokens allow every position to have a context of the required length.
+
+## Maximum likelihood estimation for bigrams
+
+Let $C(u,v)$ denote the number of times token $u$ is followed by token $v$ in the training corpus.  Let
+
+$$
+C(u)=\sum_{v\in V} C(u,v)
+$$
+
+be the number of times $u$ appears as a context token.  The maximum likelihood estimator for a bigram model is
+
+$$
+\widehat p(v\mid u)=\frac{C(u,v)}{C(u)}.
+$$
+
+This is simply a row-normalized count table.
+
+### Derivation
+
+For a fixed context $u$, suppose we observe counts
+
+$$
+C(u,v_1),C(u,v_2),\ldots,C(u,v_d).
+$$
+
+We want to estimate a conditional probability vector
+
+$$
+p(\cdot\mid u)=(p(v_1\mid u),\ldots,p(v_d\mid u))\in \Delta^{d-1}.
+$$
+
+The conditional likelihood for this row is
+
+$$
+L_u(p)=\prod_{j=1}^{d} p(v_j\mid u)^{C(u,v_j)}.
+$$
+
+The log-likelihood is
+
+$$
+\ell_u(p)=\sum_{j=1}^{d} C(u,v_j)\log p(v_j\mid u).
+$$
+
+We maximize $\ell_u(p)$ subject to
+
+$$
+\sum_{j=1}^{d}p(v_j\mid u)=1.
+$$
+
+Using a Lagrange multiplier $\lambda$,
+
+$$
+\mathcal{L}(p,\lambda)
+=
+\sum_{j=1}^{d}C(u,v_j)\log p(v_j\mid u)
++
+\lambda\left(\sum_{j=1}^{d}p(v_j\mid u)-1\right).
+$$
+
+Differentiating with respect to $p(v_j\mid u)$ gives
+
+$$
+\frac{C(u,v_j)}{p(v_j\mid u)}+\lambda=0.
+$$
+
+Thus
+
+$$
+p(v_j\mid u)=-\frac{C(u,v_j)}{\lambda}.
+$$
+
+Summing over $j$ and using the constraint gives
+
+$$
+1=\sum_{j=1}^{d}p(v_j\mid u)
+=-\frac{1}{\lambda}\sum_{j=1}^{d}C(u,v_j)
+=-\frac{C(u)}{\lambda}.
+$$
+
+So $\lambda=-C(u)$ and therefore
+
+$$
+\widehat p(v_j\mid u)=\frac{C(u,v_j)}{C(u)}.
+$$
+
+This derivation is important because it shows that the count ratio is not merely intuitive.  It is the maximum likelihood estimate under a multinomial model.
+
+## General $n$-gram maximum likelihood estimator
+
+Let $h$ be a context of length $n-1$.  For example, in a trigram model,
+
+$$
+h=(u_1,u_2).
+$$
+
+Let $C(h,v)$ be the number of times context $h$ is followed by token $v$, and let
+
+$$
+C(h)=\sum_{v\in V}C(h,v).
+$$
+
+The maximum likelihood estimator is
+
+$$
+\widehat p(v\mid h)=\frac{C(h,v)}{C(h)}.
+$$
+
+The same Lagrange multiplier argument applies independently to each context row.
+
+::: {.math-card}
+**Conditional probability table.**  An $n$-gram model is a collection of probability vectors
+
+$$
+\{p(\cdot\mid h): h\in V^{n-1}\}.
+$$
+
+Each row belongs to the probability simplex $\Delta^{d-1}$.
+:::
+
+For bigrams, this table is a $d\times d$ matrix.  For trigrams, it is a $d^2\times d$ table.  For general $n$, the number of possible contexts is $d^{n-1}$, which grows quickly.
+
+## Python example: building an $n$-gram model from scratch
+
+The following code builds an $n$-gram count model, estimates probabilities, and displays the next-token distribution for a chosen context.
+
+```{python}
+from collections import Counter, defaultdict
+import math
+import random
+
+corpus = [
+    "language models learn from data",
+    "language models predict tokens",
+    "statistical models learn probability",
+    "neural models learn representations",
+    "data science uses probability models",
+    "models predict language tokens",
+]
+
+def tokenize(sentence):
+    return sentence.lower().split()
+
+def add_boundaries(tokens, n):
+    return ["<s>"] * (n - 1) + tokens + ["</s>"]
+
+def fit_ngram(corpus, n=2):
+    context_counts = Counter()
+    next_counts = defaultdict(Counter)
+    vocab = set(["<s>", "</s>"])
+
+    for sentence in corpus:
+        tokens = add_boundaries(tokenize(sentence), n)
+        vocab.update(tokens)
+        for i in range(n - 1, len(tokens)):
+            context = tuple(tokens[i - n + 1:i])
+            word = tokens[i]
+            context_counts[context] += 1
+            next_counts[context][word] += 1
+
+    vocab = sorted(vocab)
+    return vocab, context_counts, next_counts
+
+vocab, context_counts, next_counts = fit_ngram(corpus, n=2)
+context = ("models",)
+
+print("Vocabulary:", vocab)
+print("Context count:", context_counts[context])
+print("Next-token counts after 'models':", next_counts[context])
+
+print("\nMLE next-token probabilities:")
+for word, count in next_counts[context].most_common():
+    prob = count / context_counts[context]
+    print(f"P({word:16s} | models) = {prob:.3f}")
+```
+
+The model has learned, from this tiny corpus, which words tend to follow `models`.
+
+## The zero-probability problem
+
+Maximum likelihood $n$-gram models assign probability zero to any next-token event not observed in the training corpus:
+
+$$
+C(h,v)=0
+\quad\Longrightarrow\quad
+\widehat p(v\mid h)=0.
+$$
+
+This is a serious issue.  If a single bigram in a test sentence has probability zero, then the entire sentence probability becomes zero:
+
+$$
+\prod_{t=1}^{T}\widehat p(w_t\mid h_t)=0.
+$$
+
+The log-probability becomes undefined because $\log 0=-\infty$.
+
+### Example
+
+Suppose the training corpus contains
+
+```text
+language models learn
+```
+
+but never contains
+
+```text
+language models explain
+```
+
+A bigram model may estimate
+
+$$
+\widehat p(\text{explain}\mid \text{models})=0,
+$$
+
+even though the phrase is perfectly reasonable.  The zero probability reflects limited data, not linguistic impossibility.
+
+## Add-$\alpha$ smoothing
+
+A simple solution is add-$\alpha$ smoothing.  For $\alpha>0$, define
+
+$$
+\widehat p_\alpha(v\mid h)
+=
+\frac{C(h,v)+\alpha}{C(h)+\alpha |V|}.
+$$
+
+The numerator adds $\alpha$ pseudo-counts to every possible next token.  The denominator adds the total pseudo-count mass $\alpha |V|$.
+
+When $\alpha=1$, this is called add-one or Laplace smoothing.  Smaller values such as $\alpha=0.1$ often behave better in language modeling because the vocabulary may be large.
+
+::: {.math-card}
+**Smoothing as regularization.**  Add-$\alpha$ smoothing moves each empirical row toward the uniform distribution:
+
+$$
+\widehat p_\alpha(\cdot\mid h)
+=
+\frac{C(h)}{C(h)+\alpha |V|}\widehat p_{\text{MLE}}(\cdot\mid h)
++
+\frac{\alpha |V|}{C(h)+\alpha |V|}\,u,
+$$
+
+where $u(v)=1/|V|$.
+:::
+
+This formula shows that smoothing is a convex combination of the empirical MLE distribution and the uniform distribution.
+
+### Python example: add-$\alpha$ probabilities
+
+```{python}
+def next_token_distribution(context, vocab, context_counts, next_counts, alpha=0.5):
+    d = len(vocab)
+    total = context_counts[context]
+    return {
+        word: (next_counts[context][word] + alpha) / (total + alpha * d)
+        for word in vocab
+        if word != "<s>"
+    }
+
+context = ("models",)
+for alpha in [0.0, 0.1, 1.0]:
+    print(f"\nalpha = {alpha}")
+    if alpha == 0.0:
+        # MLE: show only observed words to avoid many zeros
+        dist = {
+            word: next_counts[context][word] / context_counts[context]
+            for word in vocab
+            if context_counts[context] > 0 and next_counts[context][word] > 0
+        }
+    else:
+        dist = next_token_distribution(context, vocab, context_counts, next_counts, alpha)
+    for word, prob in sorted(dist.items(), key=lambda x: -x[1])[:8]:
+        print(f"P({word:16s} | models) = {prob:.3f}")
+```
+
+As $\alpha$ increases, probability mass spreads more evenly across the vocabulary.
+
+## Sentence probability and log-probability
+
+Let $w_{1:T}$ be a sentence after adding boundary tokens.  Under an $n$-gram model,
+
+$$
+p(w_{1:T})
+=
+\prod_{t=n}^{T}p(w_t\mid w_{t-n+1:t-1}).
+$$
+
+In computation, we usually work with log-probabilities:
+
+$$
+\log p(w_{1:T})
+=
+\sum_{t=n}^{T}\log p(w_t\mid w_{t-n+1:t-1}).
+$$
+
+This is numerically more stable because products of many small probabilities can underflow to zero.
+
+### Python example: sentence log-probability
+
+```{python}
+def sentence_logprob(sentence, n, vocab, context_counts, next_counts, alpha=0.5):
+    tokens = add_boundaries(tokenize(sentence), n)
+    d = len(vocab)
+    logp = 0.0
+    details = []
+
+    for i in range(n - 1, len(tokens)):
+        context = tuple(tokens[i - n + 1:i])
+        word = tokens[i]
+        count_context = context_counts[context]
+        count_pair = next_counts[context][word]
+        prob = (count_pair + alpha) / (count_context + alpha * d)
+        logp += math.log(prob)
+        details.append((context, word, prob))
+
+    return logp, details
+
+sentence = "language models learn probability"
+logp, details = sentence_logprob(sentence, 2, vocab, context_counts, next_counts, alpha=0.5)
+
+print("Sentence:", sentence)
+print("Log-probability:", round(logp, 4))
+print("Probability:", round(math.exp(logp), 8))
+print("\nFactors:")
+for context, word, prob in details:
+    print(f"P({word:16s} | {context}) = {prob:.4f}")
+```
+
+The sentence probability is a product of local next-token probabilities.
+
+## Cross-entropy and perplexity
+
+Let a test corpus contain $N$ predicted tokens.  Suppose the model assigns probability $p_i$ to the correct token at position $i$.  The average negative log-likelihood is
+
+$$
+\operatorname{NLL}_{\text{avg}}
+=
+-\frac{1}{N}\sum_{i=1}^{N}\log p_i.
+$$
+
+When natural logarithms are used, this quantity is measured in nats per token.  The perplexity is
+
+$$
+\operatorname{Perplexity}
+=
+\exp\left(\operatorname{NLL}_{\text{avg}}\right).
+$$
+
+Equivalently,
+
+$$
+\operatorname{Perplexity}
+=
+\left(\prod_{i=1}^{N}\frac{1}{p_i}\right)^{1/N}.
+$$
+
+So perplexity is the geometric mean of the inverse probabilities assigned to the correct next tokens.
+
+::: {.math-card}
+**Interpretation.**  Lower perplexity is better.  A perplexity of $10$ roughly means that, on average, the model is as uncertain as choosing uniformly among $10$ plausible next tokens.
+:::
+
+This interpretation is approximate, but it is useful for intuition.
+
+### Python example: evaluating perplexity
+
+```{python}
+def evaluate_perplexity(test_corpus, n, vocab, context_counts, next_counts, alpha=0.5):
+    total_logp = 0.0
+    total_tokens = 0
+
+    for sentence in test_corpus:
+        tokens = add_boundaries(tokenize(sentence), n)
+        d = len(vocab)
+        for i in range(n - 1, len(tokens)):
+            context = tuple(tokens[i - n + 1:i])
+            word = tokens[i]
+            prob = (next_counts[context][word] + alpha) / (context_counts[context] + alpha * d)
+            total_logp += math.log(prob)
+            total_tokens += 1
+
+    avg_nll = -total_logp / total_tokens
+    return math.exp(avg_nll), avg_nll
+
+test_corpus = [
+    "language models predict probability",
+    "neural models learn language",
+]
+
+for alpha in [0.1, 0.5, 1.0]:
+    ppl, avg_nll = evaluate_perplexity(test_corpus, 2, vocab, context_counts, next_counts, alpha)
+    print(f"alpha={alpha:3.1f}  avg NLL={avg_nll:.3f}  perplexity={ppl:.3f}")
+```
+
+Perplexity depends on the test set, the vocabulary, the tokenization scheme, the order $n$, and the smoothing method.  Comparing perplexities is meaningful only when these conditions are comparable.
+
+## Interactive HTML: smoothing and next-token uncertainty
+
+The interactive below uses a small bigram corpus.  Move the smoothing slider to see how add-$\alpha$ smoothing changes the conditional distribution after the context word `models`.  The bar chart shows the next-token probabilities.  The table also reports the entropy of the distribution.
+
+```{=html}
+<div class="interactive-card">
+  <h3>Interactive: Add-α smoothing for a bigram model</h3>
+  <p>
+    Context: <code>models</code>.  Move the slider to control the pseudo-count α.
+  </p>
+  <label for="ch05-alpha-slider">α = <span id="ch05-alpha-value">0.50</span></label>
+  <input id="ch05-alpha-slider" type="range" min="0.01" max="2.00" value="0.50" step="0.01" style="width: 100%; max-width: 520px;">
+  <div id="ch05-ngram-plot" class="plotly-demo" style="height: 430px;"></div>
+  <div id="ch05-ngram-summary" style="font-family: system-ui, sans-serif; margin-top: 0.75rem;"></div>
+</div>
+
+<script>
+(function() {
+  function ensurePlotly(callback) {
+    if (window.Plotly) {
+      callback();
+      return;
+    }
+    var script = document.createElement("script");
+    script.src = "https://cdn.plot.ly/plotly-2.35.2.min.js";
+    script.onload = callback;
+    document.head.appendChild(script);
+  }
+
+  function initialize() {
+    var vocab = ["</s>", "from", "learn", "predict", "representations", "tokens", "uses", "probability", "language", "data", "neural", "statistical"];
+    var counts = {
+      "</s>": 0,
+      "from": 0,
+      "learn": 3,
+      "predict": 2,
+      "representations": 0,
+      "tokens": 0,
+      "uses": 0,
+      "probability": 0,
+      "language": 0,
+      "data": 0,
+      "neural": 0,
+      "statistical": 0
+    };
+    var total = 5;
+
+    var slider = document.getElementById("ch05-alpha-slider");
+    var alphaValue = document.getElementById("ch05-alpha-value");
+    var summary = document.getElementById("ch05-ngram-summary");
+
+    function update() {
+      var alpha = parseFloat(slider.value);
+      alphaValue.textContent = alpha.toFixed(2);
+      var denom = total + alpha * vocab.length;
+      var probs = vocab.map(function(w) { return (counts[w] + alpha) / denom; });
+      var entropy = -probs.reduce(function(acc, p) { return acc + p * Math.log(p); }, 0);
+      var perplexity = Math.exp(entropy);
+
+      var zipped = vocab.map(function(w, i) { return {word: w, prob: probs[i], count: counts[w]}; });
+      zipped.sort(function(a, b) { return b.prob - a.prob; });
+
+      var words = zipped.map(function(z) { return z.word; });
+      var values = zipped.map(function(z) { return z.prob; });
+      var hover = zipped.map(function(z) {
+        return "token: " + z.word + "<br>count: " + z.count + "<br>probability: " + z.prob.toFixed(4);
+      });
+
+      Plotly.react("ch05-ngram-plot", [{
+        type: "bar",
+        x: words,
+        y: values,
+        text: values.map(function(v) { return v.toFixed(3); }),
+        textposition: "auto",
+        hovertext: hover,
+        hoverinfo: "text"
+      }], {
+        title: "Smoothed distribution P(next token | models)",
+        xaxis: {title: "next token"},
+        yaxis: {title: "probability", range: [0, Math.max(0.55, Math.max.apply(null, values) + 0.08)]},
+        margin: {l: 55, r: 25, t: 60, b: 90}
+      }, {responsive: true});
+
+      summary.innerHTML =
+        "<strong>Entropy:</strong> " + entropy.toFixed(3) + " nats" +
+        " &nbsp; <strong>Effective perplexity:</strong> " + perplexity.toFixed(3) +
+        " &nbsp; <strong>Formula:</strong> (count + α) / (total + α|V|)";
+    }
+
+    slider.addEventListener("input", update);
+    update();
+  }
+
+  ensurePlotly(initialize);
+})();
+</script>
+```
+
+The key mathematical pattern is shrinkage.  When $\alpha$ is small, the distribution is close to the empirical count distribution.  When $\alpha$ is large, the distribution moves toward uniform.
+
+## Sampling text from an $n$-gram model
+
+A fitted $n$-gram model is generative.  Starting with boundary tokens, repeatedly sample the next token from
+
+$$
+p(\cdot\mid h_t).
+$$
+
+Then update the context and continue until the end token appears.
+
+### Python example: bigram generation
+
+```{python}
+def sample_next(distribution):
+    words = list(distribution.keys())
+    probs = list(distribution.values())
+    return random.choices(words, weights=probs, k=1)[0]
+
+def generate_ngram(n, vocab, context_counts, next_counts, alpha=0.5, max_steps=20, seed=7):
+    random.seed(seed)
+    context = tuple(["<s>"] * (n - 1))
+    generated = []
+
+    for _ in range(max_steps):
+        dist = next_token_distribution(context, vocab, context_counts, next_counts, alpha=alpha)
+        word = sample_next(dist)
+        if word == "</s>":
+            break
+        generated.append(word)
+        if n > 1:
+            context = tuple((list(context) + [word])[-(n - 1):])
+
+    return " ".join(generated)
+
+for seed in range(5):
+    print(generate_ngram(2, vocab, context_counts, next_counts, alpha=0.3, seed=seed))
+```
+
+The generated text may be grammatical in small fragments, but it often lacks long-range coherence.  This is a mathematical consequence of the short-context assumption.
+
+## Comparing unigram, bigram, and trigram models
+
+A unigram model assumes tokens are independent:
+
+$$
+p(w_{1:T})\approx \prod_{t=1}^{T}p(w_t).
+$$
+
+A bigram model keeps one previous token:
+
+$$
+p(w_{1:T})\approx \prod_{t=1}^{T}p(w_t\mid w_{t-1}).
+$$
+
+A trigram model keeps two previous tokens:
+
+$$
+p(w_{1:T})\approx \prod_{t=1}^{T}p(w_t\mid w_{t-2},w_{t-1}).
+$$
+
+As $n$ increases, the model can represent richer local structure.  But the number of possible contexts grows as
+
+$$
+|V|^{n-1}.
+$$
+
+This creates a bias-variance tradeoff.
+
+| Model | Context length | Strength | Weakness |
+|---|---:|---|---|
+| unigram | 0 | stable estimates | ignores order |
+| bigram | 1 | captures local transitions | limited memory |
+| trigram | 2 | captures short phrases | sparse counts |
+| larger $n$ | $n-1$ | more context | severe sparsity |
+
+::: {.math-card}
+**Bias-variance viewpoint.**  Small $n$ gives high bias because the model is too simple.  Large $n$ can give high variance because many contexts have few or no observations.  Smoothing partially controls variance but cannot fully solve the curse of dimensionality.
+:::
+
+## Backoff and interpolation
+
+Add-$\alpha$ smoothing is simple but not always strong enough.  Two common ideas are backoff and interpolation.
+
+### Backoff
+
+If a trigram context is rare or unseen, use a lower-order model:
+
+$$
+p(w_t\mid w_{t-2},w_{t-1})
+\quad \longrightarrow \quad
+p(w_t\mid w_{t-1})
+\quad \longrightarrow \quad
+p(w_t).
+$$
+
+The model backs off from specific context to more general context.
+
+### Interpolation
+
+Interpolation combines several orders:
+
+$$
+p(w_t\mid w_{t-2},w_{t-1})
+=
+\lambda_3 p_3(w_t\mid w_{t-2},w_{t-1})
++
+\lambda_2 p_2(w_t\mid w_{t-1})
++
+\lambda_1 p_1(w_t),
+$$
+
+where
+
+$$
+\lambda_1,\lambda_2,\lambda_3\geq 0,
+\qquad
+\lambda_1+\lambda_2+\lambda_3=1.
+$$
+
+This is a convex combination of probability distributions.  It is mathematically similar to ensemble methods and shrinkage estimators.
+
+## Matrix viewpoint for bigram models
+
+For a vocabulary of size $d$, a bigram model can be represented by a transition matrix
+
+$$
+P\in R^{d\times d},
+$$
+
+where
+
+$$
+P_{ij}=P(W_t=v_j\mid W_{t-1}=v_i).
+$$
+
+Each row is a probability vector:
+
+$$
+P_{ij}\geq 0,
+\qquad
+\sum_{j=1}^{d}P_{ij}=1.
+$$
+
+Thus $P$ is a row-stochastic matrix.  A distribution $\pi_t$ over the current token evolves by
+
+$$
+\pi_{t+1}=\pi_t P.
+$$
+
+This connects bigram language modeling to finite Markov chains.
+
+### Python example: transition matrix
+
+```{python}
+# Build a smoothed bigram transition matrix over the full vocabulary.
+# Using the full vocabulary makes each row a probability vector.
+selected = vocab
+index = {word: i for i, word in enumerate(selected)}
+alpha = 0.2
+
+P = []
+for u in selected:
+    row = []
+    context = (u,)
+    denom = context_counts[context] + alpha * len(selected)
+    for v in selected:
+        row.append((next_counts[context][v] + alpha) / denom)
+    P.append(row)
+
+print("Rows approximately sum to 1:")
+for word, row in list(zip(selected, P))[:8]:
+    print(f"{word:12s} row sum = {sum(row):.6f}")
+
+print("\nTransition probability P(models -> learn):")
+print(P[index["models"]][index["learn"]])
+```
+
+The transition matrix view is useful because it exposes the connection between NLP and stochastic processes.
+
+## Worked hand calculation
+
+Consider the corpus consisting of two sentences:
+
+```text
+<s> a b </s>
+<s> a c </s>
+```
+
+The bigram counts after context `a` are
+
+$$
+C(a,b)=1,
+\qquad
+C(a,c)=1,
+\qquad
+C(a)=2.
+$$
+
+With no smoothing,
+
+$$
+\widehat p(b\mid a)=\frac{1}{2},
+\qquad
+\widehat p(c\mid a)=\frac{1}{2}.
+$$
+
+If the vocabulary is
+
+$$
+V=\{a,b,c,d,\langle/ s\rangle\},
+$$
+
+then $|V|=5$.  With add-$\alpha$ smoothing and $\alpha=1$,
+
+$$
+\widehat p_1(b\mid a)=\frac{1+1}{2+5}=\frac{2}{7},
+$$
+
+$$
+\widehat p_1(c\mid a)=\frac{2}{7},
+$$
+
+and the unseen word $d$ receives
+
+$$
+\widehat p_1(d\mid a)=\frac{0+1}{2+5}=\frac{1}{7}.
+$$
+
+This example shows both the benefit and cost of smoothing: unseen events get nonzero probability, but observed events lose some probability mass.
+
+## AI-assisted learning component
+
+AI systems can be helpful for studying $n$-gram models, but they should be used as mathematical assistants rather than answer engines.
+
+### Prompt 1: audit an assumption
+
+```text
+I am studying n-gram language models. Explain the Markov assumption in a bigram model. Give one example where it works reasonably well and one example where it fails because of long-range dependence. Do not use code.
+```
+
+After reading the response, check whether the explanation distinguishes clearly between an exact identity and an approximation.
+
+### Prompt 2: verify a derivation
+
+```text
+Derive the maximum likelihood estimator for P(v | h) in an n-gram model using a Lagrange multiplier. Use counts C(h,v). Then explain why the estimator is undefined when C(h)=0.
+```
+
+You should verify that the final answer is
+
+$$
+\widehat p(v\mid h)=\frac{C(h,v)}{C(h)}.
+$$
+
+### Prompt 3: critique smoothing
+
+```text
+In an n-gram model, add-alpha smoothing gives P_alpha(v | h) = (C(h,v)+alpha)/(C(h)+alpha |V|). Explain this formula as shrinkage toward the uniform distribution. What problem does it solve, and what new problem can it introduce?
+```
+
+A strong answer should mention zero probabilities, probability mass redistribution, and the fact that large vocabularies can make add-one smoothing too strong.
+
+### Prompt 4: connect to modern language models
+
+```text
+Compare an n-gram language model and a transformer language model from a mathematical point of view. Focus on how each estimates P(w_t | context), how the context is represented, and why transformers can use longer-range dependencies.
+```
+
+This helps students see why Chapter 5 belongs in a modern NLP book rather than only in a historical survey.
+
+## Mathematical summary
+
+The main formulas of this chapter are:
+
+$$
+P(w_{1:T})
+=
+\prod_{t=1}^{T}P(w_t\mid w_{1:t-1})
+$$
+
+for the exact chain rule,
+
+$$
+P(w_t\mid w_{1:t-1})
+\approx
+P(w_t\mid w_{t-n+1:t-1})
+$$
+
+for the $n$-gram Markov approximation,
+
+$$
+\widehat p(v\mid h)=\frac{C(h,v)}{C(h)}
+$$
+
+for maximum likelihood estimation,
+
+$$
+\widehat p_\alpha(v\mid h)=\frac{C(h,v)+\alpha}{C(h)+\alpha |V|}
+$$
+
+for add-$\alpha$ smoothing, and
+
+$$
+\operatorname{Perplexity}
+=
+\exp\left(-\frac{1}{N}\sum_{i=1}^{N}\log p_i\right)
+$$
+
+for evaluation.
+
+## Exercises
+
+### Conceptual exercises
+
+1. Explain in your own words why the exact chain rule is not enough to build a practical language model.
+2. What is the difference between a bigram model and a trigram model?
+3. Why does increasing $n$ reduce bias but increase variance?
+4. Why can an unseen bigram force an entire sentence to have probability zero?
+5. Explain add-$\alpha$ smoothing as a convex combination of the empirical distribution and the uniform distribution.
+6. Why is perplexity related to average uncertainty?
+7. Give an example of a sentence where a bigram model misses important long-range information.
+
+### Mathematical exercises
+
+1. Let $C(h,v_1)=3$, $C(h,v_2)=2$, and $C(h,v_3)=0$.  Compute the MLE probabilities.
+2. For the same counts, compute add-one smoothed probabilities.
+3. For the same counts, compute add-$0.5$ smoothed probabilities.
+4. Prove that $\widehat p_\alpha(\cdot\mid h)$ sums to $1$.
+5. Derive the MLE estimator for $p(v\mid h)$ using a Lagrange multiplier.
+6. Suppose a model assigns probabilities $0.5,0.25,0.1,0.4$ to four correct next tokens.  Compute the average negative log-likelihood and perplexity using natural logarithms.
+7. Show that a bigram transition matrix is row-stochastic.
+8. Suppose $\pi_t$ is a row vector distribution over tokens and $P$ is a bigram transition matrix.  Explain why $\pi_{t+1}=\pi_tP$ is again a probability distribution.
+
+### Python exercises
+
+1. Modify the code above to build a trigram model.
+2. Compare bigram and trigram perplexity on a small train/test split.
+3. Implement a function that returns the top $k$ most likely next tokens for a given context.
+4. Generate ten sentences using different values of $\alpha$.  Describe how the output changes.
+5. Implement interpolation between unigram and bigram probabilities.
+6. Build a heatmap of the bigram transition matrix for a selected vocabulary.
+7. Write a function that identifies contexts with the highest entropy.
+
+## Mini-project: small-domain language model
+
+Choose a small text domain, such as course descriptions, research abstracts, textbook section titles, or advising questions.  Build unigram, bigram, and trigram models.
+
+Your report should include:
+
+1. the tokenization rule;
+2. the vocabulary size;
+3. the number of observed contexts for each model order;
+4. several next-token predictions for selected contexts;
+5. generated text samples;
+6. perplexity on a held-out set;
+7. a discussion of where the Markov assumption succeeds and fails.
+
+For a mathematically stronger project, include the transition matrix for the bigram model and analyze row entropies.
+
+## Lab connection
+
+The corresponding computer lab should guide students through:
+
+- building $n$-gram counts from scratch;
+- deriving and implementing MLE probabilities;
+- implementing add-$\alpha$ smoothing;
+- computing sentence log-probability and perplexity;
+- generating text by sequential sampling;
+- visualizing smoothing effects with Plotly;
+- comparing unigram, bigram, and trigram models.
+
+This lab is an important bridge between probability theory and modern neural language modeling.  The next chapters will use the same probabilistic ideas in text classification and representation learning.
